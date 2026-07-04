@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EasyTraining</title>
+<link rel="stylesheet" href="css/styles.css">
+<style>
+#boot{display:flex;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;background:#080810;gap:16px}
+#boot-icon{font-size:3rem}
+#boot-text{color:#A0A0C0;font-size:.9rem;font-family:-apple-system,sans-serif}
+#boot-err{display:none;background:rgba(239,68,68,.15);border:1px solid #EF4444;border-radius:10px;padding:16px;max-width:500px;color:#EF4444;font-size:.82rem;line-height:1.6;white-space:pre-wrap;font-family:monospace;margin-top:12px}
+#root{height:100%}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div id="boot-icon">⚡</div>
+  <div id="boot-text">Ładowanie EasyTraining...</div>
+  <div id="boot-err" id="boot-err"></div>
+</div>
+<div id="root"></div>
+
+<!-- Error handler before scripts -->
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  var el = document.getElementById('boot-err');
+  el.style.display = 'block';
+  el.textContent = 'Błąd JavaScript:\n' + msg + '\nPlik: ' + src + '\nLinia: ' + line;
+  document.getElementById('boot-text').textContent = 'Błąd ładowania — otwórz konsolę (F12) po szczegóły.';
+};
+window.ET = {};
+</script>
+
+<!-- React & ReactDOM (local, works offline and via file://) -->
+<script src="js/vendor/react.development.js"></script>
+<script src="js/vendor/react-dom.development.js"></script>
+
+<!-- Foundation -->
+<script src="js/store.js?v=6"></script>
+<script src="js/navigation.js?v=7"></script>
+<script src="js/components.js?v=4"></script>
+
+<!-- AI Engine (offline expert system) -->
+<script src="js/ai-engine.js?v=1"></script>
+
+<!-- Baza ćwiczeń (190 pozycji) -->
+<script src="js/exercises-db.js?v=1"></script>
+
+<!-- AI Coach (reguły) + skład ciała -->
+<script src="js/ai-coach.js?v=1"></script>
+
+<!-- Modules -->
+<script src="js/dashboard.js?v=4"></script>
+<script src="js/strength.js?v=12"></script>
+<script src="js/running.js?v=9"></script>
+<script src="js/sleep.js?v=4"></script>
+<script src="js/sauna.js?v=5"></script>
+<script src="js/measurements.js?v=9"></script>
+<script src="js/diet.js"></script>
+<script src="js/supplements-db.js?v=2"></script>
+<script src="js/supplements.js?v=3"></script>
+<script src="js/wellbeing.js?v=2"></script>
+<script src="js/pain.js?v=4"></script>
+<script src="js/calendar.js?v=3"></script>
+<script src="js/competitions.js"></script>
+<script src="js/goals.js?v=4"></script>
+<script src="js/statistics.js?v=7"></script>
+<script src="js/photos.js?v=3"></script>
+<script src="js/history.js?v=2"></script>
+<script src="js/library.js?v=1"></script>
+<script src="js/physio.js?v=1"></script>
+<script src="js/backup.js?v=2"></script>
+<script src="js/planner.js?v=2"></script>
+<script src="js/acwr.js?v=1"></script>
+<script src="js/assessment.js?v=1"></script>
+<script src="js/ai.js"></script>
+<script src="js/profile.js?v=2"></script>
+<script src="js/dev-panel.js?v=2"></script>
+<script src="js/intervals.js"></script>
+<script src="js/journal.js?v=2"></script>
+<script src="js/habits.js"></script>
+
+<!-- App bootstrap (last) -->
+<script src="js/app.js?v=8"></script>
+
+</body>
+</html>

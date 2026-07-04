@@ -1,0 +1,1547 @@
+(function() {
+  'use strict';
+  window.ET = window.ET || {};
+  var _h = React.createElement;
+
+  // ── PLANY TRENINGOWE (z Excela) ──────────────────────────────────────────
+  var WORKOUT_PLANS = [
+    {
+      id:'pon_gora_sila', name:'Góra / Siła', icon:'💪', day:'Poniedziałek',
+      color:'var(--a)', desc:'Wyciskanie 5×5 · Podciąganie · Wiosło', badge:'badge-blue',
+      warmup:[
+        { n:'2 min Cardio', note:'Lekki trucht lub rower' },
+        { n:'Band Pull Apart', s:2, r:15, note:'Łopatki do tyłu!' },
+        { n:'Rotacja gumą', s:2, r:12 },
+        { n:'Scapular Push Ups', s:2, r:10 },
+      ],
+      exercises:[
+        { name:'Wyciskanie sztangi',    plan:'5×5',   sets:5, reps:5,  weight:72.5, rir:2, tempo:'3-1-1',   rest:180, prog:'+2.5 kg/tydz' },
+        { name:'Podciąganie + Maszyna', plan:'5 serii', sets:5, reps:6,  weight:0,    rir:2, tempo:'kontrola', rest:120, prog:'mniej pomocy co tydz' },
+        { name:'Wyciskanie hantli skos',plan:'3×8',   sets:3, reps:8,  weight:16,   rir:2, tempo:'3-1-1',   rest:90,  prog:'+2 gdy 10/10/10' },
+        { name:'Wiosło maszyna',        plan:'4×8',   sets:4, reps:8,  weight:50,   rir:2, tempo:'3-1-1',   rest:120, prog:'+2.5 kg/tydz' },
+        { name:'Face pull',             plan:'3×15',  sets:3, reps:15, weight:17,   rir:2, tempo:'kontrola', rest:60,  prog:'+powt lub ciężar' },
+        { name:'Biceps hantle',         plan:'3×10',  sets:3, reps:10, weight:10,   rir:2, tempo:'kontrola', rest:60,  prog:'+2 kg/tydz' },
+      ],
+      cooldown:[
+        { n:'Rozciąganie klatki (ościeżnica)', d:'60s' },
+        { n:'Rozciąganie bicepsa', d:'30s/stronę' },
+        { n:'Rotacja barków', d:'10 krążeń każdy' },
+        { n:'Rozciąganie karku', d:'30s/stronę' },
+      ]
+    },
+    {
+      id:'sr_dol_core', name:'Dół + Core', icon:'🦵', day:'Środa',
+      color:'var(--green)', desc:'Hip Thrust · RDL · Split Squat · Plank', badge:'badge-green',
+      warmup:[
+        { n:'Rower', note:'2 min lekko' },
+        { n:'Krążenia bioder', r:10 },
+        { n:'Glute bridge', s:2, r:15 },
+        { n:'Hip hinge drill', s:2, r:10 },
+        { n:'Dead bug', s:2, r:10 },
+        { n:'RDL lekko', s:2, r:8, note:'40×8 / 50×5' },
+      ],
+      exercises:[
+        { name:'Hip Thrust',    plan:'4×10', sets:4, reps:10, weight:40, rir:2, tempo:'pauza',   rest:90,  prog:'+10 kg/tydz' },
+        { name:'RDL',           plan:'3×8',  sets:3, reps:8,  weight:60, rir:2, tempo:'3-1-1',  rest:90,  prog:'+5 kg/tydz' },
+        { name:'Split Squat',   plan:'3×8',  sets:3, reps:8,  weight:10, rir:2, tempo:'kontrola', rest:60, prog:'+2 kg/tydz' },
+        { name:'Plank',         plan:'3×40s', sets:3, reps:40, weight:0, rir:2, tempo:'izometria', rest:45, prog:'+5s/tydz' },
+        { name:'Dead Bug',      plan:'3×10', sets:3, reps:10, weight:0,  rir:2, tempo:'kontrola', rest:30, prog:'+powt' },
+      ],
+      cooldown:[
+        { n:'Hip flexor stretch', d:'60s/stronę' },
+        { n:'Piriformis (pozycja gołębia)', d:'60s/stronę' },
+        { n:'Rozciąganie tylnej uda', d:'45s/stronę' },
+        { n:'Rozciąganie łydek', d:'30s/stronę' },
+      ]
+    },
+    {
+      id:'pt_gora_hiper', name:'Góra / Hipertrofia', icon:'🏋️', day:'Piątek',
+      color:'var(--purple)', desc:'Hantle · Ściąganie · Wiosło · Biceps/Triceps', badge:'badge-purple',
+      warmup:[
+        { n:'Cardio', note:'2 min lekki trucht' },
+        { n:'Krążenia ramion', s:2, r:15 },
+        { n:'Rotacja gumą', s:2, r:12 },
+        { n:'Band pull apart', s:2, r:15 },
+        { n:'Y-raise', s:2, r:12 },
+        { n:'Lekka seria hantli', s:2, r:12, note:'Rozgrzewkowe' },
+      ],
+      exercises:[
+        { name:'Hantle skos',       plan:'3×10', sets:3, reps:10, weight:20, rir:2, tempo:'3-1-1',  rest:75, prog:'+2 kg/tydz' },
+        { name:'Ściąganie drążka',  plan:'3×10', sets:3, reps:10, weight:55, rir:2, tempo:'kontrola', rest:75, prog:'+2.5 kg' },
+        { name:'Wiosło jednorącz',  plan:'3×12', sets:3, reps:12, weight:22, rir:2, tempo:'kontrola', rest:75, prog:'+2 kg' },
+        { name:'Rozpiętki',         plan:'3×15', sets:3, reps:15, weight:8,  rir:2, tempo:'wolno',   rest:60, prog:'+powt' },
+        { name:'Biceps',            plan:'3×12', sets:3, reps:12, weight:10, rir:2, tempo:'kontrola', rest:60, prog:'+2 kg' },
+        { name:'Triceps',           plan:'3×12', sets:3, reps:12, weight:20, rir:2, tempo:'kontrola', rest:60, prog:'+2.5 kg' },
+        { name:'Y-raise',           plan:'3×15', sets:3, reps:15, weight:3,  rir:2, tempo:'wolno',   rest:45, prog:'+powt' },
+      ],
+      cooldown:[
+        { n:'Rozciąganie klatki (ościeżnica)', d:'60s' },
+        { n:'Rozciąganie bicepsa', d:'30s/stronę' },
+        { n:'Rozciąganie tricepsa (za głową)', d:'30s/stronę' },
+        { n:'Rotacja barków', d:'10 krążeń każdy' },
+      ]
+    },
+    {
+      id:'nd_fullbody', name:'FullBody', icon:'⚡', day:'Niedziela',
+      color:'var(--yellow)', desc:'Pulldown · Hip Thrust · Step-up · Barki', badge:'badge-yellow',
+      warmup:[
+        { n:'Cardio', note:'2 min trucht' },
+        { n:'Krążenia bioder', r:10 },
+        { n:'Krążenia barków', r:10 },
+        { n:'Glute bridge', s:2, r:12 },
+        { n:'Face pull', s:2, r:15, note:'ŁOPATKI!' },
+        { n:'Lekka seria każdego ćwiczenia', note:'Rozgrzewkowe powtórzenia' },
+      ],
+      exercises:[
+        { name:'Straight Arm Pulldown', plan:'3×12-15', sets:3, reps:12, weight:0,  rir:2, tempo:'Izolacja',  rest:60, prog:'' },
+        { name:'Hip Thrust lekko',      plan:'3×12',    sets:3, reps:12, weight:0,  rir:3, tempo:'kontrola', rest:60, prog:'-' },
+        { name:'Ściąganie drążka',      plan:'3×12',    sets:3, reps:12, weight:0,  rir:2, tempo:'kontrola', rest:60, prog:'po 12 +2.5 kg' },
+        { name:'Step-up',               plan:'3×10',    sets:3, reps:10, weight:10, rir:2, tempo:'kontrola', rest:60, prog:'+2 kg' },
+        { name:'Face Pull',             plan:'3×15',    sets:3, reps:15, weight:15, rir:2, tempo:'kontrola', rest:45, prog:'+powt' },
+        { name:'Unoszenia bokiem',      plan:'3×15',    sets:3, reps:15, weight:5,  rir:2, tempo:'wolno',    rest:45, prog:'+powt' },
+        { name:'Plank',                 plan:'2 serie', sets:2, reps:40, weight:0,  rir:2, tempo:'izometria', rest:30, prog:'+czas' },
+      ],
+      cooldown:[
+        { n:'Hip flexor stretch', d:'60s/stronę' },
+        { n:'Rozciąganie klatki', d:'60s' },
+        { n:'Rotacja barków', d:'10 krążeń każdy' },
+        { n:'Rozciąganie karku', d:'30s/stronę' },
+        { n:'Rozciąganie łydek', d:'30s/stronę' },
+      ]
+    },
+  ];
+
+  // Udostępnij plany innym modułom (np. eksport CSV/XLSX)
+  ET.WORKOUT_PLANS = WORKOUT_PLANS;
+
+  var READINESS_FIELDS = [
+    { key:'willingness', label:'Chęć do treningu', opts:['😤 Bez chęci','😐 Ujdzie','💪 Pełna!'] },
+    { key:'state',       label:'Samopoczucie',      opts:['😞 Słabo','😐 Normalnie','😄 Świetnie'] },
+    { key:'fatigue',     label:'Zmęczenie',          opts:['😴 Bardzo zmęczony','😐 Umiarkowane','⚡ Brak zmęczenia'] },
+  ];
+
+  function calc1RM(w, r) { return (!w||!r) ? 0 : Math.round(w*(1+r/30)); }
+
+  function fmtMs(ms) {
+    var s = Math.round(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+    return (h>0 ? h+'h ' : '') + (m%60>0||h>0 ? (m%60)+'min ' : '') + (h===0 ? (s%60)+'s' : '');
+  }
+
+  // ── STEP 1: WYBÓR TRENINGU (PICKER SHEET) ────────────────────────────────
+  function WorkoutPicker(props) {
+    var plans = props.plans || WORKOUT_PLANS;
+    return _h(ET.Sheet, { open:true, onClose:props.onClose, title:'Wybierz trening' },
+      plans.map(function(plan) {
+        return _h('div', { key:plan.id,
+          style:{ display:'flex', alignItems:'center', gap:14, padding:'14px 0', borderBottom:'1px solid var(--b1)', cursor:'pointer' },
+          onClick:function(){ props.onSelect(plan); }
+        },
+          _h('div', { style:{ width:44, height:44, borderRadius:'var(--r2)', background:'var(--s3)', border:'1px solid var(--b1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.4rem', flexShrink:0 } }, plan.icon),
+          _h('div', { style:{ flex:1 } },
+            _h('div', { style:{ fontWeight:700 } }, plan.name),
+            _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:3 } }, plan.day + ' · ' + plan.desc)
+          ),
+          _h('div', { style:{ color:'var(--t3)', fontSize:'1.2rem' } }, '›')
+        );
+      })
+    );
+  }
+
+  // ── STEP 2: GOTOWOŚĆ ─────────────────────────────────────────────────────
+  function ReadinessStep(props) {
+    var rd = props.readiness, setRd = props.setReadiness;
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
+        _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
+        _h('div', null,
+          _h('h1', { style:{ fontSize:'1.2rem', fontWeight:700 } }, props.plan.icon + ' ' + props.plan.name),
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 1 z 4 — Ocena gotowości')
+        )
+      ),
+
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:16, fontSize:'.88rem', color:'var(--t2)' } }, '📊 Jak się dziś czujesz?'),
+        READINESS_FIELDS.map(function(f) {
+          return _h('div', { key:f.key, style:{ marginBottom:16 } },
+            _h('div', { style:{ fontSize:'.72rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 } }, f.label),
+            _h('div', { style:{ display:'flex', gap:6 } },
+              f.opts.map(function(opt, i) {
+                var active = rd[f.key] === (i+1);
+                return _h('button', { key:i,
+                  style:{ flex:1, padding:'10px 4px', borderRadius:'var(--r2)', border:'1px solid '+(active?'var(--a)':'var(--b1)'), background:active?'var(--a-dim)':'var(--s3)', color:active?'var(--a-light)':'var(--t2)', cursor:'pointer', fontSize:'.72rem', fontWeight:600, lineHeight:1.3, textAlign:'center', transition:'all .15s' },
+                  onClick:function(){ var o={}; o[f.key]=i+1; setRd(Object.assign({},rd,o)); }
+                }, opt);
+              })
+            )
+          );
+        })
+      ),
+
+      _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%' }, onClick:props.onNext }, '→ Dalej: Rozgrzewka')
+    );
+  }
+
+  // ── STEP 3: ROZGRZEWKA (format jak trening) ──────────────────────────────
+  function WarmupStep(props) {
+    // Normalize warmup items to exercise-card format
+    var warmupExs = React.useState(function() {
+      return props.plan.warmup.map(function(item, i) {
+        var sets = item.s || 1;
+        var reps = item.r || 0;
+        return {
+          id: i, name: item.n, note: item.note || '',
+          expanded: true,
+          setsData: Array.from({ length:sets }, function(_,j){
+            return { id:j, reps:reps, done:false };
+          })
+        };
+      });
+    });
+    var exs = warmupExs[0]; var setExs = warmupExs[1];
+
+    function toggleSet(exId, sId) {
+      setExs(function(es){ return es.map(function(ex){
+        if (ex.id!==exId) return ex;
+        return Object.assign({},ex,{ setsData:ex.setsData.map(function(s){
+          return s.id===sId ? Object.assign({},s,{done:!s.done}) : s;
+        })});
+      }); });
+    }
+
+    function addWarmupSet(exId) {
+      setExs(function(es){ return es.map(function(ex){
+        if (ex.id!==exId) return ex;
+        var last = ex.setsData.slice(-1)[0];
+        return Object.assign({},ex,{ setsData:ex.setsData.concat([{ id:Date.now(), reps:last&&last.reps||10, done:false }]) });
+      }); });
+    }
+
+    function removeWarmupSet(exId, sId) {
+      setExs(function(es){ return es.map(function(ex){
+        if (ex.id!==exId) return ex;
+        if (ex.setsData.length <= 1) return ex;
+        return Object.assign({},ex,{ setsData:ex.setsData.filter(function(s){ return s.id!==sId; }) });
+      }); });
+    }
+
+    var doneSets  = exs.reduce(function(t,e){ return t+e.setsData.filter(function(s){ return s.done; }).length; },0);
+    var totalSets = exs.reduce(function(t,e){ return t+e.setsData.length; },0);
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:12 } },
+        _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
+        _h('div', { style:{ flex:1 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'1rem' } }, '🔥 Rozgrzewka'),
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 2 z 5 — '+props.plan.name)
+        ),
+        _h('button', { className:'btn btn-primary btn-sm', onClick:props.onNext }, 'Start →')
+      ),
+
+      _h('div', { style:{ marginBottom:12 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', marginBottom:4 } },
+          _h('span', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, 'Postęp'),
+          _h('span', { style:{ fontSize:'.72rem', color:'var(--a-light)', fontWeight:700 } }, doneSets+'/'+totalSets+' serii')
+        ),
+        _h(ET.ProgressBar, { value:totalSets?doneSets/totalSets*100:0 })
+      ),
+
+      exs.map(function(ex) {
+        return _h('div', { key:ex.id, className:'exercise-card' },
+          _h('div', { className:'exercise-card-head',
+            onClick:function(){ setExs(function(es){ return es.map(function(e){ return e.id===ex.id?Object.assign({},e,{expanded:!e.expanded}):e; }); }); }
+          },
+            _h('div', { style:{ flex:1 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, ex.name),
+              ex.note && _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:2 } }, ex.note)
+            ),
+            _h('span', { style:{ color:'var(--t3)' } }, ex.expanded?'▴':'▾')
+          ),
+          ex.expanded && _h('div', { style:{ padding:'0 12px 12px' } },
+            _h('table', { className:'sets-table' },
+              _h('thead', null, _h('tr', null, _h('th',null,'#'), _h('th',null,'Powt.'), _h('th',null,'✓'), _h('th',null,''))),
+              _h('tbody', null,
+                ex.setsData.map(function(s,si){
+                  return _h('tr', { key:s.id, style:{ opacity:s.done?.5:1 } },
+                    _h('td', { style:{ color:'var(--t3)', fontSize:'.75rem' } }, si+1),
+                    _h('td', null, s.reps ? s.reps+' powt.' : 'Dowolnie'),
+                    _h('td', null, _h('div', { className:'set-done-btn'+(s.done?' done':''),
+                      onClick:function(){ toggleSet(ex.id,s.id); }
+                    }, s.done?'✓':'○')),
+                    _h('td', null, _h('button', { style:{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.85rem', padding:'2px 4px', lineHeight:1 }, onClick:function(){ removeWarmupSet(ex.id,s.id); } }, '✕'))
+                  );
+                })
+              )
+            ),
+            _h('button', { className:'btn btn-ghost btn-sm', style:{ marginTop:6, width:'100%', borderStyle:'dashed', fontSize:'.75rem' }, onClick:function(){ addWarmupSet(ex.id); } }, '+ Seria')
+          )
+        );
+      }),
+
+      _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%', marginTop:10 }, onClick:props.onNext },
+        doneSets===totalSets ? '→ Dalej: Trening' : '→ Pomiń resztę i zacznij trening'
+      )
+    );
+  }
+
+  // ── SPRAWDZENIE CELÓW PO TRENINGU ─────────────────────────────────────────
+  function GoalCheckStep(props) {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var assignedGoals = (store.goals||[]).filter(function(g){
+      return g.progress < 100 && (g.workouts||[]).indexOf(props.plan.id) !== -1;
+    });
+    var pg = React.useState(function(){
+      var m = {};
+      assignedGoals.forEach(function(g){ m[g.id] = g.progress; });
+      return m;
+    });
+    var progMap = pg[0]; var setProgMap = pg[1];
+
+    function save() {
+      var ids = Object.keys(progMap);
+      if (ids.length > 0) {
+        update(function(s){ return Object.assign({},s,{ goals:(s.goals||[]).map(function(g){
+          return progMap[g.id] !== undefined ? Object.assign({},g,{progress:progMap[g.id]}) : g;
+        })}); });
+      }
+      props.onNext();
+    }
+
+    if (assignedGoals.length === 0) {
+      return _h('div', { className:'fade-in' },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
+          _h('div', null,
+            _h('h1', { style:{ fontSize:'1.1rem', fontWeight:700 } }, '🎯 Postęp celów'),
+            _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 5 z 6')
+          )
+        ),
+        _h(ET.Placeholder, { icon:'🎯', title:'Brak przypisanych celów', desc:'Możesz przypisać cele do treningów w zakładce Cele.' }),
+        _h('button', { className:'btn btn-primary', style:{ width:'100%', marginTop:10 }, onClick:props.onNext }, '→ Dalej: Samopoczucie')
+      );
+    }
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
+        _h('div', null,
+          _h('h1', { style:{ fontSize:'1.1rem', fontWeight:700 } }, '🎯 Postęp celów'),
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 5 z 6 — '+assignedGoals.length+' przypisanych celów')
+        )
+      ),
+
+      _h('div', { className:'card card-accent', style:{ marginBottom:14, fontSize:'.82rem', color:'var(--t2)' } },
+        '💡 Zaktualizuj postęp w celach przypisanych do tego treningu.'
+      ),
+
+      assignedGoals.map(function(g) {
+        var tc = { short:'var(--green)', medium:'var(--a)', long:'var(--purple)' }[g.term]||'var(--a)';
+        var val = progMap[g.id] !== undefined ? progMap[g.id] : g.progress;
+        return _h('div', { key:g.id, className:'card', style:{ marginBottom:10 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.9rem', marginBottom:4 } }, g.title),
+          g.target && _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginBottom:8 } }, 'Cel: '+g.target+' '+g.unit),
+          _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 } },
+            _h(ET.ProgressBar, { value:val, color:tc }),
+            _h('div', { style:{ fontSize:'1.1rem', fontWeight:700, color:tc, marginLeft:12, flexShrink:0 } }, val+'%')
+          ),
+          _h('div', { className:'slider-wrap' },
+            _h('input', { type:'range', min:0, max:100, value:val,
+              onChange:function(e){ setProgMap(function(m){ var o={}; o[g.id]=+e.target.value; return Object.assign({},m,o); }); }
+            })
+          )
+        );
+      }),
+
+      _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%', marginTop:6 }, onClick:save }, '→ Dalej: Samopoczucie po treningu')
+    );
+  }
+
+  // ── KROK SAMOPOCZUCIA ────────────────────────────────────────────────────
+  function WellbeingStep(props) {
+    var su = ET.useStore(); var update = su.update;
+    var wv = React.useState(Object.assign({}, ET.WellbeingDefaults));
+    var wbValues = wv[0]; var setWbValues = wv[1];
+    function upWb(k,v){ setWbValues(function(p){ var o={}; o[k]=v; return Object.assign({},p,o); }); }
+
+    function save() {
+      ET.saveWellbeingEntry(update, wbValues, props.tag || '');
+      props.onNext(wbValues);
+    }
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:16 } },
+        props.onBack && _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
+        _h('div', null,
+          _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em' } }, props.stepLabel || ''),
+          _h('h1', { style:{ fontSize:'1.1rem', fontWeight:700, marginTop:2 } }, props.title || 'Samopoczucie')
+        )
+      ),
+      _h(ET.WellbeingForm, {
+        values: wbValues,
+        onChange: upWb,
+        label: '',
+        saveLabel: props.saveLabel || 'Dalej →',
+        onSave: save,
+        onSkip: props.onSkip ? function(){ props.onSkip(); } : null
+      })
+    );
+  }
+
+  // ── STEP 4: TRENING WŁAŚCIWY ─────────────────────────────────────────────
+  function StrengthSession(props) {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+    var plan = props.plan;
+
+    var t0 = React.useRef(Date.now());
+    var el = React.useState(0); var elapsed = el[0], setElapsed = el[1];
+    var rl = React.useState(0); var restLeft = rl[0], setRestLeft = rl[1];
+    var sa = React.useState(false); var showAdd = sa[0], setShowAdd = sa[1];
+    var tr = React.useState(0); var totalRestMs = tr[0], setTotalRestMs = tr[1];
+    var restStartRef = React.useRef(null);
+
+    var ne = React.useState({ name:'', sets:3, reps:10, weight:0, tempo:'2-1-1', rpe:7, rir:3, rest:90 });
+    var newEx = ne[0], setNewEx = ne[1];
+
+    var es = React.useState(function() {
+      var overrides = (store.planSuggestions||{})[plan.id]||{};
+      return plan.exercises.map(function(e, i) {
+        var ov = overrides[e.name]||{};
+        var sets  = ov.sets   || e.sets;
+        var reps  = ov.reps   || e.reps;
+        var weight= ov.weight != null ? ov.weight : (e.weight||0);
+        return Object.assign({}, e, { id:i+1, expanded:true, sets:sets, reps:reps, weight:weight,
+          setsData:Array.from({ length:sets }, function(_,j){ return { id:j, reps:reps, weight:weight, done:false }; })
+        });
+      });
+    });
+    var exs = es[0], setExs = es[1];
+
+    // Elapsed timer
+    React.useEffect(function() {
+      var t = setInterval(function(){ setElapsed(Date.now()-t0.current); }, 1000);
+      return function(){ clearInterval(t); };
+    }, []);
+
+    // Rest countdown
+    React.useEffect(function() {
+      if (!restLeft) return;
+      var t = setTimeout(function(){
+        setRestLeft(function(r) {
+          var newR = Math.max(0, r-1);
+          if (newR === 0 && restStartRef.current) {
+            setTotalRestMs(function(prev){ return prev + (Date.now() - restStartRef.current); });
+            restStartRef.current = null;
+          }
+          return newR;
+        });
+      }, 1000);
+      return function(){ clearTimeout(t); };
+    }, [restLeft]);
+
+    function upSet(exId, sId, field, val) {
+      setExs(function(es) {
+        return es.map(function(ex) {
+          if (ex.id!==exId) return ex;
+          return Object.assign({}, ex, { setsData:ex.setsData.map(function(s) {
+            if (s.id!==sId) return s;
+            var v = field==='done' ? val : (parseFloat(val)||0);
+            var o={}; o[field]=v; return Object.assign({},s,o);
+          })});
+        });
+      });
+    }
+
+    function doneSet(exId, sId, rest) {
+      if (restStartRef.current) {
+        setTotalRestMs(function(p){ return p + (Date.now() - restStartRef.current); });
+      }
+      restStartRef.current = Date.now();
+      upSet(exId, sId, 'done', true);
+      setRestLeft(rest);
+      toast('Seria zaliczona! Przerwa '+rest+'s ⏳', 'success');
+    }
+
+    function skipRest() {
+      if (restStartRef.current) {
+        setTotalRestMs(function(p){ return p + (Date.now() - restStartRef.current); });
+        restStartRef.current = null;
+      }
+      setRestLeft(0);
+    }
+
+    function removeEx(exId) { setExs(function(es){ return es.filter(function(e){ return e.id!==exId; }); }); }
+
+    function addSeries(exId) {
+      setExs(function(es){ return es.map(function(e){
+        if (e.id!==exId) return e;
+        var last = e.setsData.slice(-1)[0];
+        return Object.assign({}, e, { setsData:e.setsData.concat([{ id:Date.now(), reps:last&&last.reps||10, weight:last&&last.weight||0, done:false }]) });
+      }); });
+    }
+
+    function removeSet(exId, sId) {
+      setExs(function(es){ return es.map(function(e){
+        if (e.id!==exId) return e;
+        if (e.setsData.length <= 1) return e;
+        return Object.assign({}, e, { setsData:e.setsData.filter(function(s){ return s.id!==sId; }) });
+      }); });
+    }
+
+    function addEx() {
+      if (!newEx.name) { toast('Podaj nazwę ćwiczenia', 'error'); return; }
+      setExs(function(es){
+        return es.concat([Object.assign({}, newEx, { id:Date.now(), expanded:true,
+          setsData:Array.from({ length:newEx.sets }, function(_,j){ return { id:j, reps:newEx.reps, weight:newEx.weight, done:false }; })
+        })]);
+      });
+      setShowAdd(false);
+      setNewEx({ name:'', sets:3, reps:10, weight:0, tempo:'2-1-1', rpe:7, rir:3, rest:90 });
+    }
+
+    function finish() {
+      var vol=0, totalReps=0;
+      var exData = exs.map(function(ex) {
+        var done = ex.setsData.filter(function(s){ return s.done; });
+        done.forEach(function(s){ vol+=(s.weight||0)*(s.reps||0); totalReps+=(s.reps||0); });
+        var best = done.reduce(function(b,s){ return calc1RM(s.weight,s.reps)>calc1RM(b&&b.weight,b&&b.reps)?s:b; }, null);
+        return Object.assign({}, ex, { e1rm:best?calc1RM(best.weight,best.reps):0 });
+      });
+      var prs = [];
+      exData.forEach(function(ex) {
+        var prevBest = (store.workouts||[]).reduce(function(best,w){
+          return Math.max(best, (w.exercises||[]).filter(function(e){ return e.name===ex.name; }).reduce(function(b,e){ return Math.max(b,e.e1rm||0); },0));
+        }, 0);
+        if (ex.e1rm > prevBest && ex.e1rm > 0) prs.push({ name:ex.name, e1rm:ex.e1rm });
+      });
+      var totalMs = Date.now() - t0.current;
+      var session = { id:Date.now(), name:plan.name, planId:plan.id, date:ET.dstr(), duration:totalMs, restMs:totalRestMs, workMs:totalMs-totalRestMs, exercises:exData, volume:vol, totalReps:totalReps, prs:prs, readiness:props.readiness };
+      update(function(s){
+        var n = Object.assign({},s,{ workouts:[session].concat(s.workouts) });
+        return ET.syncGoals ? ET.syncGoals(n, 'workout', session) : n;
+      });
+      props.onFinish({ session:session, prs:prs });
+    }
+
+    var doneSets = exs.reduce(function(t,e){ return t+e.setsData.filter(function(s){ return s.done; }).length; },0);
+    var totalSets = exs.reduce(function(t,e){ return t+e.setsData.length; },0);
+    var elH=Math.floor(elapsed/3600000), elM=Math.floor(elapsed/60000)%60, elS=Math.floor(elapsed/1000)%60;
+    var elStr=(elH>0?elH+':':'')+String(elM).padStart(2,'0')+':'+String(elS).padStart(2,'0');
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:12, flexWrap:'wrap' } },
+        _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
+        _h('div', { style:{ flex:1 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'1rem' } }, plan.icon + ' ' + plan.name),
+          _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, 'Krok 3 z 4 — Trening właściwy')
+        ),
+        _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'6px 12px', fontSize:'.88rem', fontWeight:700, color:'var(--a-light)', fontVariantNumeric:'tabular-nums' } }, '⏱ '+elStr),
+        _h('button', { className:'btn btn-primary btn-sm', onClick:finish }, 'Zakończ →')
+      ),
+
+      _h('div', { style:{ marginBottom:12 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', marginBottom:4 } },
+          _h('span', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, 'Postęp'),
+          _h('span', { style:{ fontSize:'.72rem', color:'var(--a-light)', fontWeight:700 } }, doneSets+'/'+totalSets+' serii')
+        ),
+        _h(ET.ProgressBar, { value:totalSets?doneSets/totalSets*100:0 })
+      ),
+
+      restLeft>0 && _h('div', { style:{ background:'var(--yellow-d)', border:'1px solid var(--yellow)', borderRadius:'var(--r2)', padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 } },
+        _h('div', null,
+          _h('div', { style:{ fontSize:'.7rem', color:'var(--yellow)', fontWeight:700 } }, '⏳ Przerwa'),
+          _h('div', { style:{ fontSize:'1.8rem', fontWeight:700, color:'var(--yellow)', fontVariantNumeric:'tabular-nums' } }, restLeft+'s')
+        ),
+        _h('div', { style:{ display:'flex', gap:5, flexWrap:'wrap' } },
+          [30,60,90,120,180].map(function(s){ return _h('button', { key:s, className:'btn btn-sm btn-ghost', onClick:function(){ setRestLeft(s); } }, s+'s'); }),
+          _h('button', { className:'btn btn-sm btn-ghost', style:{ color:'var(--red)' }, onClick:skipRest }, '✕')
+        )
+      ),
+
+      exs.map(function(ex) {
+        return _h('div', { key:ex.id, className:'exercise-card' },
+          _h('div', { className:'exercise-card-head', onClick:function(){ setExs(function(es){ return es.map(function(e){ return e.id===ex.id?Object.assign({},e,{expanded:!e.expanded}):e; }); }); } },
+            _h('div', { style:{ flex:1 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, ex.name),
+              _h('div', { style:{ display:'flex', gap:4, marginTop:3, flexWrap:'wrap' } },
+                _h('span', { className:'chip', style:{ fontSize:'.6rem' } }, ex.plan),
+                ex.tempo && ex.tempo !== '0' && _h('span', { className:'chip', style:{ fontSize:'.6rem' } }, 'Tempo '+ex.tempo),
+                ex.rir != null && _h('span', { className:'chip', style:{ fontSize:'.6rem' } }, 'RIR '+ex.rir),
+                _h('span', { className:'chip', style:{ fontSize:'.6rem', color:'var(--a-light)' } }, '1RM ~'+calc1RM(ex.setsData[0]&&ex.setsData[0].weight,ex.setsData[0]&&ex.setsData[0].reps)+' kg')
+              )
+            ),
+            _h('div', { style:{ display:'flex', gap:6, alignItems:'center', flexShrink:0 } },
+              _h('span', { style:{ fontSize:'.65rem', color:'var(--t3)' } }, ex.prog),
+              _h('button', { className:'btn btn-ghost btn-sm btn-icon', style:{ color:'var(--red)' }, onClick:function(e){ e.stopPropagation(); removeEx(ex.id); } }, '✕'),
+              _h('span', { style:{ color:'var(--t3)' } }, ex.expanded?'▴':'▾')
+            )
+          ),
+          ex.expanded && _h('div', { style:{ padding:'0 12px 12px' } },
+            _h('table', { className:'sets-table' },
+              _h('thead', null, _h('tr', null, _h('th',null,'#'), _h('th',null,'Powt.'), _h('th',null,'kg'), _h('th',null,'1RM'), _h('th',null,'✓'), _h('th',null,''))),
+              _h('tbody', null,
+                ex.setsData.map(function(s, si) {
+                  return _h('tr', { key:s.id, style:{ opacity:s.done?.5:1, transition:'opacity .2s' } },
+                    _h('td', { style:{ color:'var(--t3)', fontSize:'.75rem' } }, si+1),
+                    _h('td', null, _h('input', { type:'number', value:s.reps, min:1, onChange:function(e){ upSet(ex.id,s.id,'reps',e.target.value); } })),
+                    _h('td', null, _h('input', { type:'number', value:s.weight, min:0, step:2.5, onChange:function(e){ upSet(ex.id,s.id,'weight',e.target.value); } })),
+                    _h('td', { style:{ color:'var(--a-light)', fontWeight:600 } }, calc1RM(s.weight,s.reps)||'—'),
+                    _h('td', null, _h('div', { className:'set-done-btn'+(s.done?' done':''), onClick:function(){ if(!s.done)doneSet(ex.id,s.id,ex.rest); } }, s.done?'✓':'○')),
+                    _h('td', null, _h('button', { style:{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.85rem', padding:'2px 4px', lineHeight:1 }, onClick:function(){ removeSet(ex.id,s.id); } }, '✕'))
+                  );
+                })
+              )
+            ),
+            _h('button', { className:'btn btn-ghost btn-sm', style:{ marginTop:8, width:'100%', borderStyle:'dashed' }, onClick:function(){ addSeries(ex.id); } }, '+ Seria')
+          )
+        );
+      }),
+
+      _h('button', { className:'btn btn-secondary', style:{ width:'100%', marginTop:10, borderStyle:'dashed' }, onClick:function(){ setShowAdd(true); } }, '+ Dodaj ćwiczenie'),
+
+      _h(ET.Sheet, { open:showAdd, onClose:function(){ setShowAdd(false); }, title:'Nowe ćwiczenie' },
+        _h('div', { className:'field' }, _h('label', null, 'Nazwa *'), _h('input', { type:'text', placeholder:'np. Overhead Press', value:newEx.name, onChange:function(e){ setNewEx(Object.assign({},newEx,{name:e.target.value})); } })),
+        _h('div', { className:'grid-3' },
+          _h('div', { className:'field' }, _h('label', null, 'Serie'), _h('input', { type:'number', min:1, value:newEx.sets, onChange:function(e){ setNewEx(Object.assign({},newEx,{sets:+e.target.value})); } })),
+          _h('div', { className:'field' }, _h('label', null, 'Powt.'), _h('input', { type:'number', min:1, value:newEx.reps, onChange:function(e){ setNewEx(Object.assign({},newEx,{reps:+e.target.value})); } })),
+          _h('div', { className:'field' }, _h('label', null, 'Ciężar kg'), _h('input', { type:'number', min:0, step:2.5, value:newEx.weight, onChange:function(e){ setNewEx(Object.assign({},newEx,{weight:+e.target.value})); } }))
+        ),
+        _h('div', { className:'grid-3' },
+          _h('div', { className:'field' }, _h('label', null, 'Tempo'), _h('input', { type:'text', placeholder:'3-1-1', value:newEx.tempo, onChange:function(e){ setNewEx(Object.assign({},newEx,{tempo:e.target.value})); } })),
+          _h('div', { className:'field' }, _h('label', null, 'RPE'), _h('input', { type:'number', min:1, max:10, value:newEx.rpe, onChange:function(e){ setNewEx(Object.assign({},newEx,{rpe:+e.target.value})); } })),
+          _h('div', { className:'field' }, _h('label', null, 'RIR'), _h('input', { type:'number', min:0, max:5, value:newEx.rir, onChange:function(e){ setNewEx(Object.assign({},newEx,{rir:+e.target.value})); } }))
+        ),
+        _h('div', { className:'field' },
+          _h('label', { style:{ display:'flex', justifyContent:'space-between' } }, _h('span', null, 'Przerwa (s)'), _h('span', { style:{ color:'var(--a-light)', fontWeight:700 } }, newEx.rest+'s')),
+          _h('div', { className:'slider-wrap' }, _h('input', { type:'range', min:30, max:300, step:15, value:newEx.rest, onChange:function(e){ setNewEx(Object.assign({},newEx,{rest:+e.target.value})); } }))
+        ),
+        _h('button', { className:'btn btn-primary', style:{ width:'100%' }, onClick:addEx }, 'Dodaj ćwiczenie')
+      )
+    );
+  }
+
+  // ── STEP 5: ROZCIĄGANIE ──────────────────────────────────────────────────
+  function CooldownStep(props) {
+    var cs = React.useState({}); var checked = cs[0], setChecked = cs[1];
+    var doneCount = Object.values(checked).filter(Boolean).length;
+    var total = props.plan.cooldown.length;
+
+    function toggle(i) {
+      setChecked(function(c){ var n={}; n[i]=!c[i]; return Object.assign({},c,n); });
+    }
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
+        _h('div', null,
+          _h('h1', { style:{ fontSize:'1.2rem', fontWeight:700 } }, '🧘 Rozciąganie'),
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 4 z 4 — ' + props.plan.name + ' · ' + doneCount + '/' + total)
+        )
+      ),
+
+      _h(ET.ProgressBar, { value: total ? (doneCount/total*100) : 0 }),
+      _h('div', { style:{ marginBottom:14 } }),
+
+      _h('div', { className:'card card-accent', style:{ marginBottom:14, fontSize:'.82rem', color:'var(--t2)', lineHeight:1.6 } },
+        '💡 Rozciąganie po treningu przyspiesza regenerację i zwiększa mobilność. Każda pozycja min. 30 sekund.'
+      ),
+
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        props.plan.cooldown.map(function(item, i) {
+          var done = !!checked[i];
+          return _h('div', { key:i, className:'suppl-item'+(done?' checked':''), onClick:function(){ toggle(i); } },
+            _h('div', { className:'suppl-check' }, done ? '✓' : ''),
+            _h('div', { style:{ flex:1 } },
+              _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, item.n),
+              item.d && _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:2 } }, '⏱ ' + item.d)
+            )
+          );
+        })
+      ),
+
+      _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%' }, onClick:props.onNext },
+        doneCount === total ? '🏆 Zakończ i podsumowanie' : '→ Pomiń i przejdź do podsumowania'
+      )
+    );
+  }
+
+  // ── PODSUMOWANIE ─────────────────────────────────────────────────────────
+  function WorkoutSummary(props) {
+    var nav = ET.useNav(); var navigate = nav.navigate;
+    var session = props.result.session, prs = props.result.prs;
+    var rd = props.readiness;
+    var totalMin = Math.round(session.duration / 60000);
+    var workMin = Math.round((session.workMs || session.duration) / 60000);
+    var restMin = Math.round((session.restMs || 0) / 60000);
+    var doneSets = session.exercises.reduce(function(t,e){ return t+e.setsData.filter(function(s){ return s.done; }).length; },0);
+
+    var rdLabels = {
+      willingness: ['—','Bez chęci','Ujdzie','Pełna!'],
+      state: ['—','Słabo','Normalnie','Świetnie'],
+      fatigue: ['—','Bardzo zmęczony','Umiarkowane','Brak zmęczenia']
+    };
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { className:'summary-hero' },
+        _h('div', { className:'summary-hero-icon' }, '🏆'),
+        _h('h2', null, 'Trening ukończony!'),
+        _h('p', { style:{ color:'var(--t2)' } }, session.name)
+      ),
+
+      prs.length>0 && _h('div', { style:{ background:'var(--yellow-d)', border:'1px solid var(--yellow)', borderRadius:'var(--r2)', padding:14, marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, color:'var(--yellow)', marginBottom:8 } }, '🎉 Nowe rekordy osobiste!'),
+        prs.map(function(pr,i){ return _h('div', { key:i, style:{ fontSize:'.85rem', marginBottom:2 } }, pr.name+': ', _h('b', null, pr.e1rm+' kg'), ' (1RM est.)'); })
+      ),
+
+      // Czas treningu i przerw
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:12, fontSize:'.88rem', color:'var(--t2)' } }, '⏱ Czas sesji'),
+        _h('div', { className:'grid-3', style:{ gap:8 } },
+          _h('div', { style:{ textAlign:'center', padding:'12px 0' } },
+            _h('div', { style:{ fontSize:'1.4rem', fontWeight:700, color:'var(--a-light)' } }, totalMin+'min'),
+            _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, 'ŁĄCZNIE')
+          ),
+          _h('div', { style:{ textAlign:'center', padding:'12px 0' } },
+            _h('div', { style:{ fontSize:'1.4rem', fontWeight:700, color:'var(--green)' } }, workMin+'min'),
+            _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, 'PRACA')
+          ),
+          _h('div', { style:{ textAlign:'center', padding:'12px 0' } },
+            _h('div', { style:{ fontSize:'1.4rem', fontWeight:700, color:'var(--yellow)' } }, restMin+'min'),
+            _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, 'PRZERWY')
+          )
+        )
+      ),
+
+      _h('div', { className:'grid-3', style:{ marginBottom:14, gap:8 } },
+        _h(ET.StatCard, { label:'Wolumen', value:(session.volume||0).toFixed(0)+' kg', color:'var(--green)' }),
+        _h(ET.StatCard, { label:'Powtórzenia', value:session.totalReps, color:'var(--purple)' }),
+        _h(ET.StatCard, { label:'Serie', value:doneSets, color:'var(--teal)' })
+      ),
+
+      rd && _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:10, fontSize:'.88rem', color:'var(--t2)' } }, '📊 Gotowość przed treningiem'),
+        _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+          _h('div', { style:{ flex:1, textAlign:'center', padding:'8px', background:'var(--s3)', borderRadius:'var(--r2)' } },
+            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:4 } }, 'CHĘĆ'),
+            _h('div', { style:{ fontWeight:700, fontSize:'.85rem' } }, rdLabels.willingness[rd.willingness||0])
+          ),
+          _h('div', { style:{ flex:1, textAlign:'center', padding:'8px', background:'var(--s3)', borderRadius:'var(--r2)' } },
+            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:4 } }, 'SAMOPOCZUCIE'),
+            _h('div', { style:{ fontWeight:700, fontSize:'.85rem' } }, rdLabels.state[rd.state||0])
+          ),
+          _h('div', { style:{ flex:1, textAlign:'center', padding:'8px', background:'var(--s3)', borderRadius:'var(--r2)' } },
+            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:4 } }, 'ZMĘCZENIE'),
+            _h('div', { style:{ fontWeight:700, fontSize:'.85rem' } }, rdLabels.fatigue[rd.fatigue||0])
+          )
+        )
+      ),
+
+      props.postWellbeing && _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:10, fontSize:'.88rem', color:'var(--t2)' } }, '🌡 Samopoczucie po treningu'),
+        _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+          [
+            { k:'energy', l:'Energia', icon:'⚡', c:'var(--yellow)' },
+            { k:'mood', l:'Nastrój', icon:'😊', c:'var(--green)' },
+            { k:'stress', l:'Stres', icon:'😰', c:'var(--red)' },
+            { k:'motivation', l:'Motywacja', icon:'🔥', c:'var(--purple)' },
+          ].map(function(sl) {
+            var val = props.postWellbeing[sl.k];
+            if (val == null) return null;
+            return _h('div', { key:sl.k, style:{ textAlign:'center', flex:1 } },
+              _h('div', { style:{ fontSize:'.85rem', fontWeight:700, color:sl.c } }, sl.icon+' '+val),
+              _h('div', { style:{ fontSize:'.55rem', color:'var(--t3)' } }, sl.l)
+            );
+          })
+        )
+      ),
+
+      // ── AI COACH ANALYSIS ────────────────────────────────────────────────
+      _h(AIWorkoutAnalysis, { result:props.result, store:props.store }),
+
+      _h('div', { style:{ display:'flex', gap:10, marginTop:6 } },
+        _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:function(){ navigate('dashboard'); } }, '🏠 Dashboard'),
+        _h('button', { className:'btn btn-secondary', style:{ flex:1 }, onClick:props.onBack }, '📋 Lista treningów')
+      )
+    );
+  }
+
+  function AIWorkoutAnalysis(props) {
+    var su = ET.useStore(); var store = props.store || su.store;
+    var open = React.useState(true); var isOpen = open[0]; var setOpen = open[1];
+    if (typeof ET.AIEngine === 'undefined') return null;
+    var session = props.result && props.result.session;
+    if (!session) return null;
+
+    var workout = Object.assign({}, session, { id: '__current__' });
+    var insights = ET.AIEngine.analyzeWorkout(workout, store);
+    var typeColor = {achievement:'var(--yellow)', positive:'var(--green)', warning:'var(--orange)', info:'var(--a-light)'};
+    var typeBg = {achievement:'rgba(234,179,8,.1)', positive:'rgba(34,197,94,.08)', warning:'rgba(249,115,22,.08)', info:'rgba(99,102,241,.08)'};
+
+    return _h('div', { className:'card', style:{ marginBottom:14 } },
+      _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:isOpen?12:0, cursor:'pointer' }, onClick:function(){ setOpen(!isOpen); } },
+        _h('div', { style:{ fontWeight:700, fontSize:'.88rem', color:'var(--t2)', display:'flex', alignItems:'center', gap:8 } },
+          _h('span', { style:{ fontSize:'1.1rem' } }, '🤖'),
+          'Analiza AI'
+        ),
+        _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, isOpen?'▲':'▼')
+      ),
+      isOpen && insights.map(function(ins, i) {
+        return _h('div', { key:i, style:{ padding:'10px 12px', borderRadius:'var(--r2)', background:typeBg[ins.type]||'var(--s3)', border:'1px solid '+(typeColor[ins.type]||'var(--b1)')+'44', marginBottom:i<insights.length-1?8:0 } },
+          _h('div', { style:{ display:'flex', gap:8, alignItems:'flex-start' } },
+            _h('span', { style:{ fontSize:'1.1rem', flexShrink:0 } }, ins.icon),
+            _h('div', null,
+              _h('div', { style:{ fontWeight:700, fontSize:'.82rem', color:typeColor[ins.type]||'var(--t2)', marginBottom:3 } }, ins.title),
+              _h('div', { style:{ fontSize:'.74rem', color:'var(--t2)', lineHeight:1.5 } }, ins.body)
+            )
+          )
+        );
+      })
+    );
+  }
+
+  // ── AI COACH PLAN VIEW ────────────────────────────────────────────────────
+  function AICoachView(props) {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+    var ps = React.useState(null); var selPlan = ps[0]; var setSelPlan = ps[1];
+
+    var stagnation = typeof ET.AIEngine !== 'undefined' ? ET.AIEngine.detectStagnation(store) : {plateaus:[],improvements:[]};
+    var corr = typeof ET.AIEngine !== 'undefined' ? ET.AIEngine.correlations(store) : [];
+
+    var suggestions = selPlan && typeof ET.AIEngine !== 'undefined' ? ET.AIEngine.suggestPlanChanges(selPlan, store) : null;
+
+    function applySuggestion(planId, exName, suggested) {
+      update(function(s) {
+        var overrides = Object.assign({}, s.planSuggestions||{});
+        if (!overrides[planId]) overrides[planId] = {};
+        overrides[planId][exName] = { weight:suggested.weight, sets:suggested.sets, reps:suggested.reps, rir:suggested.rir };
+        return Object.assign({},s,{ planSuggestions:overrides });
+      });
+      toast('Sugestia zastosowana — aktywna przy następnym treningu ✓', 'success');
+    }
+
+    function removeSuggestion(planId, exName) {
+      update(function(s) {
+        var overrides = Object.assign({}, s.planSuggestions||{});
+        if (overrides[planId]) { delete overrides[planId][exName]; }
+        return Object.assign({},s,{ planSuggestions:overrides });
+      });
+      toast('Sugestia cofnięta', 'default');
+    }
+
+    var applied = store.planSuggestions||{};
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { className:'page-hdr' },
+        _h('div', null,
+          _h('h1', null, '🤖 AI Coach'),
+          _h('p', null, 'Sugestie oparte wyłącznie na Twoich danych')
+        ),
+        _h('button', { className:'btn btn-ghost', onClick:props.onBack }, '← Wróć')
+      ),
+
+      // Recovery score
+      (function() {
+        var rec = typeof ET.AIEngine !== 'undefined' ? ET.AIEngine.recovery(store) : null;
+        if (!rec) return null;
+        var col = rec.score>=65?'var(--green)':rec.score>=45?'var(--yellow)':'var(--red)';
+        return _h('div', { className:'card', style:{ marginBottom:14, display:'flex', gap:12, alignItems:'center' } },
+          _h('div', { style:{ width:54, height:54, borderRadius:'50%', background:col+'22', border:'3px solid '+col, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 } },
+            _h('div', { style:{ fontWeight:700, fontSize:'.9rem', color:col } }, rec.score+'%')
+          ),
+          _h('div', { style:{ flex:1 } },
+            _h('div', { style:{ fontWeight:700, fontSize:'.88rem', marginBottom:3 } }, '🔋 Regeneracja: '+rec.category),
+            _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', lineHeight:1.4 } }, rec.recommendation),
+            _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 } },
+              rec.factors.map(function(f,i){
+                return _h('span', { key:i, style:{ fontSize:'.62rem', padding:'2px 7px', borderRadius:20, background:f.color+'22', color:f.color, fontWeight:600 } },
+                  (f.value>0?'+':'')+f.value+' '+f.label);
+              })
+            )
+          )
+        );
+      })(),
+
+      // Plan selector
+      _h('div', { style:{ marginBottom:14 } },
+        _h('div', { className:'section-hdr' }, _h('h2', null, 'Wybierz plan do analizy')),
+        _h('div', { className:'grid-2', style:{ gap:8 } },
+          WORKOUT_PLANS.map(function(p) {
+            var isActive = selPlan && selPlan.id===p.id;
+            var hasApplied = applied[p.id] && Object.keys(applied[p.id]).length > 0;
+            return _h('button', { key:p.id,
+              style:{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:'var(--r2)', border:'2px solid '+(isActive?p.color:'var(--b1)'), background:isActive?p.color+'18':'var(--s2)', cursor:'pointer', textAlign:'left', transition:'all .15s' },
+              onClick:function(){ setSelPlan(isActive?null:p); }
+            },
+              _h('span', { style:{ fontSize:'1.4rem' } }, p.icon),
+              _h('div', null,
+                _h('div', { style:{ fontWeight:700, fontSize:'.85rem', color:isActive?p.color:'var(--t1)' } }, p.name),
+                hasApplied && _h('div', { style:{ fontSize:'.6rem', color:'var(--green)', marginTop:2 } }, '✓ Aktywne sugestie')
+              )
+            );
+          })
+        )
+      ),
+
+      // Suggestions for selected plan
+      selPlan && suggestions && _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:14, fontSize:'.88rem', color:'var(--t2)', display:'flex', gap:8 } },
+          _h('span', { style:{ fontSize:'1rem' } }, selPlan.icon), selPlan.name, ' — sugerowane zmiany'
+        ),
+        suggestions.map(function(s, i) {
+          var appliedHere = (applied[selPlan.id]||{})[s.original.name];
+          var isChanged = s.changed;
+          var borderColor = isChanged ? 'var(--green)' : 'var(--b1)';
+          var bg = isChanged ? 'rgba(34,197,94,.06)' : 'var(--s3)';
+          return _h('div', { key:i, style:{ padding:'12px', borderRadius:'var(--r2)', border:'1.5px solid '+borderColor, background:bg, marginBottom:8 } },
+            _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 } },
+              _h('div', { style:{ flex:1 } },
+                _h('div', { style:{ fontWeight:700, fontSize:'.85rem', marginBottom:6, color:isChanged?'var(--green)':'var(--t1)' } },
+                  (isChanged?'✦ ':'') + s.original.name
+                ),
+                _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: isChanged?8:0 } },
+                  // Original values
+                  [
+                    {l:'Serie', orig:s.original.sets, new:s.suggested.sets},
+                    {l:'Powt.', orig:s.original.reps, new:s.suggested.reps},
+                    {l:'Ciężar', orig:s.original.weight+'kg', new:s.suggested.weight+'kg'},
+                    {l:'RIR', orig:s.original.rir, new:s.suggested.rir},
+                  ].map(function(field, fi) {
+                    var changed = String(field.orig) !== String(field.new);
+                    return _h('div', { key:fi, style:{ textAlign:'center', padding:'4px 8px', borderRadius:'var(--r2)', background:'var(--s2)', border:'1px solid '+(changed?'var(--green)':'var(--b1)') } },
+                      _h('div', { style:{ fontSize:'.55rem', color:'var(--t3)', marginBottom:2 } }, field.l),
+                      changed
+                        ? _h('div', null,
+                            _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)', textDecoration:'line-through', marginRight:4 } }, field.orig),
+                            _h('span', { style:{ fontSize:'.78rem', fontWeight:700, color:'var(--green)' } }, field.new)
+                          )
+                        : _h('div', { style:{ fontSize:'.78rem', fontWeight:700, color:'var(--t2)' } }, field.orig)
+                    );
+                  })
+                ),
+                isChanged && s.reasons.map(function(r, ri) {
+                  return _h('div', { key:ri, style:{ fontSize:'.72rem', color:'var(--t2)', background:'rgba(34,197,94,.08)', padding:'6px 8px', borderRadius:'var(--r2)', lineHeight:1.5, marginBottom:ri<s.reasons.length-1?4:0 } }, '📋 '+r);
+                })
+              ),
+              isChanged && _h('div', { style:{ flexShrink:0 } },
+                appliedHere
+                  ? _h('button', { style:{ padding:'6px 10px', borderRadius:'var(--r2)', border:'1px solid var(--b1)', background:'var(--s3)', color:'var(--t3)', cursor:'pointer', fontSize:'.7rem' },
+                      onClick:function(){ removeSuggestion(selPlan.id, s.original.name); }
+                    }, '✓ Cofnij')
+                  : _h('button', { style:{ padding:'6px 10px', borderRadius:'var(--r2)', border:'1px solid var(--green)', background:'rgba(34,197,94,.12)', color:'var(--green)', cursor:'pointer', fontSize:'.7rem', fontWeight:700 },
+                      onClick:function(){ applySuggestion(selPlan.id, s.original.name, s.suggested); }
+                    }, '✓ Zastosuj')
+              )
+            )
+          );
+        })
+      ),
+
+      // Stagnation analysis
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:10, fontSize:'.88rem' } }, '⚠️ Analiza stagnacji'),
+        stagnation.plateaus.length===0
+          ? _h('div', { style:{ color:'var(--green)', fontSize:'.8rem' } }, '✓ Brak stagnacji — aktywna progresja we wszystkich ćwiczeniach')
+          : stagnation.plateaus.map(function(p, i) {
+              return _h('div', { key:i, style:{ display:'flex', gap:10, padding:'8px 0', borderBottom:i<stagnation.plateaus.length-1?'1px solid var(--b1)':'none' } },
+                _h('div', { style:{ flex:1 } },
+                  _h('div', { style:{ fontWeight:700, fontSize:'.82rem', marginBottom:2 } }, p.name),
+                  _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, p.weight+'kg przez '+p.sessions+' sesje · '+p.days+' dni')
+                ),
+                _h('div', { style:{ padding:'3px 8px', borderRadius:20, background:'rgba(249,115,22,.12)', color:'var(--orange)', fontSize:'.65rem', fontWeight:700, alignSelf:'center' } }, 'PLATEAU')
+              );
+            })
+      ),
+
+      // Improvements
+      stagnation.improvements.length>0 && _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:10, fontSize:'.88rem' } }, '📈 Mocne strony — aktywny progres'),
+        stagnation.improvements.map(function(imp, i) {
+          return _h('div', { key:i, style:{ display:'flex', gap:10, padding:'8px 0', borderBottom:i<stagnation.improvements.length-1?'1px solid var(--b1)':'none' } },
+            _h('div', { style:{ flex:1 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.82rem', marginBottom:2 } }, imp.name),
+              _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, imp.from+'kg → '+imp.to+'kg')
+            ),
+            _h('div', { style:{ padding:'3px 8px', borderRadius:20, background:'rgba(34,197,94,.12)', color:'var(--green)', fontSize:'.65rem', fontWeight:700, alignSelf:'center' } }, '+'+imp.pct+'%')
+          );
+        })
+      ),
+
+      // Correlations
+      corr.length>0 && _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:10, fontSize:'.88rem' } }, '🔗 Korelacje wykryte w danych'),
+        corr.map(function(c, i) {
+          return _h('div', { key:i, style:{ padding:'8px 0', borderBottom:i<corr.length-1?'1px solid var(--b1)':'none' } },
+            _h('div', { style:{ fontWeight:700, fontSize:'.8rem', marginBottom:3 } }, c.icon+' '+c.title),
+            _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', lineHeight:1.5 } }, c.body)
+          );
+        })
+      )
+    );
+  }
+
+  // ── EDYCJA / RĘCZNE DODAWANIE TRENINGU ───────────────────────────────────
+  function WorkoutEditSheet(props) {
+    var w = props.workout;
+    var isNew = !w;
+    var initExercises = w && w.exercises && w.exercises.length
+      ? w.exercises.map(function(ex) {
+          var sets = ex.setsData || [];
+          return {
+            name:    ex.name||'',
+            sets:    sets.length || (ex.sets||3),
+            reps:    sets.length ? (sets[0].reps||0) : (ex.reps||0),
+            weight:  sets.length ? (sets[0].weight||0) : (ex.weight||0),
+          };
+        })
+      : [{ name:'', sets:3, reps:10, weight:0 }];
+
+    var ds = React.useState({
+      date:     w ? w.date       : ET.dstr(),
+      name:     w ? w.name       : '',
+      duration: w ? Math.round((w.duration||0)/60000) : 60,
+      volume:   w ? (w.volume||0) : 0,
+      notes:    w ? (w.notes||'') : '',
+    });
+    var data = ds[0]; var setData = ds[1];
+    function upD(k,v){ setData(function(p){ var o={}; o[k]=v; return Object.assign({},p,o); }); }
+
+    var exs = React.useState(initExercises);
+    var exercises = exs[0]; var setExercises = exs[1];
+
+    function upEx(i, k, v) {
+      setExercises(function(prev){
+        return prev.map(function(e, j){ if(j!==i) return e; var o={}; o[k]=v; return Object.assign({},e,o); });
+      });
+    }
+
+    function addEx() { setExercises(function(p){ return p.concat([{ name:'', sets:3, reps:10, weight:0 }]); }); }
+    function removeEx(i) { setExercises(function(p){ return p.filter(function(_,j){ return j!==i; }); }); }
+
+    function calcVolume() {
+      return exercises.reduce(function(t, ex){ return t + (ex.sets||0)*(ex.reps||0)*(ex.weight||0); }, 0);
+    }
+
+    function save() {
+      var exFull = exercises.filter(function(e){ return e.name.trim(); }).map(function(e){
+        var setsData = [];
+        for (var i=0; i<(e.sets||1); i++) setsData.push({ id:i, reps:e.reps||0, weight:e.weight||0, done:true });
+        return { name:e.name, sets:e.sets||0, reps:e.reps||0, weight:e.weight||0, setsData:setsData };
+      });
+      var vol = data.volume || calcVolume();
+      var totalReps = exFull.reduce(function(t,e){ return t+(e.sets||0)*(e.reps||0); }, 0);
+      var newW = {
+        id:          w ? w.id : Date.now(),
+        date:        data.date,
+        name:        data.name || 'Trening',
+        duration:    data.duration * 60000,
+        volume:      vol,
+        totalReps:   totalReps,
+        exercises:   exFull,
+        notes:       data.notes,
+        prs:         w ? (w.prs||[]) : [],
+        readiness:   w ? (w.readiness||null) : null,
+      };
+      props.update(function(s){
+        var list = s.workouts || [];
+        if (isNew) return Object.assign({},s,{ workouts:[newW].concat(list) });
+        return Object.assign({},s,{ workouts:list.map(function(x){ return x.id===w.id?newW:x; }) });
+      });
+      props.toast(isNew?'Trening dodany ✓':'Zaktualizowano ✓','success');
+      props.onClose();
+    }
+
+    function remove() {
+      if (!confirm('Usunąć trening z historii?')) return;
+      props.update(function(s){ return Object.assign({},s,{ workouts:(s.workouts||[]).filter(function(x){ return x.id!==w.id; }) }); });
+      props.toast('Trening usunięty','default');
+      props.onClose();
+    }
+
+    var fldStyle = { marginBottom:10 };
+    var lblStyle = { fontSize:'.7rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', display:'block', marginBottom:4 };
+    var inputStyle = { width:'100%', boxSizing:'border-box' };
+
+    return _h(ET.Sheet, { open:true, onClose:props.onClose, title:isNew?'Dodaj trening ręcznie':'Edytuj trening' },
+      _h('div', { style:fldStyle },
+        _h('label', { style:lblStyle }, 'Data'),
+        _h('input', { type:'date', value:data.date, style:inputStyle, onChange:function(e){ upD('date',e.target.value); } })
+      ),
+      _h('div', { style:fldStyle },
+        _h('label', { style:lblStyle }, 'Nazwa treningu'),
+        _h('input', { type:'text', placeholder:'np. Góra / Siła', value:data.name, style:inputStyle, onChange:function(e){ upD('name',e.target.value); } })
+      ),
+      _h('div', { style:{ display:'flex', gap:10, marginBottom:10 } },
+        _h('div', { style:{ flex:1 } },
+          _h('label', { style:lblStyle }, 'Czas (min)'),
+          _h('input', { type:'number', min:1, max:300, value:data.duration, style:inputStyle, onChange:function(e){ upD('duration',+e.target.value); } })
+        ),
+        _h('div', { style:{ flex:1 } },
+          _h('label', { style:lblStyle }, 'Wolumen (kg) — auto'),
+          _h('input', { type:'number', min:0, value:data.volume||calcVolume(), style:inputStyle, onChange:function(e){ upD('volume',+e.target.value); } })
+        )
+      ),
+
+      _h('div', { style:{ marginBottom:8 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 } },
+          _h('label', { style:lblStyle }, 'Ćwiczenia'),
+          _h('button', { style:{ fontSize:'.72rem', padding:'3px 10px', borderRadius:'var(--r2)', border:'1px solid var(--a)', background:'var(--a)', color:'white', cursor:'pointer' }, onClick:addEx }, '+ Dodaj ćwiczenie')
+        ),
+        exercises.map(function(ex, i) {
+          return _h('div', { key:i, style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:10, marginBottom:8 } },
+            _h('div', { style:{ display:'flex', gap:6, marginBottom:6 } },
+              _h('input', { type:'text', placeholder:'Nazwa ćwiczenia', value:ex.name, style:{ flex:1 },
+                onChange:function(e){ upEx(i,'name',e.target.value); } }),
+              _h('button', { style:{ padding:'0 10px', borderRadius:'var(--r2)', border:'1px solid var(--b1)', background:'transparent', color:'var(--red)', cursor:'pointer', fontSize:'1rem' },
+                onClick:function(){ removeEx(i); } }, '×')
+            ),
+            _h('div', { style:{ display:'flex', gap:6 } },
+              _h('div', { style:{ flex:1, textAlign:'center' } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Serie'),
+                _h('input', { type:'number', min:1, max:20, value:ex.sets, style:{ width:'100%' }, onChange:function(e){ upEx(i,'sets',+e.target.value); } })
+              ),
+              _h('div', { style:{ flex:1, textAlign:'center' } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Powt.'),
+                _h('input', { type:'number', min:1, max:100, value:ex.reps, style:{ width:'100%' }, onChange:function(e){ upEx(i,'reps',+e.target.value); } })
+              ),
+              _h('div', { style:{ flex:1, textAlign:'center' } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Ciężar (kg)'),
+                _h('input', { type:'number', min:0, max:500, step:0.5, value:ex.weight, style:{ width:'100%' }, onChange:function(e){ upEx(i,'weight',+e.target.value); } })
+              )
+            )
+          );
+        })
+      ),
+
+      _h('div', { style:fldStyle },
+        _h('label', { style:lblStyle }, 'Notatki (opcjonalnie)'),
+        _h('textarea', { rows:2, placeholder:'np. dobry trening, bolał bark...', value:data.notes, style:Object.assign({},inputStyle,{resize:'vertical'}),
+          onChange:function(e){ upD('notes',e.target.value); } })
+      ),
+
+      _h('div', { style:{ display:'flex', gap:8 } },
+        !isNew && _h('button', { className:'btn btn-danger', style:{ flex:'0 0 auto' }, onClick:remove }, '🗑️'),
+        _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:save }, isNew?'Dodaj trening':'Zapisz zmiany')
+      )
+    );
+  }
+
+  // ── HELPER: efektywne plany (domyślne + nadpisania ze store) ────────────────
+  function getEffectivePlans(store) {
+    var overrides = store.workoutPlans || {};
+    var customs = store.customWorkoutPlans || [];
+    var base = WORKOUT_PLANS.map(function(p) {
+      return overrides[p.id] ? Object.assign({}, p, overrides[p.id]) : p;
+    });
+    return base.concat(customs);
+  }
+
+  // ── EDYTOR PLANU (widok pojedynczego planu) ──────────────────────────────
+  function PlanEditView(props) {
+    var ep = React.useState(JSON.parse(JSON.stringify(props.plan)));
+    var editing = ep[0], setEditing = ep[1];
+
+    function upE(key, val) { setEditing(function(p){ var o={}; o[key]=val; return Object.assign({},p,o); }); }
+
+    function addWarmup() {
+      setEditing(function(p){ return Object.assign({},p,{ warmup:(p.warmup||[]).concat([{ n:'', s:1, r:0, note:'' }]) }); });
+    }
+    function upWarmup(i, field, val) {
+      setEditing(function(p){
+        return Object.assign({},p,{ warmup:p.warmup.map(function(item,j){ if(j!==i)return item; var o={}; o[field]=val; return Object.assign({},item,o); }) });
+      });
+    }
+    function rmWarmup(i) {
+      setEditing(function(p){ return Object.assign({},p,{ warmup:p.warmup.filter(function(_,j){ return j!==i; }) }); });
+    }
+
+    function addExercise() {
+      var newEx = { name:'', plan:'3×10', sets:3, reps:10, weight:0, rir:2, tempo:'kontrola', rest:90, prog:'' };
+      setEditing(function(p){ return Object.assign({},p,{ exercises:(p.exercises||[]).concat([newEx]) }); });
+    }
+    function upExercise(i, field, val) {
+      setEditing(function(p){
+        return Object.assign({},p,{ exercises:p.exercises.map(function(ex,j){
+          if(j!==i)return ex;
+          var o={}; o[field]=val;
+          var updated = Object.assign({},ex,o);
+          if(field==='sets'||field==='reps') updated.plan = updated.sets+'×'+updated.reps;
+          return updated;
+        })});
+      });
+    }
+    function rmExercise(i) {
+      setEditing(function(p){ return Object.assign({},p,{ exercises:p.exercises.filter(function(_,j){ return j!==i; }) }); });
+    }
+    function addSet(i) {
+      setEditing(function(p){ return Object.assign({},p,{ exercises:p.exercises.map(function(ex,j){
+        if(j!==i)return ex; var ns=(ex.sets||1)+1; return Object.assign({},ex,{sets:ns, plan:ns+'×'+ex.reps});
+      })}); });
+    }
+    function rmSet(i) {
+      setEditing(function(p){ return Object.assign({},p,{ exercises:p.exercises.map(function(ex,j){
+        if(j!==i)return ex; var ns=Math.max(1,(ex.sets||1)-1); return Object.assign({},ex,{sets:ns, plan:ns+'×'+ex.reps});
+      })}); });
+    }
+    function addWarmupSet(i) {
+      setEditing(function(p){ return Object.assign({},p,{ warmup:p.warmup.map(function(item,j){
+        if(j!==i)return item; return Object.assign({},item,{s:(item.s||1)+1});
+      })}); });
+    }
+    function rmWarmupSet(i) {
+      setEditing(function(p){ return Object.assign({},p,{ warmup:p.warmup.map(function(item,j){
+        if(j!==i)return item; return Object.assign({},item,{s:Math.max(1,(item.s||1)-1)});
+      })}); });
+    }
+
+    var ICONS = ['💪','🦵','🏋️','⚡','🔥','🧘','🏃','🤸','🥊','🎯','🌟','📋'];
+
+    return _h('div', { style:{ paddingBottom:20 } },
+      _h('div', { style:{ display:'flex', gap:8, marginBottom:16, position:'sticky', top:0, background:'var(--s1)', padding:'12px 0 8px', zIndex:5, borderBottom:'1px solid var(--b1)' } },
+        _h('button', { className:'btn btn-ghost', onClick:props.onBack }, '←'),
+        _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:function(){ props.onSave(editing); } }, '✓ Zapisz plan'),
+        (props.onReset || props.onDelete) && _h('button', {
+          className:'btn btn-ghost', style:{ color: props.onDelete ? 'var(--red)' : 'var(--orange)' },
+          onClick: props.onDelete || props.onReset
+        }, props.onDelete ? '🗑' : '↩')
+      ),
+
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:12, fontSize:'.85rem', color:'var(--t2)' } }, 'Informacje o planie'),
+        _h('div', { className:'field' },
+          _h('label', null, 'Ikona'),
+          _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 } },
+            ICONS.map(function(ic){ return _h('button', { key:ic, onClick:function(){ upE('icon',ic); },
+              style:{ width:36, height:36, borderRadius:'var(--r2)', border:'2px solid '+(editing.icon===ic?'var(--a)':'var(--b1)'), background:editing.icon===ic?'var(--a-dim)':'var(--s3)', fontSize:'1.2rem', cursor:'pointer' } }, ic); })
+          )
+        ),
+        _h('div', { className:'field' }, _h('label', null, 'Nazwa'), _h('input', { type:'text', value:editing.name, onChange:function(e){ upE('name',e.target.value); } })),
+        _h('div', { className:'grid-2' },
+          _h('div', { className:'field' }, _h('label', null, 'Dzień'), _h('input', { type:'text', value:editing.day||'', onChange:function(e){ upE('day',e.target.value); } })),
+          _h('div', { className:'field' }, _h('label', null, 'Opis skrócony'), _h('input', { type:'text', value:editing.desc||'', onChange:function(e){ upE('desc',e.target.value); } }))
+        )
+      ),
+
+      _h('div', { style:{ marginBottom:14 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, '🔥 Rozgrzewka ('+((editing.warmup||[]).length)+')'),
+          _h('button', { className:'btn btn-secondary btn-sm', onClick:addWarmup }, '+ Dodaj')
+        ),
+        (editing.warmup||[]).length===0 && _h('div', { style:{ color:'var(--t3)', fontSize:'.78rem', padding:'6px 0' } }, 'Brak ćwiczeń rozgrzewkowych'),
+        (editing.warmup||[]).map(function(item, i) {
+          return _h('div', { key:i, className:'card card-sm', style:{ marginBottom:6 } },
+            _h('div', { style:{ display:'flex', gap:6, alignItems:'center', marginBottom:6 } },
+              _h('input', { type:'text', value:item.n, placeholder:'Nazwa ćwiczenia', style:{ flex:1 }, onChange:function(e){ upWarmup(i,'n',e.target.value); } }),
+              _h('button', { className:'btn btn-ghost btn-sm btn-icon', style:{ color:'var(--red)', flexShrink:0 }, onClick:function(){ rmWarmup(i); } }, '✕')
+            ),
+            _h('div', { style:{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' } },
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:4 } },
+                _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ rmWarmupSet(i); } }, '−'),
+                _h('span', { style:{ fontWeight:700, minWidth:20, textAlign:'center' } }, item.s||1),
+                _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ addWarmupSet(i); } }, '+'),
+                _h('span', { style:{ fontSize:'.65rem', color:'var(--t3)' } }, 'serie')
+              ),
+              _h('div', { style:{ flex:1, minWidth:80 } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)' } }, 'Powtórzenia'),
+                _h('input', { type:'number', min:0, value:item.r||0, onChange:function(e){ upWarmup(i,'r',+e.target.value); } })
+              ),
+              _h('div', { style:{ flex:2, minWidth:100 } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)' } }, 'Notatka'),
+                _h('input', { type:'text', value:item.note||'', placeholder:'np. Łopatki do tyłu', onChange:function(e){ upWarmup(i,'note',e.target.value); } })
+              )
+            )
+          );
+        })
+      ),
+
+      _h('div', { style:{ marginBottom:14 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, '💪 Ćwiczenia ('+((editing.exercises||[]).length)+')'),
+          _h('button', { className:'btn btn-secondary btn-sm', onClick:addExercise }, '+ Dodaj')
+        ),
+        (editing.exercises||[]).length===0 && _h('div', { style:{ color:'var(--t3)', fontSize:'.78rem', padding:'6px 0' } }, 'Brak ćwiczeń'),
+        (editing.exercises||[]).map(function(ex, i) {
+          return _h('div', { key:i, className:'card card-sm', style:{ marginBottom:8, background:'var(--s3)' } },
+            _h('div', { style:{ display:'flex', gap:6, alignItems:'center', marginBottom:8 } },
+              _h('div', { style:{ fontSize:'.72rem', fontWeight:700, color:'var(--t3)', minWidth:22 } }, i+1+'.'),
+              _h('input', { type:'text', value:ex.name, placeholder:'Nazwa ćwiczenia *', style:{ flex:1 }, onChange:function(e){ upExercise(i,'name',e.target.value); } }),
+              _h('button', { className:'btn btn-ghost btn-sm btn-icon', style:{ color:'var(--red)', flexShrink:0 }, onClick:function(){ rmExercise(i); } }, '✕')
+            ),
+            _h('div', { style:{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:8 } },
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:4 } },
+                _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ rmSet(i); } }, '−'),
+                _h('span', { style:{ fontWeight:700, minWidth:20, textAlign:'center', fontSize:'.95rem' } }, ex.sets||1),
+                _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ addSet(i); } }, '+'),
+                _h('span', { style:{ fontSize:'.65rem', color:'var(--t3)' } }, 'serie')
+              ),
+              _h('span', { style:{ color:'var(--b2)', fontWeight:700 } }, '×'),
+              _h('div', { style:{ flex:'0 0 75px' } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Powt.'),
+                _h('input', { type:'number', min:1, value:ex.reps||0, onChange:function(e){ upExercise(i,'reps',+e.target.value); } })
+              ),
+              _h('div', { style:{ flex:'0 0 85px' } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Ciężar (kg)'),
+                _h('input', { type:'number', min:0, step:2.5, value:ex.weight||0, onChange:function(e){ upExercise(i,'weight',+e.target.value); } })
+              )
+            ),
+            _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+              _h('div', { style:{ flex:1, minWidth:70 } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Przerwa (s)'),
+                _h('input', { type:'number', min:0, step:15, value:ex.rest||90, onChange:function(e){ upExercise(i,'rest',+e.target.value); } })
+              ),
+              _h('div', { style:{ flex:1, minWidth:70 } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Tempo'),
+                _h('input', { type:'text', value:ex.tempo||'', placeholder:'3-1-1', onChange:function(e){ upExercise(i,'tempo',e.target.value); } })
+              ),
+              _h('div', { style:{ flex:'0 0 60px' } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'RIR'),
+                _h('input', { type:'number', min:0, max:5, value:ex.rir!=null?ex.rir:2, onChange:function(e){ upExercise(i,'rir',+e.target.value); } })
+              ),
+              _h('div', { style:{ flex:2, minWidth:100 } },
+                _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Progresja'),
+                _h('input', { type:'text', value:ex.prog||'', placeholder:'+2.5 kg/tydz', onChange:function(e){ upExercise(i,'prog',e.target.value); } })
+              )
+            )
+          );
+        })
+      )
+    );
+  }
+
+  // ── EDYTOR PLANÓW (sheet z listą i nawigacją do edycji) ──────────────────
+  function PlanEditorSheet(props) {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+    var sv = React.useState(null); var selPlan = sv[0], setSelPlan = sv[1];
+
+    function getPlans() { return getEffectivePlans(store); }
+
+    function savePlan(plan) {
+      if (plan._isCustom) {
+        update(function(s){
+          var isNew = !(s.customWorkoutPlans||[]).find(function(p){ return p.id===plan.id; });
+          var list = isNew ? (s.customWorkoutPlans||[]).concat([plan]) : (s.customWorkoutPlans||[]).map(function(p){ return p.id===plan.id?plan:p; });
+          return Object.assign({},s,{ customWorkoutPlans:list });
+        });
+      } else {
+        update(function(s){
+          var ov = Object.assign({},s.workoutPlans||{}); ov[plan.id]=plan;
+          return Object.assign({},s,{ workoutPlans:ov });
+        });
+      }
+      toast('Plan zapisany ✓','success');
+      setSelPlan(null);
+    }
+
+    function resetPlan(planId) {
+      if (!confirm('Przywrócić oryginalny plan?')) return;
+      update(function(s){ var ov=Object.assign({},s.workoutPlans||{}); delete ov[planId]; return Object.assign({},s,{workoutPlans:ov}); });
+      toast('Plan przywrócony','default'); setSelPlan(null);
+    }
+
+    function deletePlan(planId) {
+      if (!confirm('Usunąć ten plan?')) return;
+      update(function(s){ return Object.assign({},s,{ customWorkoutPlans:(s.customWorkoutPlans||[]).filter(function(p){ return p.id!==planId; }) }); });
+      toast('Plan usunięty','default'); setSelPlan(null);
+    }
+
+    function addNewPlan() {
+      var newPlan = { id:'custom_'+Date.now(), _isCustom:true, name:'Nowy plan', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
+      setSelPlan(newPlan);
+    }
+
+    function importCSV(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var lines = ev.target.result.split('\n').map(function(l){ return l.replace(/\r/,''); });
+        var warmup=[], exercises=[], cooldown=[];
+        var planName = file.name.replace(/\.[^.]+$/,'');
+        lines.slice(1).forEach(function(line) {
+          if (!line.trim()) return;
+          var cols = line.split(',').map(function(c){ return c.trim().replace(/^"|"$/g,''); });
+          var type=(cols[0]||'').toLowerCase(), name=cols[1]||'';
+          if (!name) return;
+          if (type==='warmup'||type==='rozgrzewka') {
+            warmup.push({ n:name, s:+cols[2]||1, r:+cols[3]||0, note:cols[7]||'' });
+          } else if (type==='exercise'||type==='cwiczenie'||type==='ćwiczenie'||type==='ex') {
+            exercises.push({ name:name, plan:(+cols[2]||3)+'×'+(+cols[3]||10), sets:+cols[2]||3, reps:+cols[3]||10, weight:+cols[4]||0, rest:+cols[5]||90, tempo:cols[6]||'kontrola', rir:+cols[7]!==undefined?+cols[7]:2, prog:cols[8]||'' });
+          } else if (type==='cooldown'||type==='rozciąganie'||type==='rozciaganie') {
+            cooldown.push({ n:name, d:cols[7]||'' });
+          }
+        });
+        var imported = { id:'custom_'+Date.now(), _isCustom:true, name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
+        setSelPlan(imported);
+        toast('Wczytano plik — sprawdź i zapisz plan','success');
+      };
+      reader.readAsText(file, 'UTF-8');
+      e.target.value='';
+    }
+
+    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title: selPlan ? (selPlan._isCustom&&!getPlans().find(function(p){return p.id===selPlan.id;}) ? 'Nowy plan' : 'Edytuj: '+selPlan.name) : 'Edytor planów treningowych' },
+
+      selPlan
+        ? _h(PlanEditView, {
+            plan: selPlan,
+            onBack: function(){ setSelPlan(null); },
+            onSave: savePlan,
+            onReset: !selPlan._isCustom && (store.workoutPlans||{})[selPlan.id] ? function(){ resetPlan(selPlan.id); } : null,
+            onDelete: selPlan._isCustom ? function(){ deletePlan(selPlan.id); } : null
+          })
+
+        : _h('div', null,
+            _h('div', { style:{ display:'flex', gap:8, marginBottom:16 } },
+              _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:addNewPlan }, '+ Nowy plan'),
+              _h('label', { className:'btn btn-secondary', style:{ flex:1, cursor:'pointer', textAlign:'center' } },
+                '📥 Import CSV',
+                _h('input', { type:'file', accept:'.csv,.txt', style:{ display:'none' }, onChange:importCSV })
+              )
+            ),
+
+            _h('div', { className:'card card-sm', style:{ marginBottom:14, fontSize:'.72rem', color:'var(--t3)', lineHeight:1.7 } },
+              _h('div', { style:{ fontWeight:700, color:'var(--t2)', marginBottom:6 } }, '📄 Format CSV (Excel → Zapisz jako CSV)'),
+              _h('div', null, 'Nagłówek: typ,nazwa,serie,powt,ciezar,przerwa,tempo,rir,notatka'),
+              _h('div', null, 'Typy: ', _h('b', null, 'warmup'), ' / ', _h('b', null, 'exercise'), ' / ', _h('b', null, 'cooldown'))
+            ),
+
+            getPlans().map(function(p) {
+              var isModified = !p._isCustom && (store.workoutPlans||{})[p.id];
+              return _h('div', { key:p.id,
+                style:{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--b1)', cursor:'pointer' },
+                onClick:function(){ setSelPlan(Object.assign({},p)); }
+              },
+                _h('div', { style:{ width:42, height:42, borderRadius:'var(--r2)', background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem', flexShrink:0 } }, p.icon),
+                _h('div', { style:{ flex:1 } },
+                  _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, p.name),
+                  _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, (p.day||'')+(p.day&&p.exercises?' · ':'')+((p.exercises||[]).length)+' ćwiczeń'),
+                  isModified && _h('div', { style:{ fontSize:'.6rem', color:'var(--orange)', marginTop:2 } }, '✏️ Zmodyfikowany'),
+                  p._isCustom && _h('div', { style:{ fontSize:'.6rem', color:'var(--teal)', marginTop:2 } }, '⭐ Własny')
+                ),
+                _h('span', { style:{ color:'var(--t3)', fontSize:'1.1rem' } }, '›')
+              );
+            })
+          )
+    );
+  }
+
+  // ── GŁÓWNY MODUŁ ─────────────────────────────────────────────────────────
+  function StrengthModule() {
+    var su = ET.useStore(); var store = su.store;
+    var nav = ET.useNav(); var initPlan = nav.params && nav.params.plan || null;
+    var vs = React.useState(initPlan ? 'wellbeing_pre' : 'list'); var view = vs[0], setView = vs[1];
+    var ps = React.useState(initPlan); var plan = ps[0], setPlan = ps[1];
+    var rs = React.useState({ willingness:2, state:2, fatigue:2 }); var readiness = rs[0], setReadiness = rs[1];
+    var res = React.useState(null); var result = res[0], setResult = res[1];
+    var sp = React.useState(false); var showPicker = sp[0], setShowPicker = sp[1];
+    var wb = React.useState(null); var postWb = wb[0], setPostWb = wb[1];
+    var ew = React.useState(null); var editW = ew[0], setEditW = ew[1];
+    var ma = React.useState(false); var showManualAdd = ma[0], setShowManualAdd = ma[1];
+    var se = React.useState(false); var showEditor = se[0], setShowEditor = se[1];
+
+    if (view==='ai-coach') return _h(AICoachView, { onBack:function(){ setView('list'); } });
+
+    function selectPlan(p) {
+      setPlan(p); setShowPicker(false);
+      setReadiness({ willingness:2, state:2, fatigue:2 }); setPostWb(null);
+      setView('wellbeing_pre');
+    }
+
+    if (view==='wellbeing_pre' && plan) return _h(WellbeingStep, {
+      plan:plan, tag:'przed treningiem '+plan.name,
+      title:'Samopoczucie przed treningiem', stepLabel:'Krok 1 z 6',
+      saveLabel:'→ Dalej: Gotowość',
+      onNext:function(){ setView('readiness'); }, onSkip:function(){ setView('readiness'); }
+    });
+    if (view==='readiness' && plan) return _h(ReadinessStep, { plan:plan, readiness:readiness, setReadiness:setReadiness,
+      onNext:function(){ setView('warmup'); }, onBack:function(){ setView('wellbeing_pre'); } });
+    if (view==='warmup' && plan) return _h(WarmupStep, { plan:plan,
+      onNext:function(){ setView('session'); }, onBack:function(){ setView('readiness'); } });
+    if (view==='session' && plan) return _h(StrengthSession, { plan:plan, readiness:readiness,
+      onFinish:function(r){ setResult(r); setView('cooldown'); }, onBack:function(){ setView('warmup'); } });
+    if (view==='cooldown' && plan) return _h(CooldownStep, { plan:plan, onNext:function(){ setView('goals_check'); } });
+    if (view==='goals_check' && plan) return _h(GoalCheckStep, { plan:plan, onNext:function(){ setView('wellbeing_post'); } });
+    if (view==='wellbeing_post' && plan) return _h(WellbeingStep, {
+      plan:plan, tag:'po treningu '+plan.name,
+      title:'Samopoczucie po treningu', stepLabel:'Krok 6 z 6',
+      saveLabel:'→ Zobacz podsumowanie',
+      onNext:function(wbVals){ setPostWb(wbVals); setView('summary'); }
+    });
+    if (view==='summary' && result) return _h(WorkoutSummary, { result:result, readiness:readiness, postWellbeing:postWb, store:store, onBack:function(){ setView('list'); setPlan(null); } });
+
+    // LIST VIEW
+    var workouts = store.workouts || [];
+    var update = su.update;
+    var toast = ET.useToast();
+    var effectivePlans = getEffectivePlans(store);
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { className:'page-hdr' },
+        _h('div', null,
+          _h('h1', null, '💪 Trening siłowy'),
+          _h('p', null, workouts.length + ' sesji')
+        ),
+        _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+          _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setView('ai-coach'); } }, '🤖 AI Coach'),
+          _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowEditor(true); } }, '✏️ Edytuj plany'),
+          _h('button', { className:'btn btn-secondary', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowManualAdd(true); } }, '➕ Dodaj ręcznie'),
+          _h('button', { className:'btn btn-primary', onClick:function(){ setShowPicker(true); } }, '▶ Nowy trening')
+        )
+      ),
+
+      ET.ACWRAlert && _h(ET.ACWRAlert, null),
+
+      showPicker && _h(WorkoutPicker, { onSelect:selectPlan, onClose:function(){ setShowPicker(false); }, plans:effectivePlans }),
+      showManualAdd && _h(WorkoutEditSheet, { workout:null, update:update, toast:toast, onClose:function(){ setShowManualAdd(false); } }),
+      editW && _h(WorkoutEditSheet, { workout:editW, update:update, toast:toast, onClose:function(){ setEditW(null); } }),
+      _h(PlanEditorSheet, { open:showEditor, onClose:function(){ setShowEditor(false); } }),
+
+      _h('div', { style:{ marginBottom:20 } },
+        _h('div', { className:'section-hdr' }, _h('h2', null, 'Twoje plany treningowe')),
+        _h('div', { className:'grid-2', style:{ gap:8 } },
+          effectivePlans.map(function(p) {
+            return _h('div', { key:p.id, className:'card card-interactive', style:{ cursor:'pointer', borderColor:'transparent', backgroundImage:'linear-gradient(135deg, var(--s2), var(--s3))', position:'relative' },
+              onClick:function(){ selectPlan(p); } },
+              p._isCustom && _h('div', { style:{ position:'absolute', top:6, right:8, fontSize:'.55rem', color:'var(--teal)', fontWeight:700 } }, '⭐ WŁASNY'),
+              (store.workoutPlans||{})[p.id] && !p._isCustom && _h('div', { style:{ position:'absolute', top:6, right:8, fontSize:'.55rem', color:'var(--orange)', fontWeight:700 } }, '✏️ EDYTOWANY'),
+              _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, p.icon),
+              _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, p.name),
+              _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:3 } }, p.day),
+              _h('div', { style:{ fontSize:'.62rem', color:'var(--t2)', marginTop:6, lineHeight:1.4 } }, p.desc)
+            );
+          })
+        )
+      ),
+
+      workouts.length === 0
+        ? _h(ET.Placeholder, { icon:'🏋️', title:'Brak zapisanych treningów', desc:'Wybierz plan i zacznij swój pierwszy trening.' })
+        : _h('div', null,
+            _h('div', { className:'section-hdr' }, _h('h2', null, 'Historia')),
+            workouts.map(function(w) {
+              var totalMin = Math.round((w.duration||0)/60000);
+              var workMin = w.workMs ? Math.round(w.workMs/60000) : totalMin;
+              var restMin = w.restMs ? Math.round(w.restMs/60000) : 0;
+              var rdColor = !w.readiness ? 'var(--t3)' : w.readiness.willingness===3?'var(--green)':w.readiness.willingness===1?'var(--red)':'var(--yellow)';
+              return _h('div', { key:w.id, className:'card', style:{ marginBottom:8 } },
+                _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 } },
+                  _h('div', { style:{ flex:1 } },
+                    _h('div', { style:{ fontWeight:700, marginBottom:2 } }, w.name),
+                    _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginBottom:4 } }, ET.fmtDate(w.date) + ' · ' + workMin + 'min praca · ' + restMin + 'min przerwy'),
+                    _h('div', { style:{ display:'flex', gap:4, flexWrap:'wrap' } },
+                      _h('span', { className:'badge badge-blue' }, (w.volume||0).toFixed(0)+' kg'),
+                      _h('span', { className:'badge badge-purple' }, (w.totalReps||0)+' powt.'),
+                      w.prs&&w.prs.length>0 && _h('span', { className:'badge badge-yellow' }, '🎉 '+w.prs.length+' PR'),
+                      w.readiness && _h('span', { style:{ fontSize:'.65rem', color:rdColor } }, ['','😤','😐','💪'][w.readiness.willingness||0])
+                    )
+                  ),
+                  _h('div', { style:{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:8, flexShrink:0 } },
+                    _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, totalMin+'min'),
+                    _h('button', { style:{ fontSize:'.7rem', padding:'4px 10px', borderRadius:'var(--r2)', border:'1px solid var(--b1)', background:'var(--s3)', color:'var(--t2)', cursor:'pointer' },
+                      onClick:function(){ setEditW(w); }
+                    }, '✏️ Edytuj')
+                  )
+                )
+              );
+            })
+          )
+    );
+  }
+
+  ET.StrengthModule = StrengthModule;
+  ET.WORKOUT_PLANS = WORKOUT_PLANS;
+})();

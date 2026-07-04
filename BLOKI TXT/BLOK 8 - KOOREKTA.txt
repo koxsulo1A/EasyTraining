@@ -1,0 +1,77 @@
+
+Zaprojektuj Moduł 8 – Ćwiczenia korekcyjne i mobilność – dla aplikacji treningowej. 
+
+aplikacja automatycznie układa krótki, 5–15-minutowy blok ćwiczeń korekcyjnych — i wplata go w rutynę treningową. Żadnego zasypywania setką ćwiczeń. Zawsze 2–4 ćwiczenia, zawsze trafione w potrzeby.
+
+Moduł realizuje zasadę: aplikacja nie może tylko dodawać obciążenia. Musi też uczyć, gdzie organizm jest słaby i jak to naprawić, zanim pojawi się kontuzja.
+
+Skąd aplikacja wie, co zalecić
+
+Użytkownik wypełnia profil zdrowotny. Zaznacza w nim tagi opisujące jego stan:
+
+• Przykładowe tagi: ból kolan przy przysiadzie, tendinopatia rzepki, kolana uciekające do środka, dyskopatia lędźwiowa, protrakcja barków (sylwetka biurowa), ograniczone zgięcie w kostce, płytki oddech, przodopochylenie miednicy, niestabilność barku, ból biodra, praca siedząca, bieganie, sztywność przywodzicieli — i kilkanaście innych.
+
+• Zaznacza też preferencję: kiedy chce wykonywać blok korekcyjny — jako rozgrzewkę przed treningiem siłowym, w dzień bez treningu, czy jako osobną, samodzielną sesję.
+
+Jak algorytm układa blok
+Algorytm patrzy na tagi użytkownika i grupuje je według regionów ciała: stopa i staw skokowy, kolano, biodro i miednica, kręgosłup i tułów, barki i łopatki.
+
+Wybiera 1–2 regiony, które najbardziej potrzebują uwagi (najwięcej pasujących tagów, najwyższa waga problemu).
+
+Z każdego wybranego regionu dobiera 1–2 ćwiczenia — preferując te najtrafniej pasujące do konkretnych tagów i o niższym poziomie trudności (chyba że użytkownik jest zaawansowany i dane ćwiczenie wykonuje już bez problemu od kilku tygodni).
+
+
+Szacuje całkowity czas bloku i wyświetla go użytkownikowi.
+
+Blok jest odnawiany (przeliczany) co 4 tygodnie, losuje nowe cwiczenia według tagów. — dla świeżości i progresji.
+
+Biblioteka ćwiczeń — co musi zawierać każde ćwiczenie
+
+Moduł 8 opiera się na bibliotece  starannie opisanych ćwiczeń . Każde ćwiczenie ma przypisane:
+
+• Nazwa — np. "Dead bug (martwy robak)"
+• Region ciała — stopa/skok, kolano, biodro/miednica, kręgosłup/tułów, barki/łopatki
+• Cel anatomiczny — konkretny mięsień lub staw, na który działa (np. "m. obszerny przyśrodkowy (VMO)")
+• Jaki problem rozwiązuje — na jaki dolegliwość działa. 
+• Tagi — po których algorytm dopasowuje ćwiczenie do profilu użytkownika
+• Poziom trudności — 1 (początkujący/rehabilitacja), 2 (średni), 3 (zaawansowany)
+• Schemat wykonania — domyślna liczba serii, powtórzeń lub czasu, opcjonalne przytrzymanie
+• Instrukcja krok po kroku
+• Najczęstsze błędy — co użytkownik prawdopodobnie zrobi źle
+• Przeciwwskazania — kiedy NIE wykonywać
+• Progresja — trudniejsza wersja ćwiczenia, na które można przejść gdy obecna staje się zbyt łatwa
+• Regresja — łatwiejsza wersja, gdy użytkownik nie daje rady lub zgłasza ból
+
+
+
+Jak to wygląda z perspektywy użytkownika w sekcji rozgrzewka przed treningiem siłowym.
+
+
+Użytkownik widzi aktywny blok — nazwę (np. "Stabilizacja kolan i stóp"), szacowany czas (np. "~12 min"), 
+
+Poniżej — 2 do 4 kart ćwiczeń. Każda karta pokazuje: nazwę ćwiczenia, miniaturę zdjęcia, schemat wykonania (np. "3 serie × 45 s"), a po kliknięciu rozwija się i pokazuje: instrukcję krok po kroku, najczęstsze błędy (zaznaczone jako przestrogi), 
+
+
+• Po każdej serii: 15–30 sekund odpoczynku.
+
+
+Historia
+
+Wykres słupkowy pokazujący, jaki procent zaplanowanych bloków użytkownik faktycznie wykonał w ostatnich 4 tygodniach. Lista wykonanych sesji z datami. Prosta statystyka: compliance rate w tym miesiącu.
+
+
+
+Preferencje użytkownika zawarte w kafelku "dolegliwości"
+
+W ustawieniach Modułu 8 użytkownik może określić: kiedy chce wykonywać blok (przed treningiem / w dzień nietreningowy / jako osobna sesja), maksymalny czas bloku (5, 10, 15 minut lub bez limitu), jak często blok ma być odświeżany (co 2, 4 lub 8 tygodni), oraz czy chce dostawać powiadomienia.
+
+Progresja i regresja — blok się uczy
+
+To nie jest statyczny zestaw. Moduł śledzi, co użytkownik robi:
+
+• Jeśli dane ćwiczenie jest wykonywane bez zarzutu przez 4+ tygodnie, aplikacja delikatnie sugeruje przejście na trudniejszą wersję (progresję) — np. ze zwykłego dead buga na dead bug z nogami wyprostowanymi.
+• Jeśli użytkownik oznaczy ćwiczenie jako "za trudne" lub zgłosi ból w trakcie, aplikacja natychmiast podmienia je na łatwiejszą wersję (regresję) i dopisuje notatkę do profilu — tak jak zrobiłby to dobry fizjoterapeuta.
+
+Zasada przewodnia
+
+Moduł 8 uczy użytkownika rozumieć swoje ciało. Każde ćwiczenie ma opisany mechanizm działania nie po to, żeby brzmieć mądrze, tylko żeby użytkownik wiedział PO CO to robi. Ktoś, kto rozumie, że "kolano ucieka mi do środka, bo nie aktywuję odwodzicieli", będzie to korygował nie tylko na macie, ale też pod sztangą. I właśnie wtedy Moduł 8 wykonał swoją robotę.

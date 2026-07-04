@@ -1,0 +1,16 @@
+{
+  "name": "easytraining",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EasyTraining — offline trening app packaged for iOS via Capacitor",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

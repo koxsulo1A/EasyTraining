@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Generated web bundle (rebuilt in CI from source in repo root)
+www/
+
+# Generated native iOS project (regenerated in CI on macOS)
+ios/
+
+# Build output
+build/
+DerivedData/
+Payload/
+*.ipa
+
+# OS junk
+.DS_Store
+Thumbs.db

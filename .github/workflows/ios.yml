@@ -1,0 +1,63 @@
+name: Build unsigned iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web assets (-> www)
+        run: npm run build:web
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Sync Capacitor (copies web + pod install)
+        run: npx cap sync ios
+
+      - name: Build unsigned archive
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/App.xcarchive" \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
+
+      - name: Package .ipa (unsigned)
+        run: |
+          set -e
+          APP_DIR="build/App.xcarchive/Products/Applications"
+          test -d "$APP_DIR/App.app" || { echo "App.app not found"; ls -R build/App.xcarchive/Products || true; exit 1; }
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP_DIR/App.app" Payload/App.app
+          zip -r -y "EasyTraining-unsigned.ipa" Payload >/dev/null
+          echo "Built:" && ls -lh EasyTraining-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyTraining-unsigned-ipa
+          path: EasyTraining-unsigned.ipa
+          if-no-files-found: error
