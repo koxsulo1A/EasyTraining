@@ -80,13 +80,53 @@
   // ── MOBILE NAV ───────────────────────────────────
   function MobileNav() {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
-    return _h('nav', { className:'mobile-nav' },
-      ET.MOBILE_TABS.map(function(item) {
-        return _h('div', { key:item.id, className:'mn-item'+(current===item.id?' active':''), onClick:function(){ navigate(item.id); } },
-          _h('span', { className:'mn-item-icon' }, item.icon),
-          _h('span', { className:'mn-item-label' }, item.label)
-        );
-      })
+    var ms = React.useState(false); var showMore = ms[0], setShowMore = ms[1];
+
+    // Grupy w sheet "Więcej" (wszystko poza MOBILE_TABS)
+    var tabIds = ET.MOBILE_TABS.map(function(t){ return t.id; });
+    var moreGroups = ET.NAV_GROUPS.map(function(g){
+      return Object.assign({}, g, { items: g.items.filter(function(i){ return tabIds.indexOf(i.id)===-1; }) });
+    }).filter(function(g){ return g.items.length > 0; });
+
+    function goTo(id) { setShowMore(false); navigate(id); }
+
+    var isMoreActive = !ET.MOBILE_TABS.some(function(t){ return t.id===current; });
+
+    return _h('div', null,
+      _h('nav', { className:'mobile-nav' },
+        ET.MOBILE_TABS.map(function(item) {
+          return _h('div', { key:item.id, className:'mn-item'+(current===item.id?' active':''), onClick:function(){ setShowMore(false); navigate(item.id); } },
+            _h('span', { className:'mn-item-icon' }, item.icon),
+            _h('span', { className:'mn-item-label' }, item.label)
+          );
+        }),
+        _h('div', { className:'mn-item'+(isMoreActive?' active':''), onClick:function(){ setShowMore(function(v){ return !v; }); } },
+          _h('span', { className:'mn-item-icon' }, '⋯'),
+          _h('span', { className:'mn-item-label' }, 'Więcej')
+        )
+      ),
+      showMore && _h('div', { style:{ position:'fixed', inset:0, zIndex:190, background:'rgba(0,0,0,.5)' }, onClick:function(){ setShowMore(false); } },
+        _h('div', { style:{ position:'absolute', bottom:'calc(var(--bnh) + env(safe-area-inset-bottom,0px))', left:0, right:0, background:'var(--s1)', borderRadius:'16px 16px 0 0', maxHeight:'70vh', overflowY:'auto', padding:'8px 0 12px' },
+          onClick:function(e){ e.stopPropagation(); } },
+          _h('div', { style:{ width:36, height:4, borderRadius:2, background:'var(--b2)', margin:'8px auto 12px' } }),
+          moreGroups.map(function(g, gi) {
+            return _h('div', { key:gi },
+              g.s && _h('div', { style:{ fontSize:'.6rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.1em', padding:'8px 20px 4px' } }, g.s),
+              _h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, padding:'0 12px 4px' } },
+                g.items.map(function(item) {
+                  var active = current===item.id;
+                  return _h('div', { key:item.id,
+                    style:{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, background: active?'var(--a-dim)':'var(--s2)', cursor:'pointer', color: active?'var(--a-light)':'var(--t2)' },
+                    onClick:function(){ goTo(item.id); } },
+                    _h('span', { style:{ fontSize:'1.1rem', width:22, textAlign:'center' } }, item.icon),
+                    _h('span', { style:{ fontSize:'.78rem', fontWeight:600 } }, item.label)
+                  );
+                })
+              )
+            );
+          })
+        )
+      )
     );
   }
 

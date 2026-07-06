@@ -90,3 +90,9 @@ export { UserStore, registerUserStore, USER_MODULE_MANIFEST } from './data/user'
 export type { UserProfile, WeightRecord, Sex } from './data/user';
 export { syncRunningWorkouts } from './integrations/health';
 export type { HealthProvider, HealthWorkout, ImportedRun, HealthSyncResult } from './integrations/health';
+export { registerOrmEngine, latestOrm, ormHistory, ORM_ENGINE_MANIFEST } from './engines/orm-engine';
+export type { CompoundResolver } from './engines/orm-engine';
+export { computeOrm, buildTrendNote } from './engines/orm-ensemble';
+export type { OrmInput, OrmResult, SetInput, ExerciseMeta, SetAnalysis } from './engines/orm';
+export { computeSeriesQuality } from './engines/orm-quality';
+export type { QualityBreakdown } from './engines/orm-quality';

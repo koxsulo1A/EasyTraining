@@ -520,8 +520,13 @@
         }, 0);
         if (ex.e1rm > prevBest && ex.e1rm > 0) prs.push({ name:ex.name, e1rm:ex.e1rm });
       });
+      // Flush aktywnej przerwy (jeśli użytkownik kończy podczas odliczania)
+      var activeRestMs = restStartRef.current ? (Date.now() - restStartRef.current) : 0;
+      var finalRestMs = totalRestMs + activeRestMs;
       var totalMs = Date.now() - t0.current;
-      var session = { id:Date.now(), name:plan.name, planId:plan.id, date:ET.dstr(), duration:totalMs, restMs:totalRestMs, workMs:totalMs-totalRestMs, exercises:exData, volume:vol, totalReps:totalReps, prs:prs, readiness:props.readiness };
+      // workMs nie może być ujemne (np. gdy serie były bardzo szybkie)
+      var safeRestMs = Math.min(finalRestMs, totalMs);
+      var session = { id:Date.now(), name:plan.name, planId:plan.id, date:ET.dstr(), duration:totalMs, restMs:safeRestMs, workMs:Math.max(0, totalMs-safeRestMs), exercises:exData, volume:vol, totalReps:totalReps, prs:prs, readiness:props.readiness };
       update(function(s){
         var n = Object.assign({},s,{ workouts:[session].concat(s.workouts) });
         return ET.syncGoals ? ET.syncGoals(n, 'workout', session) : n;
@@ -1647,6 +1652,50 @@
               _h('div', { style:{ width:64, fontSize:'.66rem', color:'var(--t3)', textAlign:'right', flexShrink:0 } }, row.v.toLocaleString('pl-PL')+' kg')
             );
           })
+        );
+      })(),
+
+      // ── 1RM ESTIMATION ENGINE: wyniki per ćwiczenie ───────────────────────
+      (function() {
+        if (!window.etcore || !ETCore.latestOrm) return null;
+        // Zbierz wszystkie ćwiczenia z ostatniego treningu
+        var lastW = (store.workouts||[])[0];
+        if (!lastW || !lastW.exercises) return null;
+        var ormRows = (lastW.exercises||[]).map(function(ex) {
+          return { name:ex.name, result: ETCore.latestOrm(window.etcore, ex.name) };
+        }).filter(function(r){ return r.result && r.result.orm1rm > 0; });
+        if (!ormRows.length) return null;
+
+        return _h('div', { className:'card', style:{ marginBottom:16 } },
+          _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
+            _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' } }, '💪 Estymowany 1RM'),
+            _h('span', { style:{ fontSize:'.65rem', color:'var(--t3)' } }, 'po ostatnim treningu')
+          ),
+          ormRows.map(function(row) {
+            var r = row.result;
+            var delta = r.deltaFromPrevious;
+            var deltaEl = delta != null
+              ? _h('span', { style:{ fontSize:'.72rem', fontWeight:700, color: delta>=0?'var(--green)':'var(--red)', marginLeft:6 } },
+                  (delta>=0?'+':'')+delta.toFixed(1)+' kg')
+              : null;
+            var confColor = r.confidence >= 70 ? 'var(--green)' : r.confidence >= 40 ? 'var(--orange)' : 'var(--red)';
+            return _h('div', { key:row.name, style:{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid var(--s3)' } },
+              _h('div', { style:{ flex:1 } },
+                _h('div', { style:{ fontSize:'.82rem', fontWeight:600 } }, row.name),
+                r.trendNote && _h('div', { style:{ fontSize:'.65rem', color:'var(--t2)', marginTop:2, lineHeight:1.4 } }, r.trendNote)
+              ),
+              _h('div', { style:{ textAlign:'right', flexShrink:0, marginLeft:8 } },
+                _h('div', { style:{ fontSize:'1.05rem', fontWeight:800, color:'var(--a-light)' } },
+                  r.orm1rm.toFixed(1)+' kg', deltaEl),
+                _h('div', { style:{ fontSize:'.6rem', color:confColor } }, 'pewność '+r.confidence+'%')
+              )
+            );
+          }),
+          // Trend note (pierwsza seria z notatką) — jeśli nie wyświetlono inline
+          (function() {
+            var first = ormRows.find(function(r){ return r.result.trendNote; });
+            return null; // już wyświetlamy inline per ćwiczenie
+          })()
         );
       })(),
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>EasyTraining</title>
-<link rel="stylesheet" href="css/styles.css?v=1">
+<link rel="stylesheet" href="css/styles.css?v=2">
 <style>
 #boot{display:flex;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;background:#080810;gap:16px}
 #boot-icon{font-size:3rem}
@@ -38,7 +38,7 @@ window.ET = {};
 <script src="js/vendor/react-dom.development.js"></script>
 
 <!-- Core (TypeScript → bundle): event bus, wersjonowanie, migracja -->
-<script src="js/core.bundle.js?v=7"></script>
+<script src="js/core.bundle.js?v=8"></script>
 <script>
 // Bootstrap rdzenia: migracja legacy et_v1 (jednorazowa) + rejestracja silników.
 try {
@@ -57,6 +57,10 @@ try {
   ETCore.registerRunningEngine(window.etcore);
   window.etcore.user = ETCore.registerUserStore(window.etcore);
   // GoalProvider: cele powiązane z ćwiczeniem z legacy store (okres przejściowy)
+  ETCore.registerOrmEngine(window.etcore, function (name) {
+    var ex = (window.ET && ET.EXERCISES_BASIC || []).find(function (e) { return e.name === name; });
+    return !!(ex && ex.isCompound);
+  });
   ETCore.registerGoalEngine(window.etcore, function () {
     try {
       var s = JSON.parse(localStorage.getItem('et_v1') || '{}');
@@ -84,7 +88,7 @@ try {
 
 <!-- Modules -->
 <script src="js/dashboard.js?v=7"></script>
-<script src="js/strength.js?v=16"></script>
+<script src="js/strength.js?v=18"></script>
 <script src="js/running.js?v=11"></script>
 <script src="js/sleep.js?v=5"></script>
 <script src="js/sauna.js?v=5"></script>
@@ -114,7 +118,7 @@ try {
 <script src="js/habits.js"></script>
 
 <!-- App bootstrap (last) -->
-<script src="js/app.js?v=9"></script>
+<script src="js/app.js?v=10"></script>
 
 </body>
 </html>
