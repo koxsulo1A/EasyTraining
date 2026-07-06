@@ -229,6 +229,8 @@
         }
         return next;
       });
+      // Core (TOM II): masa → historia masy ciała (append-only)
+      if (window.etcore && f.weight) { try { window.etcore.bus.publish('WeightUpdated', { weight:f.weight, measuredAt: f.date ? new Date(f.date).getTime() : Date.now() }, 'user'); } catch(e) { console.error('[core]', e); } }
       toast(editRec ? 'Pomiar zaktualizowany ✓' : 'Pomiary zapisane'+(pc>0?' · '+pc+' zdjęć ✓':' ✓'), 'success');
       handleClose();
     }
@@ -343,6 +345,7 @@
     var lb = React.useState(null); var lightbox = lb[0], setLightbox = lb[1];
     var ed = React.useState(null); var editTarget = ed[0], setEditTarget = ed[1];
     var co = React.useState(false); var showCoach = co[0], setShowCoach = co[1];
+    var ti = React.useState(null); var tileOpen = ti[0], setTileOpen = ti[1];
 
     function openEdit(m) { setEditTarget(m); setShowAdd(true); }
 
@@ -365,6 +368,31 @@
     }
 
     var comp = last ? ET.bodyComp(last, store.profile) : {};
+    var height = (store.profile && store.profile.height) || null;
+
+    function seriesFor(kind) {
+      return meas.slice().reverse().map(function(m) {
+        var v = kind==='bmi' ? ET.bmi(m.weight, height) : kind==='whr' ? ET.whr(m.waist, m.hips) : (m.waist!=null ? m.waist : null);
+        return v!=null ? { date:m.date, val:v } : null;
+      }).filter(Boolean);
+    }
+    function Sparkline(pts, color) {
+      if (pts.length < 2) return _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', padding:'8px 0', textAlign:'center' } }, 'Za mało danych do wykresu');
+      var vals = pts.map(function(p){ return p.val; });
+      var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+      var W=280, H=48, pad=5, rng=(max-min)||1;
+      function x(i){ return pad + i/(pts.length-1)*(W-2*pad); }
+      function y(v){ return H-pad - ((v-min)/rng)*(H-2*pad); }
+      return _h('svg', { viewBox:'0 0 '+W+' '+H, style:{ width:'100%', height:'auto' } },
+        _h('polyline', { points:pts.map(function(p,i){ return x(i)+','+y(p.val); }).join(' '), fill:'none', stroke:color||'var(--a-light)', strokeWidth:2 }),
+        pts.map(function(p,i){ return _h('circle', { key:i, cx:x(i), cy:y(p.val), r:2, fill:color||'var(--a-light)' }); })
+      );
+    }
+    var METRIC_TILES = [
+      { id:'bmi',   label:'BMI',        val: comp.bmi!=null ? comp.bmi.toFixed(1) : '—', cat:comp.bmiCat },
+      { id:'whr',   label:'WHR',        val: comp.whr!=null ? comp.whr.toFixed(2) : '—', cat:comp.whrCat },
+      { id:'waist', label:'Obwód pasa', val: (last && last.waist!=null) ? last.waist+' cm' : '—', cat:comp.waistCat },
+    ];
 
     function diff(key) {
       if (!last||!prev||last[key]==null||prev[key]==null) return null;
@@ -381,6 +409,29 @@
           _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowCoach(true); } }, '🤖 AI Coach'),
           _h('button', { className:'btn btn-primary', onClick:function(){ setEditTarget(null); setShowAdd(true); } }, '+ Dodaj pomiar')
         )
+      ),
+
+      // ── 3 KAFELKI: BMI / WHR / OBWÓD PASA (prompt 3.1) ───────────────────
+      last && _h('div', { style:{ marginBottom:14 } },
+        _h('div', { className:'grid-3', style:{ gap:8 } },
+          METRIC_TILES.map(function(t) {
+            var c = t.cat ? t.cat.color : 'var(--t3)';
+            var open = tileOpen===t.id;
+            return _h('div', { key:t.id, className:'card', style:{ cursor:'pointer', textAlign:'center', padding:'12px 8px', borderTop:'3px solid '+c, background: open?'var(--s3)':'var(--s2)' },
+              onClick:function(){ setTileOpen(open?null:t.id); } },
+              _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:3 } }, t.label),
+              _h('div', { style:{ fontSize:'1.4rem', fontWeight:800 } }, t.val),
+              t.cat && _h('div', { style:{ fontSize:'.6rem', fontWeight:700, color:c, marginTop:2 } }, t.cat.label)
+            );
+          })
+        ),
+        tileOpen && (function() {
+          var mt = METRIC_TILES.find(function(x){ return x.id===tileOpen; }) || {};
+          return _h('div', { className:'card', style:{ marginTop:8, padding:'10px 12px' } },
+            _h('div', { style:{ fontSize:'.66rem', color:'var(--t3)', marginBottom:6, textTransform:'uppercase', letterSpacing:'.05em', fontWeight:700 } }, 'Trend — '+mt.label),
+            Sparkline(seriesFor(tileOpen), mt.cat && mt.cat.color)
+          );
+        })()
       ),
 
       last && _h('div', { className:'card card-accent', style:{ marginBottom:14, cursor:'pointer' }, onClick:function(){ openEdit(last); } },
@@ -421,33 +472,18 @@
         )
       ),
 
-      // ── SKŁAD CIAŁA (BMI / Body Fat / WHR) ───────────────────────────────
-      last && (comp.bmi!=null || comp.bodyFat!=null || comp.whr!=null) && _h('div', { className:'card', style:{ marginBottom:14 } },
+      // ── BODY FAT (BMI/WHR/pas są w kafelkach powyżej) ────────────────────
+      last && (comp.bodyFat!=null || !comp.height) && _h('div', { className:'card', style:{ marginBottom:14 } },
         _h('div', { style:{ fontWeight:700, fontSize:'.82rem', color:'var(--t2)', marginBottom:10 } }, '🧬 Skład ciała'),
-        _h('div', { className:'grid-2', style:{ gap:8 } },
-          comp.bmi!=null && _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'10px 12px' } },
-            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:2 } }, 'BMI'),
-            _h('div', { style:{ fontSize:'1.3rem', fontWeight:700 } }, comp.bmi.toFixed(1)),
-            comp.bmiCat && _h('div', { style:{ fontSize:'.62rem', fontWeight:700, color:comp.bmiCat.color } }, comp.bmiCat.label)
-          ),
-          comp.bodyFat!=null && _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'10px 12px' } },
-            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:2 } }, 'Tkanka tłuszczowa'),
-            _h('div', { style:{ fontSize:'1.3rem', fontWeight:700 } }, comp.bodyFat.toFixed(1)+'%'),
-            comp.bodyFatCat && _h('div', { style:{ fontSize:'.62rem', fontWeight:700, color:comp.bodyFatCat.color } }, comp.bodyFatCat.label)
-          ),
-          comp.whr!=null && _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'10px 12px' } },
-            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:2 } }, 'WHR (talia/biodra)'),
-            _h('div', { style:{ fontSize:'1.3rem', fontWeight:700 } }, comp.whr.toFixed(2)),
-            comp.whrCat && _h('div', { style:{ fontSize:'.62rem', fontWeight:700, color:comp.whrCat.color } }, comp.whrCat.label)
-          ),
-          last.waist!=null && comp.waistCat && _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'10px 12px' } },
-            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:2 } }, 'Obwód pasa'),
-            _h('div', { style:{ fontSize:'1.3rem', fontWeight:700 } }, last.waist+' cm'),
-            _h('div', { style:{ fontSize:'.62rem', fontWeight:700, color:comp.waistCat.color } }, comp.waistCat.label)
-          )
-        ),
-        !comp.height && _h('div', { style:{ fontSize:'.66rem', color:'var(--t3)', marginTop:8 } },
-          '📐 Dodaj wzrost w Profilu, aby liczyć BMI i % tkanki tłuszczowej.')
+        comp.bodyFat!=null
+          ? _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--s3)', borderRadius:'var(--r2)', padding:'10px 14px' } },
+              _h('div', null,
+                _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:2 } }, 'Tkanka tłuszczowa (US Navy)'),
+                _h('div', { style:{ fontSize:'1.4rem', fontWeight:800 } }, comp.bodyFat.toFixed(1)+'%')
+              ),
+              comp.bodyFatCat && _h('span', { style:{ fontSize:'.72rem', fontWeight:700, color:comp.bodyFatCat.color } }, comp.bodyFatCat.label)
+            )
+          : _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, '📐 Dodaj wzrost w Profilu, aby liczyć BMI i % tkanki tłuszczowej.')
       ),
 
       // ── PORÓWNANIE Z PIERWSZYM POMIAREM (spec 8.3) ───────────────────────

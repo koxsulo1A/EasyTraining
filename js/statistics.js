@@ -32,6 +32,7 @@
 
   function StatisticsModule() {
     var su = ET.useStore(); var store = su.store;
+    var nav = ET.useNav(); var navigate = nav.navigate;
     var tab = React.useState('strength'); var activeTab = tab[0], setActiveTab = tab[1];
     var rng = React.useState(30); var range = rng[0], setRange = rng[1];
     var exSel = React.useState([]); var selExes = exSel[0], setSelExes = exSel[1];
@@ -194,7 +195,7 @@
     return _h('div', { className:'fade-in' },
       _h('div', { className:'page-hdr' },
         _h('h1', null, 'Statystyki'),
-        _h('div', null)
+        _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ navigate('history'); } }, '📜 Historia')
       ),
 
       // All-time top row

@@ -111,6 +111,15 @@
     },
   ];
 
+  // ── PERIODYZACJA: domyślne zakresy tygodni + deload dla wbudowanych planów ─
+  var DEFAULT_RANGES = [
+    { id:1, startWeek:1, endWeek:4,  mode:'progresja', deloadPct:15, volumePct:65 },
+    { id:2, startWeek:5, endWeek:8,  mode:'progresja', deloadPct:15, volumePct:85 },
+    { id:3, startWeek:9, endWeek:12, mode:'deload',    deloadPct:15, volumePct:50 },
+  ];
+  function defaultRanges() { return JSON.parse(JSON.stringify(DEFAULT_RANGES)); }
+  WORKOUT_PLANS.forEach(function(p){ if (!p.ranges) p.ranges = defaultRanges(); });
+
   // Udostępnij plany innym modułom (np. eksport CSV/XLSX)
   ET.WORKOUT_PLANS = WORKOUT_PLANS;
 
@@ -517,6 +526,8 @@
         var n = Object.assign({},s,{ workouts:[session].concat(s.workouts) });
         return ET.syncGoals ? ET.syncGoals(n, 'workout', session) : n;
       });
+      // Core (Faza 1): zdarzenie → Workout Engine liczy objętość per mięsień
+      if (window.etcore) { try { window.etcore.bus.publish('WorkoutFinished', session, 'user'); } catch(e) { console.error('[core] publish:', e); } }
       props.onFinish({ session:session, prs:prs });
     }
 
@@ -575,13 +586,14 @@
           ),
           ex.expanded && _h('div', { style:{ padding:'0 12px 12px' } },
             _h('table', { className:'sets-table' },
-              _h('thead', null, _h('tr', null, _h('th',null,'#'), _h('th',null,'Powt.'), _h('th',null,'kg'), _h('th',null,'1RM'), _h('th',null,'✓'), _h('th',null,''))),
+              _h('thead', null, _h('tr', null, _h('th',null,'#'), _h('th',null,'Powt.'), _h('th',null,'kg'), _h('th',{ title:'Subiektywna trudność 1-10' },'RPE'), _h('th',null,'1RM'), _h('th',null,'✓'), _h('th',null,''))),
               _h('tbody', null,
                 ex.setsData.map(function(s, si) {
                   return _h('tr', { key:s.id, style:{ opacity:s.done?.5:1, transition:'opacity .2s' } },
                     _h('td', { style:{ color:'var(--t3)', fontSize:'.75rem' } }, si+1),
                     _h('td', null, _h('input', { type:'number', value:s.reps, min:1, onChange:function(e){ upSet(ex.id,s.id,'reps',e.target.value); } })),
                     _h('td', null, _h('input', { type:'number', value:s.weight, min:0, step:2.5, onChange:function(e){ upSet(ex.id,s.id,'weight',e.target.value); } })),
+                    _h('td', null, _h('input', { type:'number', value:s.rpe!=null?s.rpe:'', min:1, max:10, step:0.5, placeholder:'–', style:{ width:44 }, onChange:function(e){ upSet(ex.id,s.id,'rpe',e.target.value); } })),
                     _h('td', { style:{ color:'var(--a-light)', fontWeight:600 } }, calc1RM(s.weight,s.reps)||'—'),
                     _h('td', null, _h('div', { className:'set-done-btn'+(s.done?' done':''), onClick:function(){ if(!s.done)doneSet(ex.id,s.id,ex.rest); } }, s.done?'✓':'○')),
                     _h('td', null, _h('button', { style:{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.85rem', padding:'2px 4px', lineHeight:1 }, onClick:function(){ removeSet(ex.id,s.id); } }, '✕'))
@@ -1129,7 +1141,10 @@
     var base = WORKOUT_PLANS.map(function(p) {
       return overrides[p.id] ? Object.assign({}, p, overrides[p.id]) : p;
     });
-    return base.concat(customs);
+    // każdy plan ma periodyzację (zakresy tygodni + deload) — domyślnie 1-4/5-8/9-12
+    return base.concat(customs).map(function(p) {
+      return p.ranges ? p : Object.assign({}, p, { ranges: defaultRanges() });
+    });
   }
 
   // ── EDYTOR PLANU (widok pojedynczego planu) ──────────────────────────────
@@ -1190,7 +1205,24 @@
       })}); });
     }
 
+    function upRange(ri, field, val) {
+      setEditing(function(p){ var ranges=(p.ranges||[]).map(function(r,j){ if(j!==ri)return r; var o={}; o[field]=val; return Object.assign({},r,o); }); return Object.assign({},p,{ranges:ranges}); });
+    }
+    function shiftBoundary(ri, delta) {
+      setEditing(function(p){
+        var ranges = JSON.parse(JSON.stringify(p.ranges||[]));
+        var a=ranges[ri], b=ranges[ri+1];
+        if(!a||!b||a.startWeek==null||b.startWeek==null) return p;
+        var ne=a.endWeek+delta;
+        if(ne<a.startWeek) ne=a.startWeek;
+        if(ne>=b.endWeek) ne=b.endWeek-1;
+        a.endWeek=ne; b.startWeek=ne+1;
+        return Object.assign({},p,{ranges:ranges});
+      });
+    }
+
     var ICONS = ['💪','🦵','🏋️','⚡','🔥','🧘','🏃','🤸','🥊','🎯','🌟','📋'];
+    var RANGE_COLORS = ['var(--a)','var(--green)','var(--purple)','var(--orange)','var(--teal)'];
 
     return _h('div', { style:{ paddingBottom:20 } },
       _h('div', { style:{ display:'flex', gap:8, marginBottom:16, position:'sticky', top:0, background:'var(--s1)', padding:'12px 0 8px', zIndex:5, borderBottom:'1px solid var(--b1)' } },
@@ -1216,6 +1248,52 @@
           _h('div', { className:'field' }, _h('label', null, 'Dzień'), _h('input', { type:'text', value:editing.day||'', onChange:function(e){ upE('day',e.target.value); } })),
           _h('div', { className:'field' }, _h('label', null, 'Opis skrócony'), _h('input', { type:'text', value:editing.desc||'', onChange:function(e){ upE('desc',e.target.value); } }))
         )
+      ),
+
+      // ── PERIODYZACJA: zakresy tygodni + deload ─────────────────────────
+      editing.ranges && editing.ranges.length>0 && editing.ranges[0].startWeek!=null && _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, marginBottom:12, fontSize:'.85rem', color:'var(--t2)' } }, '📆 Periodyzacja — zakresy tygodni'),
+        (function() {
+          var ranges = editing.ranges;
+          var total = ranges[ranges.length-1].endWeek || 12;
+          function blockOf(w){ for(var i=0;i<ranges.length;i++){ if(w>=ranges[i].startWeek && w<=ranges[i].endWeek) return i; } return -1; }
+          return _h('div', null,
+            _h('div', { style:{ display:'flex', gap:2, marginBottom:8 } },
+              (function(){ var cells=[]; for(var w=1;w<=total;w++){ var bi=blockOf(w); cells.push(_h('div',{ key:w, style:{ flex:1, height:22, borderRadius:3, background: bi>=0?RANGE_COLORS[bi%RANGE_COLORS.length]:'var(--b1)', opacity:.85, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'.5rem', color:'#fff', fontWeight:700 } }, w)); } return cells; })()
+            ),
+            ranges.length>1 && _h('div', { style:{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:10 } },
+              ranges.slice(0,-1).map(function(rg, ri) {
+                return _h('div', { key:ri, style:{ display:'flex', alignItems:'center', gap:4, fontSize:'.66rem', color:'var(--t3)' } },
+                  _h('span', null, 'Granica '+(ri+1)+'|'+(ri+2)+':'),
+                  _h('button', { className:'btn btn-ghost btn-sm', style:{ padding:'2px 7px' }, onClick:function(){ shiftBoundary(ri,-1); } }, '◀'),
+                  _h('b', { style:{ color:'var(--t1)' } }, 'tydz. '+rg.endWeek),
+                  _h('button', { className:'btn btn-ghost btn-sm', style:{ padding:'2px 7px' }, onClick:function(){ shiftBoundary(ri,1); } }, '▶')
+                );
+              })
+            ),
+            ranges.map(function(rg, ri) {
+              return _h('div', { key:ri, style:{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', padding:'8px 0', borderTop:ri>0?'1px solid var(--b1)':'none' } },
+                _h('div', { style:{ fontWeight:700, fontSize:'.82rem', minWidth:82, color:RANGE_COLORS[ri%RANGE_COLORS.length] } }, 'Tydz. '+rg.startWeek+'–'+rg.endWeek),
+                _h('div', { style:{ display:'flex', gap:4 } },
+                  [{ id:'progresja', l:'📈 Progresja' }, { id:'deload', l:'📉 Deload' }].map(function(m) {
+                    return _h('button', { key:m.id, className:'tag-btn'+(rg.mode===m.id?' active':''), style:{ fontSize:'.68rem' }, onClick:function(){ upRange(ri,'mode',m.id); } }, m.l);
+                  })
+                ),
+                _h('div', { style:{ display:'flex', alignItems:'center', gap:3 } },
+                  _h('span', { style:{ fontSize:'.64rem', color:'var(--t3)' } }, 'obj.'),
+                  _h('input', { type:'number', min:30, max:100, value:rg.volumePct!=null?rg.volumePct:80, style:{ width:52 }, onChange:function(e){ upRange(ri,'volumePct',+e.target.value); } }),
+                  _h('span', { style:{ fontSize:'.64rem', color:'var(--t3)' } }, '%')
+                ),
+                rg.mode==='deload' && _h('div', { style:{ display:'flex', alignItems:'center', gap:3 } },
+                  _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, 'deload -'),
+                  _h('input', { type:'number', min:5, max:50, value:rg.deloadPct, style:{ width:50 }, onChange:function(e){ upRange(ri,'deloadPct',+e.target.value); } }),
+                  _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, '%')
+                )
+              );
+            })
+          );
+        })(),
+        _h('div', { style:{ fontSize:'.66rem', color:'var(--t3)', marginTop:8, lineHeight:1.5 } }, '💡 Przesuwaj granice ◀▶ (np. 1-4 → 1-5), ustaw tryb i deload dla każdego bloku. Tydzień zalicza się po wszystkich treningach.')
       ),
 
       _h('div', { style:{ marginBottom:14 } },
@@ -1374,8 +1452,14 @@
       e.target.value='';
     }
 
-    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title: selPlan ? (selPlan._isCustom&&!getPlans().find(function(p){return p.id===selPlan.id;}) ? 'Nowy plan' : 'Edytuj: '+selPlan.name) : 'Edytor planów treningowych' },
+    function rangeSummary(p) {
+      if (!p.ranges || !p.ranges.length || p.ranges[0].startWeek==null) return null;
+      var deloads = p.ranges.filter(function(r){ return r.mode==='deload'; }).length;
+      var last = p.ranges[p.ranges.length-1];
+      return (last.endWeek||12)+' tyg.'+(deloads?' · '+deloads+'× deload':'');
+    }
 
+    return _h('div', { className:'fade-in' },
       selPlan
         ? _h(PlanEditView, {
             plan: selPlan,
@@ -1386,11 +1470,20 @@
           })
 
         : _h('div', null,
-            _h('div', { style:{ display:'flex', gap:8, marginBottom:16 } },
-              _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:addNewPlan }, '+ Nowy plan'),
-              _h('label', { className:'btn btn-secondary', style:{ flex:1, cursor:'pointer', textAlign:'center' } },
-                '📥 Import CSV',
-                _h('input', { type:'file', accept:'.csv,.txt', style:{ display:'none' }, onChange:importCSV })
+            _h('div', { className:'page-hdr' },
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+                _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onClose }, '←'),
+                _h('div', null,
+                  _h('h1', null, '📋 Edytor planów'),
+                  _h('p', null, getPlans().length+' planów treningowych')
+                )
+              ),
+              _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+                _h('button', { className:'btn btn-primary', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:addNewPlan }, '+ Nowy plan'),
+                _h('label', { className:'btn btn-secondary', style:{ fontSize:'.75rem', padding:'8px 12px', cursor:'pointer' } },
+                  '📥 Import CSV',
+                  _h('input', { type:'file', accept:'.csv,.txt', style:{ display:'none' }, onChange:importCSV })
+                )
               )
             ),
 
@@ -1400,22 +1493,29 @@
               _h('div', null, 'Typy: ', _h('b', null, 'warmup'), ' / ', _h('b', null, 'exercise'), ' / ', _h('b', null, 'cooldown'))
             ),
 
-            getPlans().map(function(p) {
-              var isModified = !p._isCustom && (store.workoutPlans||{})[p.id];
-              return _h('div', { key:p.id,
-                style:{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--b1)', cursor:'pointer' },
-                onClick:function(){ setSelPlan(Object.assign({},p)); }
-              },
-                _h('div', { style:{ width:42, height:42, borderRadius:'var(--r2)', background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem', flexShrink:0 } }, p.icon),
-                _h('div', { style:{ flex:1 } },
-                  _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, p.name),
-                  _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, (p.day||'')+(p.day&&p.exercises?' · ':'')+((p.exercises||[]).length)+' ćwiczeń'),
-                  isModified && _h('div', { style:{ fontSize:'.6rem', color:'var(--orange)', marginTop:2 } }, '✏️ Zmodyfikowany'),
-                  p._isCustom && _h('div', { style:{ fontSize:'.6rem', color:'var(--teal)', marginTop:2 } }, '⭐ Własny')
-                ),
-                _h('span', { style:{ color:'var(--t3)', fontSize:'1.1rem' } }, '›')
-              );
-            })
+            _h('div', { className:'grid-2', style:{ gap:10 } },
+              getPlans().map(function(p) {
+                var isModified = !p._isCustom && (store.workoutPlans||{})[p.id];
+                var summ = rangeSummary(p);
+                return _h('div', { key:p.id, className:'card card-interactive',
+                  style:{ cursor:'pointer', display:'flex', flexDirection:'column', gap:8, borderLeft:'3px solid '+(p.color||'var(--a)') },
+                  onClick:function(){ setSelPlan(JSON.parse(JSON.stringify(p))); }
+                },
+                  _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+                    _h('div', { style:{ width:40, height:40, borderRadius:'var(--r2)', background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem', flexShrink:0 } }, p.icon),
+                    _h('div', { style:{ flex:1, minWidth:0 } },
+                      _h('div', { style:{ fontWeight:700, fontSize:'.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, p.name),
+                      _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, (p.day?p.day+' · ':'')+((p.exercises||[]).length)+' ćwiczeń')
+                    )
+                  ),
+                  _h('div', { style:{ display:'flex', gap:5, flexWrap:'wrap' } },
+                    summ && _h('span', { className:'badge badge-blue', style:{ fontSize:'.58rem' } }, '📆 '+summ),
+                    isModified && _h('span', { className:'badge badge-orange', style:{ fontSize:'.58rem' } }, '✏️ Zmodyfikowany'),
+                    p._isCustom && _h('span', { className:'badge badge-teal', style:{ fontSize:'.58rem' } }, '⭐ Własny')
+                  )
+                );
+              })
+            )
           )
     );
   }
@@ -1435,6 +1535,7 @@
     var se = React.useState(false); var showEditor = se[0], setShowEditor = se[1];
 
     if (view==='ai-coach') return _h(AICoachView, { onBack:function(){ setView('list'); } });
+    if (showEditor) return _h(PlanEditorSheet, { onClose:function(){ setShowEditor(false); } });
 
     function selectPlan(p) {
       setPlan(p); setShowPicker(false);
@@ -1477,19 +1578,81 @@
           _h('p', null, workouts.length + ' sesji')
         ),
         _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
-          _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setView('ai-coach'); } }, '🤖 AI Coach'),
           _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowEditor(true); } }, '✏️ Edytuj plany'),
-          _h('button', { className:'btn btn-secondary', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowManualAdd(true); } }, '➕ Dodaj ręcznie'),
-          _h('button', { className:'btn btn-primary', onClick:function(){ setShowPicker(true); } }, '▶ Nowy trening')
+          _h('button', { className:'btn btn-secondary', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowManualAdd(true); } }, '➕ Dodaj ręcznie')
         )
       ),
 
       ET.ACWRAlert && _h(ET.ACWRAlert, null),
 
+      // ── KAFELKI NARZĘDZI (prompt 1.1) ──────────────────────────────────
+      (function() {
+        var acwrD = (typeof ET.acwrData==='function') ? ET.acwrData(store) : null;
+        var acwrReady = acwrD && acwrD.ready;
+        var az = acwrReady ? acwrD.zone : null;
+        function tile(icon, label, sub, onClick) {
+          return _h('div', { key:label, className:'card card-interactive', style:{ cursor:'pointer', padding:'14px 12px', textAlign:'center' }, onClick:onClick },
+            _h('div', { style:{ fontSize:'1.5rem', marginBottom:4 } }, icon),
+            _h('div', { style:{ fontWeight:700, fontSize:'.82rem' } }, label),
+            sub && _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)', marginTop:2 } }, sub)
+          );
+        }
+        return _h('div', { className:'grid-2', style:{ gap:8, marginBottom:16 } },
+          tile('🤖', 'AI Coach', 'Analiza treningu', function(){ setView('ai-coach'); }),
+          tile('🧩', 'Kreator Planu', 'Ułóż plan', function(){ nav.navigate('planner'); }),
+          _h('div', { key:'acwr', className:'card card-interactive', style:{ cursor:'pointer', padding:'14px 12px', textAlign:'center' }, onClick:function(){ nav.navigate('acwr'); } },
+            _h('div', { style:{ fontSize:'1.5rem', marginBottom:4 } }, '📈'),
+            _h('div', { style:{ fontWeight:700, fontSize:'.82rem' } }, 'ACWR'),
+            acwrReady
+              ? _h('div', { style:{ marginTop:4 } },
+                  _h('div', { style:{ fontSize:'1rem', fontWeight:800, color:az.color } }, (Math.round(acwrD.acwr*100)/100).toFixed(2).replace('.',',')),
+                  _h('div', { style:{ height:5, borderRadius:3, marginTop:5, background:'linear-gradient(90deg, var(--a-light) 0 40%, var(--green) 40% 65%, var(--orange) 65% 75%, var(--red) 75% 100%)', position:'relative' } },
+                    _h('div', { style:{ position:'absolute', left:'calc('+Math.max(0,Math.min(100,acwrD.acwr/2*100))+'% - 1.5px)', top:-1, width:3, height:7, background:'var(--t1)', borderRadius:1 } })
+                  )
+                )
+              : _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)', marginTop:2 } }, acwrD&&acwrD.hasData ? 'Zbieranie danych' : 'Brak danych')
+          ),
+          tile('▶', 'Nowy Trening', 'Rozpocznij', function(){ setShowPicker(true); })
+        );
+      })(),
+
+      // ── ANALIZA CORE: objętość per partia z Workout Engine (Faza 1) ─────
+      (function() {
+        if (!window.etcore || !ETCore.latestAnalysis) return null;
+        var a = ETCore.latestAnalysis(window.etcore);
+        if (!a || !a.totalVolume) return null;
+        var groups = Object.keys(a.perGroup||{}).map(function(g){ return { g:g, v:a.perGroup[g] }; })
+          .sort(function(x,y){ return y.v-x.v; }).slice(0,4);
+        var maxV = groups.length ? groups[0].v : 1;
+        var groupLabel = function(g){ var m=(ET.MUSCLE_GROUPS||[]).find(function(x){return x.tag===g;}); return m?m.label:g; };
+        return _h('div', { className:'card', style:{ marginBottom:16 } },
+          _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 } },
+            _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' } }, '🧠 Analiza ostatniej sesji (core)'),
+            _h('span', { style:{ fontSize:'.68rem', color:'var(--t3)' } }, (a.date?ET.fmtDateShort(a.date)+' · ':'')+a.setsDone+'/'+a.setsTotal+' serii')
+          ),
+          _h('div', { style:{ display:'flex', gap:14, alignItems:'baseline', marginBottom:10 } },
+            _h('div', null,
+              _h('span', { style:{ fontSize:'1.3rem', fontWeight:800, color:'var(--a-light)' } }, a.totalVolume.toLocaleString('pl-PL')),
+              _h('span', { style:{ fontSize:'.68rem', color:'var(--t3)', marginLeft:4 } }, 'kg objętości')
+            ),
+            _h('span', { style:{ fontSize:'.72rem', color: a.completionPct>=90?'var(--green)':'var(--orange)', fontWeight:700 } }, a.completionPct+'% ukończenia'),
+            a.avgRpe!=null && _h('span', { style:{ fontSize:'.72rem', color:'var(--purple)', fontWeight:700 } }, 'RPE '+a.avgRpe)
+          ),
+          groups.map(function(row) {
+            return _h('div', { key:row.g, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:4 } },
+              _h('div', { style:{ width:110, fontSize:'.7rem', color:'var(--t2)', flexShrink:0 } }, groupLabel(row.g)),
+              _h('div', { style:{ flex:1, height:8, borderRadius:4, background:'var(--s3)', overflow:'hidden' } },
+                _h('div', { style:{ width:Math.max(4,(row.v/maxV*100))+'%', height:'100%', borderRadius:4, background:'var(--a)' } })
+              ),
+              _h('div', { style:{ width:64, fontSize:'.66rem', color:'var(--t3)', textAlign:'right', flexShrink:0 } }, row.v.toLocaleString('pl-PL')+' kg')
+            );
+          })
+        );
+      })(),
+
       showPicker && _h(WorkoutPicker, { onSelect:selectPlan, onClose:function(){ setShowPicker(false); }, plans:effectivePlans }),
       showManualAdd && _h(WorkoutEditSheet, { workout:null, update:update, toast:toast, onClose:function(){ setShowManualAdd(false); } }),
       editW && _h(WorkoutEditSheet, { workout:editW, update:update, toast:toast, onClose:function(){ setEditW(null); } }),
-      _h(PlanEditorSheet, { open:showEditor, onClose:function(){ setShowEditor(false); } }),
 
       _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr' }, _h('h2', null, 'Twoje plany treningowe')),

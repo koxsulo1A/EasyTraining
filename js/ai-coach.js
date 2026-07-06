@@ -135,18 +135,54 @@
     if (last14 >= 6) out.push({ type:'positive', icon:'🔥', title:'Wysoka regularność', body:last14+' biegów w 2 tygodnie. Konsekwencja to podstawa progresu.' });
     else if (last14 <= 1) out.push({ type:'info', icon:'📅', title:'Mała regularność', body:'Tylko '+last14+' bieg w ostatnich 2 tygodniach. Nawet 2–3 biegi/tydz. dają duży efekt.' });
 
-    // Długie wybiegania
-    var hasLong = runs.slice(0,8).some(function(r){ return r.type==='long' || (r.distance||0)>=12; });
-    if (!hasLong) out.push({ type:'info', icon:'🛣', title:'Brak długiego biegu', body:'W ostatnich biegach brak długiego wybiegania. 1 długi bieg/tydz. buduje bazę tlenową.' });
+    // Reguła: rosnące tętno w kolejnych biegach = zmęczenie/przetrenowanie
+    var hrSeq = runs.filter(function(r){ return r.avgHr>0; }).slice(0,4);
+    if (hrSeq.length>=3) {
+      var rising = hrSeq[0].avgHr>hrSeq[1].avgHr && hrSeq[1].avgHr>hrSeq[2].avgHr && (hrSeq[0].avgHr-hrSeq[2].avgHr)>=5;
+      if (rising) out.push({ type:'warning', icon:'🚨', title:'Rosnące tętno = zmęczenie', body:'Średnie tętno rośnie w 3 kolejnych biegach (+'+(hrSeq[0].avgHr-hrSeq[2].avgHr)+' bpm). Możliwe przetrenowanie — rozważ dzień odpoczynku.' });
+    }
 
-    // Tętno
+    // Reguła: progresja tempa 4 tyg. vs poprzednie 4 tyg.
+    function avgPaceWindow(from, to) {
+      var ps = [];
+      runs.forEach(function(r){ var a=Math.floor((todayMs-new Date(r.date).getTime())/86400000); if (a>=from&&a<=to){ var sec=paceToSec(r.pace); if (sec!=null) ps.push(sec); } });
+      return ps.length ? ps.reduce(function(x,y){return x+y;},0)/ps.length : null;
+    }
+    var p4=avgPaceWindow(0,27), p4prev=avgPaceWindow(28,55);
+    if (p4!=null && p4prev!=null) {
+      var volNow=sumIn(runs,0,27,todayMs), volPrev=sumIn(runs,28,55,todayMs);
+      var dp = p4prev - p4; // dodatnie = szybciej teraz
+      if (dp<=-4 && volNow>=volPrev) out.push({ type:'warning', icon:'🐌', title:'Tempo spada mimo obciążenia', body:'Śr. tempo z 4 tyg. wolniejsze o '+Math.round(-dp)+' s/km przy niespadającym kilometrażu. Możliwe zmęczenie — rozważ deload.' });
+      else if (dp>=4) out.push({ type:'achievement', icon:'📈', title:'Wydolność rośnie', body:'Śr. tempo z ostatnich 4 tyg. szybsze o '+Math.round(dp)+' s/km względem poprzednich 4 tyg.' });
+    }
+
+    // Reguła: bilans tygodniowy (długi / interwały / trucht)
+    var last7 = runs.filter(function(r){ return Math.floor((todayMs-new Date(r.date).getTime())/86400000)<=6; });
+    if (last7.length>=2) {
+      var hasLongW = last7.some(function(r){ return r.type==='long' || (r.distance||0)>=12; });
+      var hasIntW = last7.some(function(r){ return r.type==='interval'; });
+      if (!hasLongW) out.push({ type:'info', icon:'🛣', title:'Brak treningu wytrzymałościowego', body:'W tym tygodniu brakuje długiego, spokojnego biegu. Dodaj go, by budować bazę tlenową.' });
+      else if (!hasIntW) out.push({ type:'info', icon:'⚡', title:'Brak treningu szybkościowego', body:'W tym tygodniu brak interwałów. Dodaj sesję interwałową, by poprawić prędkość i próg mleczanowy.' });
+    }
+
+    // Reguła: stagnacja tempa na ~5 km (6 tyg.)
+    var fives = runs.filter(function(r){ var d=r.distance||0; return d>=4 && d<=6 && paceToSec(r.pace)!=null; });
+    var recent5 = fives.filter(function(r){ return Math.floor((todayMs-new Date(r.date).getTime())/86400000)<=42; });
+    var older5 = fives.filter(function(r){ var a=Math.floor((todayMs-new Date(r.date).getTime())/86400000); return a>42 && a<=84; });
+    if (recent5.length && older5.length) {
+      var bestRecent = Math.min.apply(null, recent5.map(function(r){ return paceToSec(r.pace); }));
+      var bestOlder = Math.min.apply(null, older5.map(function(r){ return paceToSec(r.pace); }));
+      if (bestRecent >= bestOlder-2) out.push({ type:'info', icon:'🎯', title:'Tempo na ~5 km stoi w miejscu', body:'Najlepsze tempo na ~5 km nie poprawiło się od 6 tyg. Dodaj interwały 400 m, by przełamać próg mleczanowy.' });
+    }
+
+    // Tętno (wysokie strefy)
     var hrRuns = runs.slice(0,5).filter(function(r){ return r.avgHr>0; });
     if (hrRuns.length) {
       var avgHr = Math.round(hrRuns.reduce(function(t,r){return t+r.avgHr;},0)/hrRuns.length);
       if (avgHr >= 170) out.push({ type:'warning', icon:'❤️', title:'Wysokie tętno', body:'Śr. tętno ostatnich biegów: '+avgHr+' bpm. Włącz więcej biegów w niższych strefach (Zone 2).' });
     }
 
-    return out.slice(0,6);
+    return out.slice(0,8);
   };
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -200,7 +236,33 @@
         body:'Szacunek metodą obwodową (US Navy: szyja, pas'+(comp.gender==='female'?', biodra':'')+', wzrost). Traktuj jako trend, nie wartość absolutną.' });
     }
 
-    return out.slice(0,6);
+    // Reguła: waga spada, ale pas stoi → woda/glikogen, nie tłuszcz
+    if (dw!=null && dwa!=null && dw < -0.5 && Math.abs(dwa) < 0.5) {
+      out.push({ type:'info', icon:'💧', title:'Spadek wagi bez zmiany pasa', body:'Tracisz głównie wodę/glikogen, nie tłuszcz. Zadbaj o podaż białka i trening siłowy.' });
+    }
+
+    // Reguła: tempo chudnięcia
+    var spanDays = Math.floor((new Date(latest.date).getTime() - new Date(first.date).getTime())/86400000);
+    if (dw!=null && dw < 0 && spanDays >= 14) {
+      var perWeek = (-dw)/(spanDays/7);
+      if (perWeek > 1) out.push({ type:'warning', icon:'⚠️', title:'Chudniesz za szybko', body:'Ubytek ~'+perWeek.toFixed(1)+' kg/tydz. Ryzyko utraty mięśni i spowolnienia metabolizmu — rozważ mniejszy deficyt.' });
+    }
+
+    // Reguła: typ sylwetki wg WHR
+    if (comp.whr!=null && comp.whrCat) {
+      if (comp.whrCat.label !== 'Niskie ryzyko') {
+        out.push({ type:'warning', icon:'🍎', title:'Sylwetka typu androidalnego', body:'WHR '+comp.whr.toFixed(2)+' powyżej normy — tłuszcz brzuszny. Priorytet: redukcja + trening siłowy, podwyższone ryzyko metaboliczne.' });
+      } else if (comp.bmiCat && (comp.bmiCat.label==='Nadwaga' || comp.bmiCat.label==='Otyłość')) {
+        out.push({ type:'info', icon:'🍐', title:'Typ gynoidalny', body:'WHR w normie mimo podwyższonego BMI — niższe ryzyko metaboliczne, ale redukcja nadal wskazana.' });
+      }
+    }
+
+    // Reguła: BMI nadwaga, ale Body Fat w normie → BMI zawyżone masą mięśniową
+    if (comp.bmiCat && comp.bmiCat.label==='Nadwaga' && comp.bodyFatCat && ['Bardzo niski','Sportowy','Fitness'].indexOf(comp.bodyFatCat.label)!==-1) {
+      out.push({ type:'positive', icon:'💪', title:'BMI zawyżone przez mięśnie', body:'BMI wskazuje nadwagę, ale tkanka tłuszczowa jest w normie. Lepszym wskaźnikiem dla Ciebie jest Body Fat i obwód pasa.' });
+    }
+
+    return out.slice(0,8);
   };
 
   // ═══════════════════════════════════════════════════════════════════════

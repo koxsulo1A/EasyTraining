@@ -287,6 +287,58 @@
     C('it10','Pallof press + lunge','ITBS','kolano','Core + biodro','Wypchnij linkę i zejdź do wykroku — stabilizacja przy ruchu nogi',2,'Wyciąg'),
   ];
 
+  // ── PRECYZYJNE TAGI MIĘŚNIOWE (akton/mięsień) — prompt 1.2.1 ─────────────
+  ET.MUSCLE_TAGS = {
+    piersiowy_gorny:'Klatka górna', piersiowy_srodkowy:'Klatka środkowa', piersiowy_dolny:'Klatka dolna',
+    piersiowy_wewnetrzny:'Klatka wewnętrzna', piersiowy_zewnetrzny:'Klatka zewnętrzna',
+    najszerszy_gorny:'Najszerszy (góra)', najszerszy_srodkowy:'Najszerszy (środek)', najszerszy_dolny:'Najszerszy (dół)',
+    prostownik_grzbietu:'Prostownik grzbietu', pulapki:'Czworoboczny (kaptur)', rownolegloboczny:'Równoległoboczny', obly_wiekszy:'Obły większy',
+    czworoglowy:'Czworogłowy uda', posladkowy_wielki:'Pośladkowy wielki', posladkowy_sredni:'Pośladkowy średni',
+    dwuglowy_uda:'Dwugłowy uda', przywodziciele:'Przywodziciele',
+    dwuglowy_ramienia:'Dwugłowy ramienia', ramienny:'Ramienny', ramienno_promieniowy:'Ramienno-promieniowy',
+    trojglowy_dluga_glowa:'Triceps (długa głowa)', trojglowy_boczna_glowa:'Triceps (boczna głowa)', trojglowy_przysrodkowa:'Triceps (przyśrodkowa)',
+    naramienny_przedni:'Naramienny przedni', naramienny_srodkowy:'Naramienny środkowy', naramienny_tylny:'Naramienny tylny',
+    brzuchaty:'Brzuchaty łydki', plaszczkowaty:'Płaszczkowaty',
+    zginacze_nadgarstka:'Zginacze nadgarstka', prostowniki_nadgarstka:'Prostowniki nadgarstka', chwyt:'Siła chwytu',
+    prosty_brzucha:'Prosty brzucha', skosne:'Skośne brzucha', poprzeczny:'Poprzeczny brzucha', prostownik_ledzwi:'Prostownik lędźwi',
+  };
+
+  var PRECISE = {
+    // Klatka
+    kp1:['piersiowy_srodkowy','piersiowy_dolny'], kp2:['piersiowy_srodkowy'], kp3:['piersiowy_gorny'],
+    kp4:['piersiowy_zewnetrzny','piersiowy_srodkowy'], kp5:['piersiowy_srodkowy','piersiowy_dolny'], kp6:['piersiowy_srodkowy'],
+    kp7:['piersiowy_wewnetrzny','piersiowy_dolny'], kp8:['piersiowy_dolny'], kp9:['piersiowy_gorny','piersiowy_wewnetrzny'], kp10:['piersiowy_gorny'],
+    // Plecy
+    pl1:['prostownik_grzbietu','najszerszy_dolny','pulapki'], pl2:['najszerszy_gorny','obly_wiekszy'], pl3:['najszerszy_srodkowy','rownolegloboczny'],
+    pl4:['najszerszy_srodkowy'], pl5:['najszerszy_gorny','obly_wiekszy'], pl6:['najszerszy_srodkowy','rownolegloboczny'],
+    pl7:['najszerszy_gorny'], pl8:['naramienny_tylny','rownolegloboczny'], pl9:['prostownik_grzbietu'], pl10:['najszerszy_dolny','rownolegloboczny'],
+    // Nogi
+    no1:['czworoglowy','posladkowy_wielki'], no2:['czworoglowy','posladkowy_wielki','przywodziciele'], no3:['dwuglowy_uda','posladkowy_wielki'],
+    no4:['posladkowy_wielki','posladkowy_sredni'], no5:['czworoglowy','posladkowy_wielki'], no6:['czworoglowy','posladkowy_wielki'],
+    no7:['czworoglowy','posladkowy_wielki'], no8:['posladkowy_wielki','czworoglowy'], no9:['czworoglowy'], no10:['posladkowy_wielki','czworoglowy'],
+    // Biceps
+    bi1:['dwuglowy_ramienia'], bi2:['dwuglowy_ramienia'], bi3:['dwuglowy_ramienia'], bi4:['ramienno_promieniowy','ramienny'], bi5:['dwuglowy_ramienia'],
+    bi6:['dwuglowy_ramienia'], bi7:['dwuglowy_ramienia'], bi8:['dwuglowy_ramienia'], bi9:['dwuglowy_ramienia'], bi10:['ramienno_promieniowy','dwuglowy_ramienia'],
+    // Triceps
+    tr1:['trojglowy_dluga_glowa'], tr2:['trojglowy_boczna_glowa'], tr3:['trojglowy_boczna_glowa','trojglowy_przysrodkowa'], tr4:['trojglowy_dluga_glowa'],
+    tr5:['trojglowy_dluga_glowa'], tr6:['trojglowy_boczna_glowa'], tr7:['trojglowy_boczna_glowa'], tr8:['trojglowy_boczna_glowa','trojglowy_przysrodkowa'],
+    tr9:['trojglowy_dluga_glowa'], tr10:['trojglowy_boczna_glowa'],
+    // Barki
+    ba1:['naramienny_przedni','naramienny_srodkowy'], ba2:['naramienny_srodkowy'], ba3:['naramienny_przedni'], ba4:['naramienny_przedni','naramienny_srodkowy'],
+    ba5:['naramienny_tylny'], ba6:['naramienny_srodkowy','pulapki'], ba7:['naramienny_srodkowy'], ba8:['naramienny_srodkowy','naramienny_przedni'],
+    ba9:['naramienny_tylny'], ba10:['naramienny_przedni','naramienny_srodkowy'],
+    // Łydki
+    ly1:['brzuchaty'], ly2:['brzuchaty'], ly3:['plaszczkowaty'], ly4:['brzuchaty'], ly5:['brzuchaty'],
+    ly6:['brzuchaty','plaszczkowaty'], ly7:['brzuchaty'], ly8:['plaszczkowaty'], ly9:['brzuchaty'], ly10:['brzuchaty'],
+    // Przedramiona
+    pr1:['zginacze_nadgarstka'], pr2:['prostowniki_nadgarstka'], pr3:['chwyt'], pr4:['chwyt'], pr5:['zginacze_nadgarstka','prostowniki_nadgarstka'],
+    pr6:['chwyt'], pr7:['zginacze_nadgarstka'], pr8:['ramienno_promieniowy','chwyt'], pr9:['chwyt'], pr10:['prostowniki_nadgarstka','ramienno_promieniowy'],
+    // Core
+    co1:['poprzeczny','prosty_brzucha'], co2:['poprzeczny'], co3:['prosty_brzucha'], co4:['prosty_brzucha'], co5:['skosne'],
+    co6:['prostownik_ledzwi','poprzeczny'], co7:['prosty_brzucha','skosne'], co8:['skosne','poprzeczny'], co9:['prosty_brzucha'], co10:['prosty_brzucha'],
+  };
+  ET.EXERCISES_BASIC.forEach(function(ex){ ex.muscles = PRECISE[ex.id] || []; });
+
   // Wszystkie ćwiczenia razem
   ET.EXERCISES = ET.EXERCISES_BASIC.concat(ET.EXERCISES_CORRECTIVE);
 
@@ -301,5 +353,9 @@
   ET.exercisesByCondition = function(cond) {
     return ET.EXERCISES_CORRECTIVE.filter(function(e){ return (e.condition_tags||[]).indexOf(cond)!==-1; });
   };
+  ET.exercisesByMuscle = function(m) {
+    return ET.EXERCISES_BASIC.filter(function(e){ return (e.muscles||[]).indexOf(m)!==-1; });
+  };
+  ET.muscleLabel = function(m) { return (ET.MUSCLE_TAGS && ET.MUSCLE_TAGS[m]) || m; };
   ET.LEVEL_LABELS = { 1:'Początkujący', 2:'Średni', 3:'Zaawansowany' };
 })();

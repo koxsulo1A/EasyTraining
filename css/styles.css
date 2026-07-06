@@ -1,4 +1,6 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Blokada zoomu przy podwójnym tapnięciu na telefonie (bez blokowania scrolla) */
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
 :root{
   --bg:#080810;--s1:#0F0F1C;--s2:#141425;--s3:#1A1A30;--s4:#20203A;--s5:#26264A;
   --b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.10);--b3:rgba(255,255,255,.16);

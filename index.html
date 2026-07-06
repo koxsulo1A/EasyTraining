@@ -2,9 +2,9 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>EasyTraining</title>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=1">
 <style>
 #boot{display:flex;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;background:#080810;gap:16px}
 #boot-icon{font-size:3rem}
@@ -37,44 +37,75 @@ window.ET = {};
 <script src="js/vendor/react.development.js"></script>
 <script src="js/vendor/react-dom.development.js"></script>
 
+<!-- Core (TypeScript → bundle): event bus, wersjonowanie, migracja -->
+<script src="js/core.bundle.js?v=7"></script>
+<script>
+// Bootstrap rdzenia: migracja legacy et_v1 (jednorazowa) + rejestracja silników.
+try {
+  window.etcore = ETCore.createCore();
+  var __mig = window.etcore.migrate(localStorage.getItem('et_v1'));
+  if (__mig.ran) console.log('[core] migracja et_v1:', __mig);
+  // Workout Engine — resolver mięśni leniwy: baza ćwiczeń (window.ET) ładuje się później,
+  // a zdarzenia WorkoutFinished i tak przychodzą dopiero po starcie aplikacji.
+  ETCore.registerWorkoutEngine(window.etcore, function (name) {
+    var ex = (window.ET && ET.EXERCISES_BASIC || []).find(function (e) { return e.name === name; });
+    return ex && ex.muscles || [];
+  });
+  ETCore.registerFatigueEngine(window.etcore);
+  ETCore.registerRecoveryEngine(window.etcore);
+  ETCore.registerProgressEngine(window.etcore);
+  ETCore.registerRunningEngine(window.etcore);
+  window.etcore.user = ETCore.registerUserStore(window.etcore);
+  // GoalProvider: cele powiązane z ćwiczeniem z legacy store (okres przejściowy)
+  ETCore.registerGoalEngine(window.etcore, function () {
+    try {
+      var s = JSON.parse(localStorage.getItem('et_v1') || '{}');
+      return (s.goals || []).filter(function (g) { return g.linkType === 'exercise' && g.exercise && g.target > 0; })
+        .map(function (g) { return { id: g.id, title: g.title, exercise: g.exercise, target: +g.target, current: +g.current || 0 }; });
+    } catch (e) { return []; }
+  });
+} catch (e) { console.error('[core] bootstrap error:', e); }
+</script>
+
 <!-- Foundation -->
 <script src="js/store.js?v=6"></script>
-<script src="js/navigation.js?v=7"></script>
+<script src="js/navigation.js?v=10"></script>
 <script src="js/components.js?v=4"></script>
 
 <!-- AI Engine (offline expert system) -->
 <script src="js/ai-engine.js?v=1"></script>
 
 <!-- Baza ćwiczeń (190 pozycji) -->
-<script src="js/exercises-db.js?v=1"></script>
+<script src="js/exercises-db.js?v=2"></script>
 
 <!-- AI Coach (reguły) + skład ciała -->
-<script src="js/ai-coach.js?v=1"></script>
+<script src="js/ai-coach.js?v=2"></script>
+<script src="js/health.js?v=1"></script>
 
 <!-- Modules -->
-<script src="js/dashboard.js?v=4"></script>
-<script src="js/strength.js?v=12"></script>
-<script src="js/running.js?v=9"></script>
-<script src="js/sleep.js?v=4"></script>
+<script src="js/dashboard.js?v=7"></script>
+<script src="js/strength.js?v=16"></script>
+<script src="js/running.js?v=11"></script>
+<script src="js/sleep.js?v=5"></script>
 <script src="js/sauna.js?v=5"></script>
-<script src="js/measurements.js?v=9"></script>
+<script src="js/measurements.js?v=11"></script>
 <script src="js/diet.js"></script>
 <script src="js/supplements-db.js?v=2"></script>
 <script src="js/supplements.js?v=3"></script>
-<script src="js/wellbeing.js?v=2"></script>
-<script src="js/pain.js?v=4"></script>
+<script src="js/wellbeing.js?v=3"></script>
+<script src="js/pain.js?v=6"></script>
 <script src="js/calendar.js?v=3"></script>
 <script src="js/competitions.js"></script>
 <script src="js/goals.js?v=4"></script>
-<script src="js/statistics.js?v=7"></script>
+<script src="js/statistics.js?v=8"></script>
 <script src="js/photos.js?v=3"></script>
-<script src="js/history.js?v=2"></script>
+<script src="js/history.js?v=3"></script>
 <script src="js/library.js?v=1"></script>
 <script src="js/physio.js?v=1"></script>
 <script src="js/backup.js?v=2"></script>
-<script src="js/planner.js?v=2"></script>
+<script src="js/planner.js?v=4"></script>
 <script src="js/acwr.js?v=1"></script>
-<script src="js/assessment.js?v=1"></script>
+<script src="js/assessment.js?v=2"></script>
 <script src="js/ai.js"></script>
 <script src="js/profile.js?v=2"></script>
 <script src="js/dev-panel.js?v=2"></script>
@@ -83,7 +114,7 @@ window.ET = {};
 <script src="js/habits.js"></script>
 
 <!-- App bootstrap (last) -->
-<script src="js/app.js?v=8"></script>
+<script src="js/app.js?v=9"></script>
 
 </body>
 </html>

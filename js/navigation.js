@@ -6,8 +6,6 @@
     { s: null, items: [{ id:'dashboard', icon:'🏠', label:'Dashboard' }] },
     { s: 'Treningi', items: [
       { id:'strength', icon:'💪', label:'Trening siłowy' },
-      { id:'planner', icon:'🧩', label:'Kreator planu' },
-      { id:'acwr', icon:'📈', label:'ACWR' },
       { id:'running', icon:'🏃', label:'Bieganie' },
       { id:'sauna', icon:'🔥', label:'Sauna' },
       { id:'intervals', icon:'⏱', label:'Interwały' },
@@ -17,9 +15,7 @@
       { id:'measurements', icon:'📏', label:'Pomiary' },
       { id:'diet', icon:'🥗', label:'Dieta' },
       { id:'supplements', icon:'💊', label:'Suplementy' },
-      { id:'wellbeing', icon:'🌡', label:'Samopoczucie' },
-      { id:'pain', icon:'🩹', label:'Ból' },
-      { id:'physio', icon:'🩺', label:'Dolegliwości' },
+      { id:'pain', icon:'🩹', label:'Dolegliwości i ból' },
     ]},
     { s: 'Planowanie', items: [
       { id:'calendar', icon:'📅', label:'Kalendarz' },
@@ -30,13 +26,10 @@
       { id:'statistics', icon:'📊', label:'Statystyki' },
       { id:'assessment', icon:'🧪', label:'Testy i ocena' },
       { id:'photos', icon:'📸', label:'Zdjęcia' },
-      { id:'history', icon:'📜', label:'Historia' },
     ]},
     { s: 'Narzędzia', items: [
       { id:'library', icon:'📚', label:'Biblioteka ćwiczeń' },
       { id:'backup', icon:'💾', label:'Kopia i eksport' },
-      { id:'journal', icon:'📓', label:'Dziennik' },
-      { id:'habits', icon:'✅', label:'Nawyki' },
     ]},
     { s: null, items: [{ id:'profile', icon:'👤', label:'Profil' }] },
   ];

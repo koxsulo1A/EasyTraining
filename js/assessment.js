@@ -47,28 +47,54 @@
         return c<-5?band('Słaba','var(--red)'):c<0?band('Poniżej średniej','var(--orange)'):c<10?band('Średnia','var(--green)'):c<15?band('Dobra','var(--green)'):band('Bardzo dobra','var(--a-light)');
       }
     },
-    { id:'onerm', cat:'Siła', name:'Test siły (1RM est.)', icon:'🏋️', unit:'kg',
-      hint:'Podnieś ciężar na kilka powtórzeń — oszacujemy 1RM (Epley).',
-      inputs:[
-        { k:'weight', l:'Ciężar (kg)', min:1, max:400, step:2.5, def:80 },
-        { k:'reps', l:'Powtórzenia', min:1, max:15, step:1, def:5 }
-      ],
+    { id:'step3', cat:'Wydolność', name:'Test schodowy 3-min', icon:'🪜', unit:'bpm',
+      hint:'Wchodź i schodź ze stopnia (~30 cm) w rytmie 96/min przez 3 min. Zaraz po zmierz tętno.',
+      inputs:[{ k:'hr', l:'Tętno po (bpm)', min:60, max:220, step:1, def:120 }],
       evaluate:function(v, p){
-        var e1rm = v.weight * (1 + v.reps/30);
-        var bw = (p&&p.weight)||0;
-        var b;
-        if (bw>0) {
-          var ratio = e1rm/bw;
-          b = ratio<0.75?band('Początkujący','var(--orange)'):ratio<1.25?band('Średniozaawansowany','var(--green)'):band('Zaawansowany','var(--a-light)');
-          b.extra = '1RM ≈ '+e1rm.toFixed(0)+' kg · '+ratio.toFixed(2)+'× masy ciała';
-        } else {
-          b = band('1RM ≈ '+e1rm.toFixed(0)+' kg','var(--a-light)');
-          b.extra = 'Uzupełnij wagę w profilu, by ocenić względem masy ciała.';
-        }
+        var male = (p&&p.gender)!=='female';
+        var vo2 = male ? (111.33 - 0.42*v.hr) : (65.81 - 0.1847*v.hr);
+        var b = vo2<35?band('Słaba','var(--red)'):vo2<42?band('Przeciętna','var(--orange)'):vo2<50?band('Dobra','var(--green)'):band('Bardzo dobra','var(--a-light)');
+        b.extra = 'VO₂max ≈ '+vo2.toFixed(1)+' ml/kg/min (test Queens College)';
         return b;
       }
     },
+    { id:'sit2stand', cat:'Wytrzymałość', name:'Wstawania z krzesła (30 s)', icon:'🪑', unit:'powt.',
+      hint:'Ile razy wstaniesz i usiądziesz w 30 s (ręce skrzyżowane na klatce).',
+      inputs:[{ k:'reps', l:'Powtórzenia', min:0, max:60, step:1, def:14 }],
+      evaluate:function(v, p){
+        var age = (p&&p.age)||35;
+        var thr = age<60 ? [12,17] : age<70 ? [11,15] : [9,13];
+        var r=v.reps;
+        return r<thr[0]?band('Poniżej normy','var(--red)'):r<thr[1]?band('Przeciętna','var(--orange)'):band('Dobra','var(--green)');
+      }
+    },
   ];
+
+  // ── 1RM: wzory (prompt 7.2) ──────────────────────────────────────────────
+  function oneRM(weight, reps) {
+    if (reps <= 1) return weight;
+    var epley   = weight * (1 + reps/30);
+    var brzycki = weight * 36 / (37 - reps);
+    var lombardi= weight * Math.pow(reps, 0.10);
+    var chosen, name;
+    if (reps < 6) { chosen = brzycki; name = 'Brzycki'; }
+    else if (reps <= 10) { chosen = epley; name = 'Epley'; }
+    else { chosen = lombardi; name = 'Lombardi'; }
+    return { value: chosen, formula: name, epley:epley, brzycki:brzycki, lombardi:lombardi };
+  }
+  // Ryzykowne ćwiczenia wg dolegliwości (blokada testu maksymalnego)
+  var ONERM_RISK = {
+    dyskopatia_L: ['martwy ciąg','przysiad'],
+    przodopochylenie_miednicy: ['martwy ciąg'],
+    ciasnota_podbarkowa: ['ohp','wyciskanie'],
+    niestabilnosc_barku: ['ohp','wyciskanie'],
+    tendinopatia_rzepki: ['przysiad'],
+  };
+  function riskFor(exName, ailments) {
+    var n = String(exName).toLowerCase(), hits = [];
+    (ailments||[]).forEach(function(a){ (ONERM_RISK[a]||[]).forEach(function(kw){ if (n.indexOf(kw)!==-1 && hits.indexOf(a)===-1) hits.push(a); }); });
+    return hits;
+  }
   function testById(id){ return TESTS.find(function(t){ return t.id===id; }); }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -115,12 +141,75 @@
     );
   }
 
+  // ── TEST 1RM (dedykowany, prompt 7.2) ────────────────────────────────────
+  function OneRMSheet(props) {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+    var ex = React.useState(''); var exName = ex[0], setExName = ex[1];
+    var mt = React.useState('B'); var method = mt[0], setMethod = mt[1];
+    var vs = React.useState({ weight:80, reps:5 }); var vals = vs[0], setVals = vs[1];
+    var profile = store.profile||{}, ailments = store.ailments||[];
+    var risks = riskFor(exName, ailments);
+    React.useEffect(function(){ if(props.open){ setExName(''); setMethod('B'); setVals({ weight:80, reps:5 }); } }, [props.open]);
+
+    var result = null;
+    if (exName) {
+      if (method==='B') { var r = oneRM(vals.weight, vals.reps); result = (typeof r==='object') ? r : { value:r, formula:'—' }; }
+      else { result = { value: vals.weight, formula:'maksymalny' }; }
+    }
+    function save() {
+      if(!exName){ toast('Wybierz ćwiczenie','error'); return; }
+      var e1 = result ? result.value : 0, bw = profile.weight||0;
+      var b2 = bw>0 ? (e1/bw<0.75?{label:'Początkujący',color:'var(--orange)'}:e1/bw<1.25?{label:'Średniozaawansowany',color:'var(--green)'}:{label:'Zaawansowany',color:'var(--a-light)'}) : {label:'1RM '+e1.toFixed(0)+' kg',color:'var(--a-light)'};
+      var rec = { id:Date.now(), testId:'onerm', date:ET.dstr(), values:{ exercise:exName, weight:vals.weight, reps:vals.reps, method:method, e1rm:e1 },
+        result:{ label:b2.label, color:b2.color, extra:exName+' · 1RM ≈ '+e1.toFixed(0)+' kg'+(method==='B'&&result?' ('+result.formula+')':'') } };
+      update(function(s){ var st=Object.assign({},s,{ fitnessTests:[rec].concat(s.fitnessTests||[]) }); if(ET.logChange) st=ET.logChange(st,{ section:'assessment', title:'Test 1RM: '+exName, desc:e1.toFixed(0)+' kg' }); return st; });
+      toast('Wynik 1RM zapisany ✓','success'); props.onClose();
+    }
+    var exNames = (ET.EXERCISES_BASIC||[]).map(function(e){ return e.name; });
+    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:'Test 1RM' },
+      _h('div', { className:'field' },
+        _h('label', null, 'Ćwiczenie'),
+        _h('input', { type:'text', list:'onerm-ex', placeholder:'Zacznij pisać nazwę…', value:exName, onChange:function(e){ setExName(e.target.value); } }),
+        _h('datalist', { id:'onerm-ex' }, exNames.map(function(n,i){ return _h('option', { key:i, value:n }); }))
+      ),
+      risks.length>0 && _h('div', { style:{ padding:'8px 12px', background:'rgba(239,68,68,.1)', border:'1px solid var(--red)', borderRadius:'var(--r2)', fontSize:'.74rem', color:'var(--red)', marginBottom:12, lineHeight:1.4 } },
+        '⚠️ Przy Twoich dolegliwościach ('+risks.map(function(a){ var c=(ET.CONDITIONS||[]).find(function(x){return x.tag===a;}); return c?c.label:a; }).join(', ')+') odradzamy test maksymalny — użyj metody B z bezpiecznym ciężarem.'),
+      _h('div', { style:{ display:'flex', gap:6, marginBottom:12 } },
+        [{id:'B',l:'B: Szacowanie'},{id:'A',l:'A: Maksymalny'}].map(function(m){
+          var disabled = m.id==='A' && risks.length>0;
+          return _h('button', { key:m.id, className:'tag-btn'+(method===m.id?' active':''), style:{ flex:1, fontSize:'.7rem', opacity:disabled?.45:1 }, onClick:function(){ if(!disabled) setMethod(m.id); } }, m.l);
+        })
+      ),
+      method==='A'
+        ? _h('div', null,
+            _h('div', { className:'card card-accent', style:{ fontSize:'.73rem', color:'var(--t2)', lineHeight:1.5, marginBottom:12 } },
+              '🔥 Protokół: 5–10× 50% CM → 3–5× 70% → 1–2× 80% → 1× 90% → próby maksymalne (+2.5–5 kg) aż do nieudanej. Wpisz ostatni udany ciężar.'),
+            _h('div', { className:'field' },
+              _h('label', { style:{ display:'flex', justifyContent:'space-between' } }, _h('span',null,'Ostatni udany ciężar (kg)'), _h('span',{style:{color:'var(--a-light)',fontWeight:700}},vals.weight)),
+              _h('div', { className:'slider-wrap' }, _h('input', { type:'range', min:20, max:400, step:2.5, value:vals.weight, onChange:function(e){ setVals(Object.assign({},vals,{ weight:+e.target.value })); } }))
+            )
+          )
+        : _h('div', { className:'grid-2' },
+            _h('div', { className:'field' }, _h('label', null, 'Ciężar (kg)'), _h('input', { type:'number', min:1, step:2.5, value:vals.weight, onChange:function(e){ setVals(Object.assign({},vals,{ weight:+e.target.value })); } })),
+            _h('div', { className:'field' }, _h('label', null, 'Powtórzenia'), _h('input', { type:'number', min:1, max:20, value:vals.reps, onChange:function(e){ setVals(Object.assign({},vals,{ reps:+e.target.value })); } }))
+          ),
+      exName && result && _h('div', { style:{ padding:'12px 14px', borderRadius:'var(--r2)', background:'var(--s3)', border:'1px solid var(--a)', textAlign:'center', marginBottom:14 } },
+        _h('div', { style:{ fontSize:'1.4rem', fontWeight:800, color:'var(--a-light)' } }, result.value.toFixed(0)+' kg'),
+        _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', marginTop:3 } },
+          method==='B' ? 'Szacowany 1RM (wzór '+result.formula+', ±5%: '+(result.value*0.95).toFixed(0)+'–'+(result.value*1.05).toFixed(0)+' kg)' : 'Zmierzony 1RM')
+      ),
+      _h('button', { className:'btn btn-primary', style:{ width:'100%' }, onClick:save }, 'Zapisz wynik 1RM')
+    );
+  }
+
   // ── ZAKŁADKA: TESTY ──────────────────────────────────────────────────────
   function TestsTab() {
     var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
     var sel = React.useState(null); var active = sel[0], setActive = sel[1];
     var vs = React.useState({}); var vals = vs[0], setVals = vs[1];
+    var o1 = React.useState(false); var show1rm = o1[0], setShow1rm = o1[1];
 
     function openTest(t) {
       var init = {}; t.inputs.forEach(function(inp){ init[inp.k]=inp.def; });
@@ -142,7 +231,24 @@
     var cats = {};
     TESTS.forEach(function(t){ (cats[t.cat]=cats[t.cat]||[]).push(t); });
 
+    var last1rm = results.find(function(r){ return r.testId==='onerm'; });
+
     return _h('div', null,
+      // Dedykowany test 1RM (wybór ćwiczenia + metoda)
+      _h('div', { style:{ marginBottom:16 } },
+        _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, 'Siła'),
+        _h('div', { className:'card card-interactive', style:{ cursor:'pointer', padding:'12px 14px' }, onClick:function(){ setShow1rm(true); } },
+          _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 } },
+            _h('div', null,
+              _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, '🏋️ Test 1RM'),
+              _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:2 } }, last1rm ? 'Ostatni: '+(last1rm.values&&last1rm.values.exercise||'')+' · '+ET.fmtDate(last1rm.date) : 'Wybierz ćwiczenie, metoda A/B')
+            ),
+            last1rm
+              ? _h('span', { style:{ fontSize:'.66rem', fontWeight:700, color:last1rm.result.color, border:'1px solid '+last1rm.result.color+'66', borderRadius:99, padding:'3px 8px' } }, last1rm.result.label)
+              : _h('span', { style:{ color:'var(--t3)', fontSize:'1.1rem' } }, '›')
+          )
+        )
+      ),
       Object.keys(cats).map(function(cat) {
         return _h('div', { key:cat, style:{ marginBottom:16 } },
           _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, cat),
@@ -189,7 +295,7 @@
       results.length>0 && _h('div', { style:{ marginTop:8 } },
         _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, 'Historia wyników'),
         results.slice(0,12).map(function(r) {
-          var t = testById(r.testId) || { name:r.testId, icon:'🧪' };
+          var t = testById(r.testId) || { name: r.testId==='onerm' ? 'Test 1RM' : r.testId, icon:'🏋️' };
           return _h('div', { key:r.id, style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:'1px solid var(--b1)' } },
             _h('div', null,
               _h('div', { style:{ fontSize:'.78rem', fontWeight:600 } }, t.icon+' '+t.name),
@@ -198,6 +304,110 @@
             _h('span', { style:{ fontSize:'.66rem', fontWeight:700, color:r.result.color } }, r.result.label)
           );
         })
+      ),
+
+      _h(OneRMSheet, { open:show1rm, onClose:function(){ setShow1rm(false); } })
+    );
+  }
+
+  // ── TESTY WZORCÓW RUCHOWYCH (prompt 6.2) ─────────────────────────────────
+  var MOVEMENT_TESTS = [
+    { id:'ohs', name:'Overhead Squat', icon:'🏋️', desc:'Przysiad z rękami wyprostowanymi nad głową. Obserwuj dolną fazę.',
+      questions:[
+        { q:'Czy pięty odrywają się od podłoża?', flag:'ograniczone_zgiecie_skokowe' },
+        { q:'Czy kolana uciekają do środka (valgus)?', flag:'kolana_valgus' },
+        { q:'Czy tułów pochyla się mocno do przodu?', flag:'przodopochylenie_miednicy' },
+      ] },
+    { id:'thomas', name:'Test Thomasa', icon:'🛏', desc:'Leżąc na krawędzi łóżka przyciągnij jedno kolano do klatki. Obserwuj drugą nogę.',
+      questions:[
+        { q:'Czy druga noga unosi się z podłoża?', flag:'przodopochylenie_miednicy' },
+        { q:'Czy udo drugiej nogi jest powyżej linii bioder?', flag:'przodopochylenie_miednicy' },
+      ] },
+    { id:'wall', name:'Test ścienny', icon:'🧱', desc:'Stań plecami do ściany (pięty, pośladki, plecy, głowa).',
+      questions:[
+        { q:'Czy głowa nie dotyka ściany bez wysiłku?', flag:'protrakcja_barkow' },
+        { q:'Czy nie możesz unieść rąk nad głowę bez odrywania pleców?', flag:'protrakcja_barkow' },
+        { q:'Czy odcinek lędźwiowy mocno odstaje od ściany?', flag:'przodopochylenie_miednicy' },
+      ] },
+    { id:'ober', name:'Test Obera', icon:'🦵', desc:'Leżąc bokiem, górna noga wyprostowana i odwiedziona — opuść ją swobodnie.',
+      questions:[
+        { q:'Czy noga utrzymuje się w górze (nie opada)?', flag:'ITBS' },
+      ] },
+    { id:'apley', name:'Rotacja barku (Apley)', icon:'🤙', desc:'Spróbuj dotknąć dłoni na plecach — jedna od góry, druga od dołu.',
+      questions:[
+        { q:'Czy dłonie nie stykają się (duża odległość)?', flag:'ciasnota_podbarkowa' },
+        { q:'Czy odczuwasz ból lub blokadę w barku?', flag:'niestabilnosc_barku' },
+      ] },
+    { id:'balance', name:'Balans na jednej nodze', icon:'⚖️', desc:'Stań na jednej nodze z zamkniętymi oczami przez 20 s.',
+      questions:[
+        { q:'Czy tracisz równowagę przed upływem 20 s?', flag:'niestabilnosc_skokowa' },
+      ] },
+  ];
+
+  function MovementTests() {
+    var su = ET.useStore(); var update = su.update; var toast = ET.useToast();
+    var sel = React.useState(null); var active = sel[0], setActive = sel[1];
+    var an = React.useState({}); var answers = an[0], setAnswers = an[1];
+    var dn = React.useState(false); var showResult = dn[0], setShowResult = dn[1];
+    function open(t){ setActive(t); setAnswers({}); setShowResult(false); }
+    function setAns(i, val){ setAnswers(function(p){ var o={}; o[i]=val; return Object.assign({},p,o); }); }
+
+    var flags = [];
+    if (active) active.questions.forEach(function(q,i){ if (answers[i]===true && q.flag && flags.indexOf(q.flag)===-1) flags.push(q.flag); });
+
+    function addToAilments(){
+      update(function(s){ var cur=s.ailments||[]; var merged=cur.slice(); flags.forEach(function(f){ if(merged.indexOf(f)===-1) merged.push(f); }); return Object.assign({},s,{ ailments:merged }); });
+      toast('Dodano do Dolegliwości ✓ — blok korekcyjny zaktualizowany','success');
+      setActive(null);
+    }
+
+    return _h('div', { style:{ marginBottom:18 } },
+      _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, 'Testy wzorców ruchowych'),
+      MOVEMENT_TESTS.map(function(t){
+        return _h('div', { key:t.id, className:'card card-interactive', style:{ marginBottom:6, cursor:'pointer', padding:'12px 14px' }, onClick:function(){ open(t); } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.86rem' } }, t.icon+' '+t.name),
+          _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:2 } }, t.desc)
+        );
+      }),
+      _h(ET.Sheet, { open:!!active, onClose:function(){ setActive(null); }, title:active?active.name:'' },
+        active && (!showResult
+          ? _h('div', null,
+              _h('div', { className:'card card-accent', style:{ fontSize:'.78rem', color:'var(--t2)', marginBottom:14, lineHeight:1.5 } }, '📋 '+active.desc),
+              active.questions.map(function(q,i){
+                return _h('div', { key:i, style:{ marginBottom:12 } },
+                  _h('div', { style:{ fontSize:'.82rem', marginBottom:6 } }, q.q),
+                  _h('div', { style:{ display:'flex', gap:6 } },
+                    [{v:true,l:'Tak'},{v:false,l:'Nie'}].map(function(o){
+                      var a = answers[i]===o.v;
+                      return _h('button', { key:String(o.v), className:'tag-btn'+(a?' active':''), style:{ flex:1 }, onClick:function(){ setAns(i,o.v); } }, o.l);
+                    })
+                  )
+                );
+              }),
+              _h('button', { className:'btn btn-primary', style:{ width:'100%', marginTop:6 }, onClick:function(){ setShowResult(true); } }, 'Zobacz wynik')
+            )
+          : _h('div', null,
+              flags.length===0
+                ? _h('div', { style:{ textAlign:'center', padding:'16px 0' } },
+                    _h('div', { style:{ fontSize:'2rem', marginBottom:8 } }, '✅'),
+                    _h('div', { style:{ fontWeight:700, color:'var(--green)' } }, 'Brak wyraźnych odchyleń'),
+                    _h('div', { style:{ fontSize:'.78rem', color:'var(--t2)', marginTop:6 } }, 'Wzorzec wygląda prawidłowo w tym teście.')
+                  )
+                : _h('div', null,
+                    _h('div', { style:{ fontWeight:700, marginBottom:8 } }, 'Prawdopodobne problemy:'),
+                    flags.map(function(f){
+                      var cond = (ET.CONDITIONS||[]).find(function(c){ return c.tag===f; });
+                      var ex = ET.exercisesByCondition ? (ET.exercisesByCondition(f)[0]) : null;
+                      return _h('div', { key:f, className:'card', style:{ marginBottom:8, borderLeft:'3px solid var(--orange)' } },
+                        _h('div', { style:{ fontWeight:700, fontSize:'.85rem' } }, cond?cond.label:f),
+                        ex && _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:3 } }, 'Sugerowane ćwiczenie: '+ex.name)
+                      );
+                    }),
+                    _h('button', { className:'btn btn-primary', style:{ width:'100%', marginTop:6 }, onClick:addToAilments }, '➕ Dodaj do Dolegliwości i zaktualizuj blok')
+                  ),
+              _h('button', { className:'btn btn-ghost', style:{ width:'100%', marginTop:8 }, onClick:function(){ setShowResult(false); } }, '← Popraw odpowiedzi')
+            )
+        )
       )
     );
   }
@@ -236,8 +446,10 @@
     var history = store.postureAssessments || [];
 
     return _h('div', null,
+      _h(MovementTests, null),
+
       _h('div', { className:'card card-accent', style:{ fontSize:'.8rem', color:'var(--t2)', marginBottom:14, lineHeight:1.5 } },
-        '💡 Zaznacz zaobserwowane odchylenia statyki i wzorców ruchowych. Wykryte problemy możesz przenieść do Dolegliwości, by dobrać ćwiczenia korekcyjne.'),
+        '💡 Poniżej zaznacz zaobserwowane odchylenia statyki. Wykryte problemy możesz przenieść do Dolegliwości, by dobrać ćwiczenia korekcyjne.'),
 
       POSTURE.map(function(g) {
         return _h('div', { key:g.group, style:{ marginBottom:14 } },
@@ -345,12 +557,12 @@
   // ── MODUŁ ────────────────────────────────────────────────────────────────
   function AssessmentModule() {
     var tb = React.useState('tests'); var tab = tb[0], setTab = tb[1];
-    var TABS = [{ id:'tests', l:'🧪 Testy' }, { id:'posture', l:'🧍 Postawa' }, { id:'checkin', l:'📋 Check-in' }];
+    var TABS = [{ id:'tests', l:'🧪 Testy' }, { id:'posture', l:'🧍 Postawa' }];
     return _h('div', { className:'fade-in' },
       _h('div', { className:'page-hdr' },
         _h('div', null,
           _h('h1', null, '🧪 Testy i ocena'),
-          _h('p', null, 'Wydolność · postawa · check-in tygodniowy')
+          _h('p', null, 'Wydolność · postawa i wzorce ruchowe')
         ),
         _h('div', null)
       ),
@@ -360,8 +572,7 @@
         })
       ),
       tab==='tests' && _h(TestsTab, null),
-      tab==='posture' && _h(PostureTab, null),
-      tab==='checkin' && _h(CheckinTab, null)
+      tab==='posture' && _h(PostureTab, null)
     );
   }
 

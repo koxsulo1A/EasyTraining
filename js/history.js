@@ -158,9 +158,12 @@
 
     return _h('div', { className:'fade-in' },
       _h('div', { className:'page-hdr' },
-        _h('div', null,
-          _h('h1', null, 'Historia'),
-          _h('p', null, all.length+' aktywności łącznie')
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+          _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ navigate('statistics'); } }, '←'),
+          _h('div', null,
+            _h('h1', null, 'Historia'),
+            _h('p', null, all.length+' aktywności łącznie')
+          )
         ),
         _h('div', null)
       ),

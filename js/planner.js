@@ -57,37 +57,67 @@
     return out;
   }
 
-  // ── GENERATOR PLANU ──────────────────────────────────────────────────────
+  // ── PORADNIK: 7 zasad wbudowanych w silnik (prompt 1.3) ──────────────────
+  ET.PLAN_RULES = [
+    { t:'Całe ciało co tydzień', d:'Każda z 9 partii min. 1×/tydz., priorytetowe 2×. Synteza białek wraca do bazy po 48–72 h.' },
+    { t:'Duże partie przed małymi', d:'Najpierw ćwiczenia wielostawowe, potem izolacja — mniejsze zmęczenie CNS.' },
+    { t:'Progresja objętości', d:'Tyg. 1–4: 60–70%, 5–8: 80–90%, tydz. 9: deload 50%. Zgodne z ACWR.' },
+    { t:'Rotacja co 4–8 tyg.', d:'Zmiana bodźca, ale tylko na ćwiczenia z tym samym precyzyjnym tagiem mięśnia.' },
+    { t:'Periodyzacja falowa', d:'Dni: ciężko 3–5 powt. / średnio 6–8 / lekko 10–12 / hipertrofia 8–10.' },
+    { t:'Balans push/pull', d:'Objętość pchania:ciągnięcia ~1:1–1:1.2 — zapobiega protrakcji barków.' },
+    { t:'Uwzględnij ograniczenia', d:'Kontuzje wykluczają ryzykowne ćwiczenia i podmieniają na bezpieczne warianty.' },
+  ];
+
+  function partiaSize(tag) {
+    var m = (ET.MUSCLE_GROUPS||[]).find(function(x){ return x.tag===tag; });
+    return m ? m.size : 'mala';
+  }
+
+  // Budowa jednego dnia — silnik reguł (sloty priorytetowe + rotacja aktonów)
+  function buildDay(tpl, di, opts, goal, avoid) {
+    var groups = tpl.groups.slice();
+    // Partie priorytetowe na początek dnia
+    [opts.prioritySmall, opts.priorityBig].forEach(function(pt) {
+      if (pt && groups.indexOf(pt)!==-1) groups = [pt].concat(groups.filter(function(g){ return g!==pt; }));
+    });
+
+    var seen = {}, usedMuscles = {}, exs = [];
+    groups.forEach(function(tag) {
+      var pool = (ET.exercisesByTag ? ET.exercisesByTag(tag) : []).filter(function(e){ return e.type==='podstawowe' && !avoid[e.id] && !seen[e.id]; });
+      if (goal.easyOnly) {
+        pool = pool.filter(function(e){ return e.difficulty<=2; }).sort(function(a,b){ return (a.difficulty-b.difficulty) || (a.id<b.id?-1:1); });
+      }
+      var slots = (tag===opts.priorityBig || tag===opts.prioritySmall) ? 2 : 1;
+      var picked = 0;
+      for (var i=0;i<pool.length && picked<slots;i++) {
+        var e = pool[i], ms = e.muscles || [];
+        // Rotacja aktonów: nie bierz drugiego ćwiczenia na ten sam precyzyjny tag mięśnia
+        var novel = ms.length===0 || ms.some(function(m){ return !usedMuscles[m]; });
+        if (!novel) continue;
+        seen[e.id] = 1; ms.forEach(function(m){ usedMuscles[m] = 1; });
+        exs.push({ id:e.id, name:e.name, tag:tag, muscles:ms.slice(), sets:goal.sets, reps:goal.reps, rest:goal.rest });
+        picked++;
+      }
+      // Gdyby rotacja nic nie dała (np. 1 dostępne ćwiczenie) — dobierz pierwsze
+      if (picked===0 && pool.length) {
+        var e0 = pool[0]; seen[e0.id] = 1;
+        exs.push({ id:e0.id, name:e0.name, tag:tag, muscles:(e0.muscles||[]).slice(), sets:goal.sets, reps:goal.reps, rest:goal.rest });
+      }
+    });
+
+    // Zasada: duże partie (złożone) przed małymi (izolacja)
+    exs.sort(function(a,b){ return (partiaSize(a.tag)==='duza'?0:1) - (partiaSize(b.tag)==='duza'?0:1); });
+    return { id:'d'+Date.now()+'_'+di+'_'+Math.floor(Math.random()*1000), name:tpl.name, groups:tpl.groups.slice(), exercises:exs };
+  }
+
+  // ── GENERATOR PLANU (silnik reguł, deterministyczny) ─────────────────────
   ET.generatePlan = function(opts) {
     var goal = goalDef(opts.goal);
     var split = getSplit(opts.units);
     var avoid = {};
     (opts.limitations||[]).forEach(function(c){ (AVOID[c]||[]).forEach(function(id){ avoid[id]=1; }); });
 
-    var days = split.map(function(tpl, di) {
-      var seen = {};
-      var exs = [];
-      // partia priorytetowa jako pierwsza + dodatkowe ćwiczenie
-      var groups = tpl.groups.slice();
-      [opts.prioritySmall, opts.priorityBig].forEach(function(pt) {
-        if (pt && groups.indexOf(pt)!==-1) { groups = [pt].concat(groups.filter(function(g){ return g!==pt; })); }
-      });
-      groups.forEach(function(tag) {
-        var pool = (ET.exercisesByTag ? ET.exercisesByTag(tag) : []).filter(function(e){ return e.type==='podstawowe' && !avoid[e.id] && !seen[e.id]; });
-        if (goal.easyOnly) {
-          // Powrót po kontuzji: preferuj najłatwiejsze
-          pool = pool.filter(function(e){ return e.difficulty<=2; });
-          pool.sort(function(a,b){ return (a.difficulty-b.difficulty) || (a.id<b.id?-1:1); });
-        }
-        // W innym wypadku zachowaj kolejność z bazy (główne ćwiczenia złożone jako pierwsze)
-        var take = (tag===opts.priorityBig || tag===opts.prioritySmall) ? 2 : 1;
-        for (var i=0;i<pool.length && i<take;i++) {
-          seen[pool[i].id] = 1;
-          exs.push({ id:pool[i].id, name:pool[i].name, tag:tag, sets:goal.sets, reps:goal.reps, rest:goal.rest });
-        }
-      });
-      return { id:'d'+Date.now()+'_'+di, name:tpl.name, groups:tpl.groups.slice(), exercises:exs };
-    });
+    var days = split.map(function(tpl, di) { return buildDay(tpl, di, opts, goal, avoid); });
 
     return {
       id: Date.now(),
@@ -99,9 +129,9 @@
       limitations: (opts.limitations||[]).slice(),
       createdAt: ET.dstr(),
       ranges: [
-        { id:1, weeks:'1–4',  mode:'progresja', deloadPct:15 },
-        { id:2, weeks:'5–8',  mode:'progresja', deloadPct:15 },
-        { id:3, weeks:'9–12', mode:'deload',    deloadPct:15 },
+        { id:1, startWeek:1, endWeek:4,  mode:'progresja', deloadPct:15, volumePct:65 },
+        { id:2, startWeek:5, endWeek:8,  mode:'progresja', deloadPct:15, volumePct:85 },
+        { id:3, startWeek:9, endWeek:12, mode:'deload',    deloadPct:15, volumePct:50 },
       ],
       days: days
     };
@@ -121,11 +151,18 @@
 
     var exclude = props.exclude || [];
     var avoid = props.avoid || {};
+    var lockMuscles = props.lockMuscles || [];
     var list = (ET.exercisesByTag ? ET.exercisesByTag(tag) : []).filter(function(e){ return e.type==='podstawowe' && exclude.indexOf(e.id)===-1; });
+    // Precyzyjny zamiennik: tylko ćwiczenia dzielące ten sam tag mięśnia (prompt 1.2.3)
+    if (props.lockTag && lockMuscles.length) {
+      list = list.filter(function(e){ return (e.muscles||[]).some(function(m){ return lockMuscles.indexOf(m)!==-1; }); });
+    }
+    var muscleNames = lockMuscles.map(function(m){ return (ET.muscleLabel ? ET.muscleLabel(m) : m); }).join(', ');
 
     return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:props.lockTag ? 'Zamień ćwiczenie' : 'Dodaj ćwiczenie' },
       props.lockTag
-        ? _h('div', { style:{ fontSize:'.78rem', color:'var(--t2)', marginBottom:12 } }, 'Alternatywy dla partii: ', _h('b', null, tagLabel(props.lockTag)))
+        ? _h('div', { style:{ fontSize:'.78rem', color:'var(--t2)', marginBottom:12 } },
+            'Alternatywy na ten sam mięsień: ', _h('b', null, muscleNames || tagLabel(props.lockTag)))
         : _h('div', { style:{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:12 } },
             (ET.MUSCLE_GROUPS||[]).map(function(m) {
               return _h('button', { key:m.tag, className:'tag-btn'+(tag===m.tag?' active':''), onClick:function(){ setTag(m.tag); } }, m.icon+' '+m.label);
@@ -150,7 +187,7 @@
 
   // ── WIDOK SZCZEGÓŁÓW / EDYCJI PLANU ──────────────────────────────────────
   function PlanDetail(props) {
-    var su = ET.useStore(); var update = su.update;
+    var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
     var plan = props.plan;
     var pick = React.useState(null); var picker = pick[0], setPicker = pick[1]; // {dayIdx, exIdx?|null, lockTag}
@@ -172,7 +209,7 @@
       var pk = picker;
       mutate(function(p) {
         var goal = goalDef(p.goal);
-        var item = { id:ex.id, name:ex.name, tag:tag, sets:goal.sets, reps:goal.reps, rest:goal.rest };
+        var item = { id:ex.id, name:ex.name, tag:tag, muscles:(ex.muscles||[]).slice(), sets:goal.sets, reps:goal.reps, rest:goal.rest };
         if (pk.exIdx != null) { // zamiana — zachowaj serie/powt.
           var old = p.days[pk.dayIdx].exercises[pk.exIdx];
           item.sets = old.sets; item.reps = old.reps; item.rest = old.rest;
@@ -189,7 +226,27 @@
       mutate(function(p){ p.ranges[ri][field] = val; return p; });
     }
 
+    function firstRep(reps){ var m=String(reps).match(/\d+/); return m ? +m[0] : 10; }
+    function applyToStrength() {
+      var g = goalDef(plan.goal);
+      update(function(s) {
+        var converted = plan.days.map(function(day, di) {
+          return { id:'kreator_'+plan.id+'_'+di, _isCustom:true, _kreatorPlanId:plan.id,
+            name:day.name, icon:g.icon, day:'Kreator · '+plan.name, color:'var(--a)',
+            desc:day.exercises.map(function(e){ return e.name; }).slice(0,3).join(' · '), badge:'badge-blue',
+            warmup:[], cooldown:[],
+            exercises:day.exercises.map(function(e){ return { name:e.name, plan:e.sets+'×'+e.reps, sets:e.sets, reps:firstRep(e.reps), weight:0, rir:2, tempo:'', rest:e.rest||90, prog:'' }; }) };
+        });
+        var others = (s.customWorkoutPlans||[]).filter(function(p){ return p._kreatorPlanId!==plan.id; });
+        var st = Object.assign({}, s, { customWorkoutPlans:others.concat(converted), activeKreatorPlanId:plan.id });
+        if (ET.logChange) st = ET.logChange(st, { section:'planner', title:'Zastosowano plan', desc:plan.name+' → Trening Siłowy' });
+        return st;
+      });
+      toast('Plan zastosowany → widoczny w Treningu Siłowym ✓', 'success');
+    }
+
     var goal = goalDef(plan.goal);
+    var isApplied = store.activeKreatorPlanId === plan.id;
 
     return _h('div', { className:'fade-in' },
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:16 } },
@@ -197,30 +254,64 @@
         _h('div', { style:{ flex:1 } },
           _h('h1', { style:{ fontSize:'1.1rem', fontWeight:700 } }, goal.icon+' '+plan.name),
           _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginTop:2 } }, 'Utworzono '+ET.fmtDate(plan.createdAt))
-        )
+        ),
+        _h('button', { className:isApplied?'btn btn-secondary btn-sm':'btn btn-primary btn-sm', onClick:applyToStrength },
+          isApplied ? '✓ Zastosowany' : '✅ Zastosuj plan')
       ),
 
-      // Zmienne dla zakresów tygodni
-      _h('div', { className:'card', style:{ marginBottom:14 } },
-        _h('div', { style:{ fontWeight:700, fontSize:'.88rem', marginBottom:10, color:'var(--t2)' } }, '📆 Zakresy tygodni'),
-        (plan.ranges||[]).map(function(rg, ri) {
-          return _h('div', { key:rg.id, style:{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', padding:'8px 0', borderTop:ri>0?'1px solid var(--b1)':'none' } },
-            _h('div', { style:{ fontWeight:700, fontSize:'.85rem', minWidth:64 } }, 'Tydz. '+rg.weeks),
-            _h('div', { style:{ display:'flex', gap:4 } },
-              [{ id:'progresja', l:'📈 Progresja' }, { id:'deload', l:'📉 Deload' }].map(function(m) {
-                return _h('button', { key:m.id, className:'tag-btn'+(rg.mode===m.id?' active':''), style:{ fontSize:'.68rem' }, onClick:function(){ setRange(ri,'mode',m.id); } }, m.l);
-              })
-            ),
-            rg.mode==='deload' && _h('div', { style:{ display:'flex', alignItems:'center', gap:4 } },
-              _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, '-'),
-              _h('input', { type:'number', min:5, max:50, value:rg.deloadPct, style:{ width:52 }, onChange:function(e){ setRange(ri,'deloadPct',+e.target.value); } }),
-              _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, '%')
-            )
-          );
-        }),
-        _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:8, lineHeight:1.5 } },
-          '💡 Tydzień zalicza się po wykonaniu wszystkich '+plan.units+' treningów. Deload domyślnie -15%.')
-      ),
+      // Zakresy tygodni z edytowalnymi granicami (prompt 1.2.4)
+      (function() {
+        var ranges = plan.ranges || [];
+        function wl(rg){ return rg.startWeek!=null ? rg.startWeek+'–'+rg.endWeek : rg.weeks; }
+        var colors = ['var(--a)','var(--green)','var(--purple)','var(--orange)','var(--teal)'];
+        var totalWeeks = ranges.length ? (ranges[ranges.length-1].endWeek || 12) : 12;
+        function blockOfWeek(w){ for(var i=0;i<ranges.length;i++){ if(ranges[i].startWeek!=null && w>=ranges[i].startWeek && w<=ranges[i].endWeek) return i; } return -1; }
+        function shiftBoundary(ri, delta){
+          mutate(function(p){
+            var a=p.ranges[ri], b=p.ranges[ri+1];
+            if(a.startWeek==null||b.startWeek==null) return p;
+            var ne=a.endWeek+delta;
+            if(ne<a.startWeek) ne=a.startWeek;
+            if(ne>=b.endWeek) ne=b.endWeek-1;
+            a.endWeek=ne; b.startWeek=ne+1;
+            return p;
+          });
+        }
+        return _h('div', { className:'card', style:{ marginBottom:14 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.88rem', marginBottom:10, color:'var(--t2)' } }, '📆 Zakresy tygodni'),
+          ranges[0] && ranges[0].startWeek!=null && _h('div', { style:{ display:'flex', gap:2, marginBottom:8 } },
+            (function(){ var cells=[]; for(var w=1;w<=totalWeeks;w++){ var bi=blockOfWeek(w); cells.push(_h('div',{ key:w, style:{ flex:1, height:22, borderRadius:3, background: bi>=0?colors[bi%colors.length]:'var(--b1)', opacity:.8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'.5rem', color:'#fff', fontWeight:700 } }, w)); } return cells; })()
+          ),
+          ranges.length>1 && ranges[0].startWeek!=null && _h('div', { style:{ display:'flex', gap:10, marginBottom:10, flexWrap:'wrap' } },
+            ranges.slice(0,-1).map(function(rg, ri) {
+              return _h('div', { key:ri, style:{ display:'flex', alignItems:'center', gap:4, fontSize:'.66rem', color:'var(--t3)' } },
+                _h('span', null, 'Granica '+(ri+1)+'|'+(ri+2)+':'),
+                _h('button', { className:'btn btn-ghost btn-sm', style:{ padding:'2px 7px' }, onClick:function(){ shiftBoundary(ri,-1); } }, '◀'),
+                _h('b', { style:{ color:'var(--t1)' } }, 'tydz. '+rg.endWeek),
+                _h('button', { className:'btn btn-ghost btn-sm', style:{ padding:'2px 7px' }, onClick:function(){ shiftBoundary(ri,1); } }, '▶')
+              );
+            })
+          ),
+          ranges.map(function(rg, ri) {
+            return _h('div', { key:rg.id, style:{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', padding:'8px 0', borderTop:ri>0?'1px solid var(--b1)':'none' } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.85rem', minWidth:74, color:colors[ri%colors.length] } }, 'Tydz. '+wl(rg)),
+              _h('div', { style:{ display:'flex', gap:4 } },
+                [{ id:'progresja', l:'📈 Progresja' }, { id:'deload', l:'📉 Deload' }].map(function(m) {
+                  return _h('button', { key:m.id, className:'tag-btn'+(rg.mode===m.id?' active':''), style:{ fontSize:'.68rem' }, onClick:function(){ setRange(ri,'mode',m.id); } }, m.l);
+                })
+              ),
+              rg.volumePct!=null && _h('span', { style:{ fontSize:'.66rem', color:'var(--t3)' } }, '~'+rg.volumePct+'% obj.'),
+              rg.mode==='deload' && _h('div', { style:{ display:'flex', alignItems:'center', gap:4 } },
+                _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, '-'),
+                _h('input', { type:'number', min:5, max:50, value:rg.deloadPct, style:{ width:52 }, onChange:function(e){ setRange(ri,'deloadPct',+e.target.value); } }),
+                _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, '%')
+              )
+            );
+          }),
+          _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:8, lineHeight:1.5 } },
+            '💡 Przesuwaj granice ◀▶, by zmienić zakres bloku. Tydzień zalicza się po wykonaniu wszystkich '+plan.units+' treningów.')
+        );
+      })(),
 
       plan.limitations && plan.limitations.length>0 && _h('div', { style:{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:14 } },
         plan.limitations.map(function(c) {
@@ -248,7 +339,7 @@
                   _h('td', null, _h('input', { type:'text', value:ex.reps, style:{ width:56 }, onChange:function(e){ setExField(di,ei,'reps',e.target.value); } })),
                   _h('td', null,
                     _h('div', { style:{ display:'flex', gap:4 } },
-                      _h('button', { className:'btn btn-ghost btn-sm', style:{ fontSize:'.62rem', padding:'2px 6px' }, onClick:function(){ setPicker({ dayIdx:di, exIdx:ei, lockTag:ex.tag }); } }, '↔'),
+                      _h('button', { className:'btn btn-ghost btn-sm', style:{ fontSize:'.62rem', padding:'2px 6px' }, onClick:function(){ setPicker({ dayIdx:di, exIdx:ei, lockTag:ex.tag, lockMuscles:ex.muscles||[] }); } }, '↔'),
                       _h('button', { className:'btn btn-ghost btn-sm', style:{ fontSize:'.7rem', padding:'2px 6px', color:'var(--red)' }, onClick:function(){ removeEx(di,ei); } }, '✕')
                     )
                   )
@@ -263,6 +354,7 @@
       _h(ExercisePicker, {
         open: !!picker,
         lockTag: picker ? picker.lockTag : null,
+        lockMuscles: picker ? (picker.lockMuscles||[]) : [],
         exclude: picker ? (plan.days[picker.dayIdx].exercises.map(function(e){ return e.id; })) : [],
         avoid: avoid,
         onPick: onPick,
@@ -360,6 +452,7 @@
     var toast = ET.useToast();
     var cr = React.useState(false); var showCreator = cr[0], setShowCreator = cr[1];
     var op = React.useState(null); var openId = op[0], setOpenId = op[1];
+    var rl = React.useState(false); var showRules = rl[0], setShowRules = rl[1];
 
     var plans = store.customPlans || [];
     var openPlan = openId ? plans.find(function(p){ return p.id===openId; }) : null;
@@ -390,8 +483,24 @@
         _h('button', { className:'btn btn-primary', onClick:function(){ setShowCreator(true); } }, '+ Nowy plan')
       ),
 
-      _h('div', { className:'card card-accent', style:{ marginBottom:14, fontSize:'.82rem', color:'var(--t2)', lineHeight:1.6 } },
-        '💡 Kreator zbuduje plan dopasowany do celu, liczby jednostek, priorytetów i kontuzji. Potem możesz edytować serie/powtórzenia i zamieniać ćwiczenia (przycisk ↔ dobiera alternatywy z tej samej partii).'),
+      _h('div', { className:'card card-accent', style:{ marginBottom:10, fontSize:'.82rem', color:'var(--t2)', lineHeight:1.6 } },
+        '💡 Kreator używa silnika reguł (nie losuje): dobiera całe ciało, priorytetowe partie 2×, rotuje aktony mięśniowe, wyklucza ćwiczenia przy kontuzjach. Zamiana ↔ proponuje ćwiczenia na ten sam precyzyjny mięsień. „Zastosuj plan" wysyła go do Treningu Siłowego.'),
+
+      // Panel 7 zasad planowania (prompt 1.3)
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }, onClick:function(){ setShowRules(!showRules); } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.82rem', color:'var(--t2)' } }, '📚 Zasady układania planu'),
+          _h('span', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, showRules?'▲':'▼')
+        ),
+        showRules && _h('div', { style:{ marginTop:10 } },
+          (ET.PLAN_RULES||[]).map(function(r, i) {
+            return _h('div', { key:i, style:{ padding:'7px 0', borderTop:i>0?'1px solid var(--b1)':'none' } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.78rem' } }, (i+1)+'. '+r.t),
+              _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', lineHeight:1.5, marginTop:2 } }, r.d)
+            );
+          })
+        )
+      ),
 
       plans.length===0
         ? _h(ET.Placeholder, { icon:'🧩', title:'Brak planów', desc:'Kliknij „Nowy plan", aby uruchomić kreator.' })

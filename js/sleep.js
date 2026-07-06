@@ -23,6 +23,8 @@
     function save() {
       var dur = calcDur(f.bedtime, f.waketime);
       update(function(s){ return Object.assign({},s,{ sleepSessions:[Object.assign({},f,{id:Date.now(),duration:dur})].concat(s.sleepSessions) }); });
+      // Core: Recovery Engine przelicza gotowość
+      if (window.etcore) { try { window.etcore.bus.publish('SleepLogged', { duration:dur, quality:f.quality }, 'user'); } catch(e) { console.error('[core]', e); } }
       toast('Sen zapisany ✓', 'success');
       handleClose();
     }

@@ -79,6 +79,8 @@
           var n = Object.assign({},s,{ runs:[run].concat(s.runs) });
           return ET.syncGoals ? ET.syncGoals(n, 'run', run) : n;
         });
+        // Core: Running Engine analizuje bieg i ryzyko przeciążenia
+        if (window.etcore) { try { window.etcore.bus.publish('RunFinished', { distance:run.distance, duration:run.duration, avgHr:run.avgHr }, 'user'); } catch(e) { console.error('[core]', e); } }
         toast('Bieg zapisany ✓', 'success');
         setLastRun(run);
         setStep('summary');
@@ -167,6 +169,7 @@
 
   function RunningModule() {
     var su = ET.useStore(); var store = su.store;
+    var toast = ET.useToast();
     var nav = ET.useNav(); var params = nav.params || {};
     var sa = React.useState(!!params.openAdd); var showAdd = sa[0], setShowAdd = sa[1];
     var ed = React.useState(null); var editRun = ed[0], setEditRun = ed[1];
@@ -220,6 +223,7 @@
         ),
         _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
           _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowCoach(true); } }, '🤖 AI Coach'),
+          _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ ET.connectAppleHealth && ET.connectAppleHealth(su.update, toast); } }, '🍎 Apple Fitness'),
           _h('button', { className:'btn btn-primary', onClick:function(){ setShowAdd(true); } }, '+ Dodaj bieg')
         )
       ),

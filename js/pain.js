@@ -116,16 +116,60 @@
     );
   }
 
+  // ── BLOK KOREKCYJNY (scalony z Dolegliwości) ─────────────────────────────
+  var REGEN_DAYS = 28;
+  function ailmentsKey(a){ return (a||[]).slice().sort().join(','); }
+  function buildBlockRecord(ailments, seed) {
+    var exs = ET.generatePhysioBlock ? ET.generatePhysioBlock(ailments, seed) : [];
+    return { exerciseIds: exs.map(function(e){ return e.id; }), generatedAt: ET.dstr(), ailmentsKey: ailmentsKey(ailments), seed: seed };
+  }
+  function daysSince(d) { return Math.floor((new Date(ET.dstr()).getTime() - new Date(d).getTime())/86400000); }
+
   function PainModule() {
     var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
     var sa = React.useState(false); var showAdd = sa[0], setShowAdd = sa[1];
     var si = React.useState('front'); var side = si[0], setSide = si[1];
     var ei = React.useState(null); var editId = ei[0], setEditId = ei[1];
+    var ss = React.useState(false); var showSettings = ss[0], setShowSettings = ss[1];
+    var sb = React.useState(false); var showBlock = sb[0], setShowBlock = sb[1];
+    var dt = React.useState(null); var detail = dt[0], setDetail = dt[1];
+    var fl = React.useState(false); var flash = fl[0], setFlash = fl[1];
     var emptyForm = { date:ET.dstr(), bodyParts:[], type:'doms', level:3, duration:'', notes:'' };
     var fs = React.useState(emptyForm);
     var f = fs[0], setF = fs[1];
     function upF(key, val) { setF(function(prev){ var o={}; o[key]=val; return Object.assign({},prev,o); }); }
+
+    var ailments = store.ailments || [];
+    var block = store.physioBlock || null;
+    var blockExs = block ? block.exerciseIds.map(function(id){ return ET.exerciseById(id); }).filter(Boolean) : [];
+
+    // Auto-regeneracja bloku: zmiana dolegliwości / brak / >28 dni
+    React.useEffect(function() {
+      if (!ailments.length) return;
+      var needs = !block || block.ailmentsKey !== ailmentsKey(ailments) || daysSince(block.generatedAt) >= REGEN_DAYS;
+      if (needs) update(function(s){ return Object.assign({}, s, { physioBlock: buildBlockRecord(s.ailments||[], (block&&block.seed)||0) }); });
+    }, [ailmentsKey(ailments)]);
+
+    function toggleAilment(tag) {
+      update(function(s) {
+        var cur = s.ailments || [];
+        var next = cur.indexOf(tag)!==-1 ? cur.filter(function(x){ return x!==tag; }) : cur.concat([tag]);
+        var rec = next.length ? buildBlockRecord(next, (s.physioBlock&&s.physioBlock.seed)||0) : null;
+        var st = Object.assign({}, s, { ailments: next, physioBlock: rec });
+        if (ET.logChange) {
+          var cond = (ET.CONDITIONS||[]).find(function(c){ return c.tag===tag; });
+          st = ET.logChange(st, { section:'pain', title:(next.indexOf(tag)!==-1?'Dodano dolegliwość':'Usunięto dolegliwość'), desc:(cond?cond.label:tag) });
+        }
+        return st;
+      });
+    }
+
+    function regenerate() {
+      update(function(s){ var seed=((s.physioBlock&&s.physioBlock.seed)||0)+1; return Object.assign({}, s, { physioBlock: buildBlockRecord(s.ailments||[], seed) }); });
+      setFlash(true); setTimeout(function(){ setFlash(false); }, 600);
+      toast('Wygenerowano nowy blok korekcyjny 🔄', 'success');
+    }
 
     function toggleBodyPart(id) {
       var parts = f.bodyParts || [];
@@ -171,36 +215,62 @@
     return _h('div', { className:'fade-in' },
       _h('div', { className:'page-hdr' },
         _h('div', null,
-          _h('h1', null, '🩹 Dziennik bólu'),
-          _h('p', null, entries.length+' wpisów · '+activeCount+' aktywnych')
+          _h('h1', null, '🩹 Dolegliwości i ból'),
+          _h('p', null, entries.length+' wpisów bólu · '+ailments.length+' dolegliwości')
         ),
-        _h('button', { className:'btn btn-primary', onClick:openNew }, '+ Dodaj')
+        _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+          _h('button', { className:'btn btn-ghost', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:function(){ setShowSettings(true); } }, '⚙️ Ustawienia'),
+          _h('button', { className:'btn btn-primary', onClick:openNew }, '➕ Dodaj ból')
+        )
       ),
 
+      // ── DZIENNIK BÓLU (poziomy pasek) ────────────────────────────────────
+      _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, 'Dziennik bólu'),
       entries.length===0
-        ? _h(ET.Placeholder, { icon:'🩹', title:'Brak wpisów', desc:'Zaznacz na ludziku miejsce bólu i zapisz szczegóły.' })
-        : entries.map(function(e) {
-            var ti = typeInfo(e.type);
-            var lc = levelColor(e.level);
-            return _h('div', { key:e.id, className:'card', style:{ marginBottom:8, cursor:'pointer', borderColor:e.level>=7?'var(--red)':e.level>=4?'var(--orange)':'var(--b1)' }, onClick:function(){ openEdit(e); } },
-              _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 } },
-                _h('div', null,
-                  _h('div', { style:{ fontWeight:700, fontSize:'.95rem', marginBottom:4 } }, e.bodyPart || 'Brak lokalizacji'),
-                  _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' } },
-                    _h('span', { className:'badge', style:{ background:ti.color+'22', color:ti.color } }, ti.icon+' '+ti.label),
-                    _h('span', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, ET.fmtDate(e.date)),
-                    _h('span', { style:{ fontSize:'.68rem', color:'var(--a-light)' } }, '✏️ edytuj')
-                  ),
-                  e.duration && _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:4 } }, 'Czas: '+e.duration),
-                  e.notes && _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:3, fontStyle:'italic' } }, e.notes)
+        ? _h('div', { style:{ fontSize:'.8rem', color:'var(--t3)', padding:'8px 0', marginBottom:6 } }, 'Brak wpisów — kliknij „Dodaj ból".')
+        : _h('div', { style:{ display:'flex', gap:8, overflowX:'auto', paddingBottom:8, marginBottom:6 } },
+            entries.map(function(e) {
+              var ti = typeInfo(e.type), lc = levelColor(e.level);
+              var bars = Math.max(1, Math.ceil(e.level/2));
+              return _h('div', { key:e.id, className:'card', style:{ flexShrink:0, width:172, cursor:'pointer', padding:'10px 12px', borderColor:e.level>=7?'var(--red)':e.level>=4?'var(--orange)':'var(--b1)' }, onClick:function(){ openEdit(e); } },
+                _h('div', { style:{ fontSize:'.66rem', color:'var(--t3)', marginBottom:3 } }, ET.fmtDate(e.date)),
+                _h('div', { style:{ fontWeight:700, fontSize:'.82rem', marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, e.bodyPart || 'Brak lokalizacji'),
+                _h('div', { style:{ display:'flex', gap:3, marginBottom:5 } },
+                  [1,2,3,4,5].map(function(n){ return _h('div', { key:n, style:{ flex:1, height:5, borderRadius:2, background: n<=bars ? lc : 'var(--b1)' } }); })
                 ),
-                _h('div', { style:{ textAlign:'center' } },
-                  _h('div', { style:{ fontSize:'1.8rem', fontWeight:700, color:lc } }, e.level),
-                  _h('div', { style:{ fontSize:'.55rem', color:'var(--t3)' } }, '/10')
-                )
-              )
-            );
-          }),
+                _h('span', { className:'badge', style:{ background:ti.color+'22', color:ti.color, fontSize:'.6rem' } }, ti.icon+' '+ti.label)
+              );
+            })
+          ),
+
+      // ── BLOK KOREKCYJNY ──────────────────────────────────────────────────
+      _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:12, marginBottom:8 } },
+        _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em' } }, 'Twój blok korekcyjny'),
+        blockExs.length>0 && _h('button', { className:'btn btn-ghost btn-sm', style:{ fontSize:'.68rem' }, onClick:regenerate }, '🔄 Regeneruj')
+      ),
+      ailments.length===0
+        ? _h('div', { className:'card', style:{ textAlign:'center', padding:'18px 14px' } },
+            _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, '🩺'),
+            _h('div', { style:{ fontSize:'.8rem', color:'var(--t2)', marginBottom:10 } }, 'Zaznacz swoje dolegliwości, aby dostać blok ćwiczeń korekcyjnych.'),
+            _h('button', { className:'btn btn-secondary btn-sm', onClick:function(){ setShowSettings(true); } }, '⚙️ Wybierz dolegliwości')
+          )
+        : _h('div', { style:{ opacity: flash?0.35:1, transition:'opacity .3s' } },
+            blockExs.map(function(ex, i) {
+              var cond = (ET.CONDITIONS||[]).find(function(c){ return (ex.condition_tags||[]).indexOf(c.tag)!==-1; });
+              return _h('div', { key:ex.id, className:'card card-interactive', style:{ marginBottom:6, cursor:'pointer', display:'flex', gap:10, alignItems:'center', padding:'10px 12px' }, onClick:function(){ setDetail(ex); } },
+                _h('div', { style:{ width:26, height:26, borderRadius:'50%', background:'var(--a-dim)', color:'var(--a-light)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'.8rem', flexShrink:0 } }, i+1),
+                _h('div', { style:{ flex:1 } },
+                  _h('div', { style:{ fontWeight:600, fontSize:'.84rem' } }, ex.name),
+                  cond && _h('div', { style:{ fontSize:'.64rem', color:'var(--teal)' } }, cond.label)
+                ),
+                _h('span', { style:{ color:'var(--t3)' } }, '›')
+              );
+            }),
+            blockExs.length>0 && _h('button', { className:'btn btn-primary', style:{ width:'100%', marginTop:4 }, onClick:function(){ setShowBlock(true); } }, '▶️ Wykonaj blok')
+          ),
+
+      // ── SAMOPOCZUCIE (przeniesione tutaj) — pod blokiem korekcyjnym ──────
+      _h(WellbeingInline, null),
 
       _h(ET.Sheet, { open:showAdd, onClose:function(){ setShowAdd(false); setEditId(null); }, title:editId ? 'Edytuj wpis bólu' : 'Nowy wpis bólu' },
         _h('div', { className:'field' }, _h('label', null, 'Data'), _h('input', { type:'date', value:f.date, onChange:function(e){ upF('date',e.target.value); } })),
@@ -256,6 +326,78 @@
         _h('div', { className:'field' }, _h('label', null, 'Czas trwania'), _h('input', { type:'text', placeholder:'np. 3 dni, od tygodnia', value:f.duration, onChange:function(e){ upF('duration',e.target.value); } })),
         _h('div', { className:'field' }, _h('label', null, 'Notatki'), _h('textarea', { value:f.notes, onChange:function(e){ upF('notes',e.target.value); }, placeholder:'Kiedy boli? Co pomaga?', style:{ minHeight:60 } })),
         _h('button', { className:'btn btn-primary', style:{ width:'100%' }, onClick:save }, editId ? 'Zapisz zmiany' : 'Zapisz wpis')
+      ),
+
+      // ── USTAWIENIA: wybór dolegliwości ───────────────────────────────────
+      _h(ET.Sheet, { open:showSettings, onClose:function(){ setShowSettings(false); }, title:'Twoje dolegliwości' },
+        _h('div', { style:{ fontSize:'.78rem', color:'var(--t2)', marginBottom:14, lineHeight:1.5 } },
+          'Zaznacz dolegliwości, które Cię dotyczą. Na tej podstawie dobierzemy blok korekcyjny (5–15 min).'),
+        (ET.BODY_REGIONS||[]).map(function(region) {
+          var conds = (ET.CONDITIONS||[]).filter(function(c){ return c.region===region.id; });
+          if (!conds.length) return null;
+          return _h('div', { key:region.id, style:{ marginBottom:14 } },
+            _h('div', { style:{ fontSize:'.68rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, region.label),
+            _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+              conds.map(function(c) {
+                var active = ailments.indexOf(c.tag)!==-1;
+                return _h('button', { key:c.tag, className:'tag-btn'+(active?' active':''), onClick:function(){ toggleAilment(c.tag); } }, (active?'✓ ':'')+c.label);
+              })
+            )
+          );
+        })
+      ),
+
+      // ── WYKONAJ BLOK: checklist ──────────────────────────────────────────
+      _h(BlockRunSheet, { open:showBlock, onClose:function(){ setShowBlock(false); }, exercises:blockExs, toast:toast }),
+
+      _h(ET.ExerciseDetail, { open:!!detail, exercise:detail, onClose:function(){ setDetail(null); } })
+    );
+  }
+
+  // Sheet wykonania bloku — prosta checklista
+  function BlockRunSheet(props) {
+    var ck = React.useState({}); var checked = ck[0], setChecked = ck[1];
+    React.useEffect(function(){ if (props.open) setChecked({}); }, [props.open]);
+    var exs = props.exercises || [];
+    var done = exs.filter(function(e){ return checked[e.id]; }).length;
+    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:'Blok korekcyjny' },
+      _h('div', { style:{ marginBottom:10 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', marginBottom:4 } },
+          _h('span', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, 'Postęp'),
+          _h('span', { style:{ fontSize:'.72rem', color:'var(--a-light)', fontWeight:700 } }, done+'/'+exs.length)
+        ),
+        _h(ET.ProgressBar, { value: exs.length ? done/exs.length*100 : 0 })
+      ),
+      exs.map(function(ex) {
+        var on = !!checked[ex.id];
+        return _h('div', { key:ex.id, className:'suppl-item'+(on?' checked':''), onClick:function(){ setChecked(function(c){ var o={}; o[ex.id]=!c[ex.id]; return Object.assign({},c,o); }); } },
+          _h('div', { className:'suppl-check' }, on?'✓':''),
+          _h('div', { style:{ flex:1 } },
+            _h('div', { style:{ fontWeight:600, fontSize:'.85rem' } }, ex.name),
+            _h('div', { style:{ fontSize:'.68rem', color:'var(--t2)' } }, ex.mechanism || ex.target_anatomy || '')
+          )
+        );
+      }),
+      _h('button', { className:'btn btn-primary', style:{ width:'100%', marginTop:12 }, onClick:function(){ props.toast(done>=exs.length&&exs.length ? 'Blok ukończony 🎉' : 'Zapisano postęp', 'success'); props.onClose(); } },
+        done>=exs.length && exs.length ? '🏆 Zakończ' : 'Zamknij')
+    );
+  }
+
+  // Samopoczucie osadzone w module Dolegliwości i ból (dawny osobny moduł „Samopoczucie").
+  function WellbeingInline() {
+    var su = ET.useStore(); var update = su.update;
+    var toast = ET.useToast();
+    var wv = React.useState(Object.assign({}, ET.WellbeingDefaults || {}));
+    var vals = wv[0], setVals = wv[1];
+    var savedToday = (su.store.wellbeingEntries||[]).some(function(e){ return e.date===ET.dstr() && !e.tag; });
+    function up(k,v){ setVals(function(p){ var o={}; o[k]=v; return Object.assign({},p,o); }); }
+    function save(){ if (ET.saveWellbeingEntry) ET.saveWellbeingEntry(update, vals, ''); toast('Samopoczucie zapisane ✓', 'success'); }
+    if (!ET.WellbeingForm) return null;
+    return _h('div', { style:{ marginTop:20 } },
+      _h('div', { style:{ fontSize:'.7rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } },
+        '🌡 Jak się dziś czujesz?'+(savedToday?' · zapisano dziś ✓':'')),
+      _h('div', { className:'card' },
+        _h(ET.WellbeingForm, { values:vals, onChange:up, saveLabel:'Zapisz samopoczucie', onSave:save })
       )
     );
   }

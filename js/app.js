@@ -112,7 +112,7 @@
     journal:      function(){ return ET.JournalModule; },
     habits:       function(){ return ET.HabitsModule; },
     library:      function(){ return ET.LibraryModule; },
-    physio:       function(){ return ET.PhysioModule; },
+    physio:       function(){ return ET.PainModule; },
     backup:       function(){ return ET.BackupModule; },
     planner:      function(){ return ET.PlannerModule; },
     acwr:         function(){ return ET.AcwrModule; },

@@ -20,6 +20,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Typecheck + unit tests (core)
+        run: npx tsc --noEmit && npx vitest run
+
+      - name: Build core bundle
+        run: npm run build:core
+
       - name: Build web assets (-> www)
         run: npm run build:web
 

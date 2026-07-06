@@ -127,6 +127,8 @@
     var entry = Object.assign({ id:Date.now(), date:ET.dstr() }, values);
     if (tag) entry.tag = tag;
     update(function(s){ return Object.assign({},s,{ wellbeingEntries:[entry].concat(s.wellbeingEntries||[]) }); });
+    // Core: Recovery Engine przelicza gotowość
+    if (window.etcore) { try { window.etcore.bus.publish('WellbeingLogged', { energy:values.energy, stress:values.stress, mood:values.mood, motivation:values.motivation }, 'user'); } catch(e) { console.error('[core]', e); } }
   }
 
   ET.WellbeingForm = WellbeingForm;

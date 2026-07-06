@@ -4,13 +4,23 @@
   "private": true,
   "description": "EasyTraining — offline trening app packaged for iOS via Capacitor",
   "scripts": {
-    "build:web": "node scripts/build-web.mjs"
+    "build:web": "node scripts/build-web.mjs",
+    "build:core": "esbuild core/src/index.ts --bundle --format=iife --global-name=ETCore --outfile=js/core.bundle.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
     "@capacitor/ios": "^6.1.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2"
+    "@capacitor/cli": "^6.1.2",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.23.1": true,
+    "esbuild@0.21.5": true
   }
 }

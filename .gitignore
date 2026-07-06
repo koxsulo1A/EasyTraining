@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Generated core bundle (built from core/src via `npm run build:core`)
+js/core.bundle.js
+
 # Generated web bundle (rebuilt in CI from source in repo root)
 www/
 
@@ -16,3 +19,6 @@ Payload/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Przypadkowa kopia całego projektu (backup) — nie commitujemy
+BLOKI TXT/new/

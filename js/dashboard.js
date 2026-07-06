@@ -156,6 +156,75 @@
     );
   }
 
+  // ── PASEK REGENERACJI (prompt 5.3) — z danych ostatnich 7 dni ────────────
+  function RegenerationBar(props) {
+    var store = props.store;
+    var todayMs = new Date(ET.dstr()).getTime();
+    function within7(dateStr){ if(!dateStr) return false; var a=Math.floor((todayMs-new Date(dateStr).getTime())/86400000); return a>=0 && a<=6; }
+    function avg(arr, key){ var v=arr.filter(function(x){ return x[key]!=null; }); return v.length ? v.reduce(function(t,x){ return t+x[key]; },0)/v.length : null; }
+
+    var wb = (store.wellbeingEntries||[]).filter(function(e){ return within7(e.date); });
+    var sl = (store.sleepSessions||[]).filter(function(e){ return within7(e.date); });
+    var energy=avg(wb,'energy'), stress=avg(wb,'stress'), motivation=avg(wb,'motivation'), mood=avg(wb,'mood');
+    var sleepH=avg(sl,'duration'), quality=avg(sl,'quality');
+
+    var comps=[];
+    if(energy!=null) comps.push(energy/10);
+    if(stress!=null) comps.push((10-stress)/10);
+    if(motivation!=null) comps.push(motivation/10);
+    if(mood!=null) comps.push(mood/10);
+    if(quality!=null) comps.push(quality/10);
+    if(sleepH!=null) comps.push(Math.min(sleepH/8,1));
+    if(!comps.length) return null;
+
+    var pct = Math.round(comps.reduce(function(a,b){ return a+b; },0)/comps.length*100);
+    var color = pct>=70?'var(--green)':pct>=45?'var(--yellow)':'var(--red)';
+    var stressLabel = stress==null?'—':stress<=3?'niski':stress<=6?'średni':'wysoki';
+
+    return _h('div', { className:'card', style:{ marginBottom:16 } },
+      _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 } },
+        _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' } }, '♻️ Regeneracja (7 dni)'),
+        _h('div', { style:{ fontSize:'1.15rem', fontWeight:800, color:color } }, pct+'%')
+      ),
+      _h(ET.ProgressBar, { value:pct, color:color }),
+      _h('div', { style:{ display:'flex', gap:12, flexWrap:'wrap', marginTop:10, fontSize:'.68rem', color:'var(--t2)' } },
+        sleepH!=null && _h('span', null, '😴 Sen '+sleepH.toFixed(1)+'h'),
+        stress!=null && _h('span', null, '😰 Stres '+stressLabel),
+        energy!=null && _h('span', null, '⚡ Energia '+energy.toFixed(0)+'/10'),
+        motivation!=null && _h('span', null, '🔥 Motywacja '+motivation.toFixed(0)+'/10')
+      )
+    );
+  }
+
+  // ── CORE SCORES: wskaźniki 0-100 z silników (ADR-006) ────────────────────
+  function CoreScoresCard() {
+    var c = window.etcore;
+    if (!c) return null;
+    var defs = [
+      { e:'recovery-engine', k:'readiness',   label:'Gotowość',   icon:'♻️', goodHigh:true },
+      { e:'fatigue-engine',  k:'overall',     label:'Zmęczenie',  icon:'🔋', goodHigh:false },
+      { e:'progress-engine', k:'progressing', label:'Progres',    icon:'📈', goodHigh:true },
+      { e:'running-engine',  k:'ramp-risk',   label:'Ryzyko biegu', icon:'🏃', goodHigh:false },
+    ];
+    var items = defs.map(function(d){ var s=c.scores.latest(d.e,d.k); return s ? { d:d, s:s } : null; }).filter(Boolean);
+    if (!items.length) return null;
+    return _h('div', { className:'card', style:{ marginBottom:16 } },
+      _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:10 } }, '🧠 Wskaźniki silników (core)'),
+      _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+        items.map(function(it) {
+          var v = it.s.value;
+          var good = it.d.goodHigh ? v : 100 - v;
+          var col = good >= 65 ? 'var(--green)' : good >= 40 ? 'var(--yellow)' : 'var(--red)';
+          return _h('div', { key:it.d.e+it.d.k, style:{ flex:1, minWidth:100, background:'var(--s3)', borderRadius:'var(--r2)', padding:'8px 10px', textAlign:'center' } },
+            _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginBottom:2 } }, it.d.icon+' '+it.d.label),
+            _h('div', { style:{ fontSize:'1.2rem', fontWeight:800, color:col } }, v),
+            _h('div', { style:{ fontSize:'.55rem', color:'var(--t3)' } }, 'pewność '+Math.round(it.s.confidence*100)+'%')
+          );
+        })
+      )
+    );
+  }
+
   // ── NEW DASHBOARD ────────────────────────────────────────────────────────
   function NewDashboard() {
     var su = ET.useStore(); var store = su.store;
@@ -222,6 +291,10 @@
 
       _h(ReadinessCard, { readiness:readiness, setReadiness:setReadiness, onOpen:function(){ setShowReadiness(true); } }),
 
+      _h(RegenerationBar, { store:store }),
+
+      _h(CoreScoresCard, null),
+
       _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr', style:{ marginBottom:10 } },
           _h('h2', null, 'Szybki start')
@@ -280,6 +353,24 @@
             _h(ET.ProgressBar, { value:g.progress })
           );
         })
+      ),
+
+      // ── WKRÓTCE (coming soon) — szara półprzezroczysta nakładka ──────────
+      _h('div', { style:{ marginBottom:20 } },
+        _h('div', { className:'section-hdr', style:{ marginBottom:10 } }, _h('h2', null, 'Wkrótce')),
+        _h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 } },
+          [{ icon:'📓', label:'Dziennik' }, { icon:'✅', label:'Nawyki' }].map(function(q) {
+            return _h('div', { key:q.label, style:{ position:'relative', borderRadius:'var(--r3)', overflow:'hidden' } },
+              _h('div', { style:{ background:'var(--s2)', border:'1px solid var(--b1)', borderRadius:'var(--r3)', padding:'18px 10px', textAlign:'center' } },
+                _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, q.icon),
+                _h('div', { style:{ fontSize:'.8rem', fontWeight:700, color:'var(--t1)' } }, q.label)
+              ),
+              _h('div', { style:{ position:'absolute', inset:0, background:'rgba(20,20,32,.62)', backdropFilter:'blur(1px)', WebkitBackdropFilter:'blur(1px)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'var(--r3)' } },
+                _h('span', { style:{ fontSize:'.66rem', fontWeight:800, color:'var(--t2)', letterSpacing:'.06em', textTransform:'uppercase', background:'rgba(0,0,0,.35)', padding:'4px 10px', borderRadius:99 } }, 'Coming soon')
+              )
+            );
+          })
+        )
       ),
 
       _h(ReadinessSheet, { open:showReadiness, onClose:function(){ setShowReadiness(false); }, readiness:readiness, setReadiness:setReadiness }),
