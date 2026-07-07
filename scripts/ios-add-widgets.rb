@@ -15,7 +15,7 @@ EXT_NAME    = 'EasyTrainingWidgets'
 EXT_BUNDLE  = 'com.easytraining.app.widgets'
 SRC_DIR     = 'ios-extras/Widgets'
 DST_DIR     = "ios/App/#{EXT_NAME}"
-DEPLOY_IOS  = '16.2'
+DEPLOY_IOS  = '17.0'
 
 abort "Brak #{PROJ_PATH} — najpierw npx cap add ios" unless File.directory?(PROJ_PATH)
 
