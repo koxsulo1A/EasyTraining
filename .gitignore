@@ -9,6 +9,7 @@ www/
 
 # Generated native iOS project (regenerated in CI on macOS)
 ios/
+!plugins/live-activity/ios/
 
 # Build output
 build/
