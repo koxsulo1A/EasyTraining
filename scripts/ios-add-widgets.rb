@@ -48,6 +48,7 @@ group.new_reference('Info.plist')
 # 4. Build settings
 ext_target.build_configurations.each do |config|
   bs = config.build_settings
+  bs['PRODUCT_NAME']                    = EXT_NAME
   bs['PRODUCT_BUNDLE_IDENTIFIER']       = EXT_BUNDLE
   bs['INFOPLIST_FILE']                  = "#{EXT_NAME}/Info.plist"
   bs['IPHONEOS_DEPLOYMENT_TARGET']      = DEPLOY_IOS
