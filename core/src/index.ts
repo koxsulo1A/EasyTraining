@@ -96,3 +96,26 @@ export { computeOrm, buildTrendNote } from './engines/orm-ensemble';
 export type { OrmInput, OrmResult, SetInput, ExerciseMeta, SetAnalysis } from './engines/orm';
 export { computeSeriesQuality } from './engines/orm-quality';
 export type { QualityBreakdown } from './engines/orm-quality';
+
+// Knowledge Base: wytyczne treningowe (ACSM/NSCA)
+export {
+  INTENSITY_ZONES, LEVEL_PROFILES, WEEKLY_VOLUME,
+  PCT_1RM_REPS, PCT_1RM_SOURCE, suggestLoad, maxRepsAtPct,
+  EXERCISE_ORDER_RULES, exerciseOrderScore, validateExerciseOrder,
+  prescribe,
+} from './knowledge/guidelines';
+export type {
+  TrainingGoal, TrainingLevel, IntensityZone, LevelProfile,
+  PrescriptionParams, OrderRule, OrderViolation,
+} from './knowledge/guidelines';
+export {
+  POPULATION_RULES, populationForAge, applyPopulation,
+  PERIODIZATION_BLOCKS, RESIDUAL_EFFECTS, residualDecayPct,
+  HYPERTROPHY_RULES, concurrentTrainingCheck, screen,
+  CARDIO_ZONES, hrZone, FLEXIBILITY_RX, NEUROMOTOR_RX,
+} from './knowledge/guidelines-b';
+export type {
+  Population, PopulationRules, BlockType, BlockDef, ResidualEffect,
+  HypertrophyRule, ConcurrentInput, ConcurrentWarning,
+  ScreeningInput, ScreeningResult, CardioZone,
+} from './knowledge/guidelines-b';

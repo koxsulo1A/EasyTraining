@@ -366,22 +366,62 @@
   // ── KREATOR (wizard) ─────────────────────────────────────────────────────
   function CreatorSheet(props) {
     var st = React.useState(1); var step = st[0], setStep = st[1];
-    var fo = React.useState({ goal:'masa', units:4, priorityBig:null, prioritySmall:null, limitations:[] });
+    var EMPTY_FORM = { goal:'masa', units:4, priorityBig:null, prioritySmall:null, limitations:[],
+      screenActive:true, screenDisease:false, screenSymptoms:false };
+    var fo = React.useState(EMPTY_FORM);
     var form = fo[0], setForm = fo[1];
     function up(k,v){ setForm(function(p){ var o={}; o[k]=v; return Object.assign({},p,o); }); }
     function toggleLim(tag){ up('limitations', form.limitations.indexOf(tag)!==-1 ? form.limitations.filter(function(x){return x!==tag;}) : form.limitations.concat([tag])); }
 
-    React.useEffect(function(){ if (props.open) { setStep(1); setForm({ goal:'masa', units:4, priorityBig:null, prioritySmall:null, limitations:[] }); } }, [props.open]);
+    React.useEffect(function(){ if (props.open) { setStep(1); setForm(EMPTY_FORM); } }, [props.open]);
+
+    // Screening ACSM (Riebe 2015): wynik na żywo z odpowiedzi
+    function screeningResult() {
+      if (!window.ETCore || !ETCore.screen) return null;
+      var vigorous = form.goal==='sila' || form.goal==='masa';
+      return ETCore.screen({
+        exercisesRegularly: !!form.screenActive,
+        knownDisease: !!form.screenDisease,
+        symptoms: !!form.screenSymptoms,
+        desiredIntensity: vigorous ? 'vigorous' : 'moderate',
+      });
+    }
+
+    // Interferencja (Wilson 2012): cardio z danych aplikacji (ostatnie 28 dni)
+    function interferenceWarnings(store) {
+      if (!window.ETCore || !ETCore.concurrentTrainingCheck) return [];
+      var now = Date.now();
+      var runs = (store.runs||[]).filter(function(r){ return (now - new Date(r.date).getTime()) <= 28*86400000; });
+      if (!runs.length) return [];
+      var minutes = runs.reduce(function(s,r){ return s + (+r.duration||0); }, 0) / 4;
+      var goalMap = { masa:'hypertrophy', sila:'strength', redukcja:'weight-loss', zdrowie:'endurance', powrot:'endurance' };
+      return ETCore.concurrentTrainingCheck({
+        goal: goalMap[form.goal] || 'hypertrophy',
+        cardioSessionsPerWeek: Math.round(runs.length / 4 * 10) / 10,
+        cardioMinutesPerWeek: Math.round(minutes),
+        cardioType: 'running',
+        sameSessionAsStrength: false,
+      });
+    }
 
     var bigGroups = (ET.MUSCLE_GROUPS||[]).filter(function(m){ return m.size==='duza'; });
     var smallGroups = (ET.MUSCLE_GROUPS||[]).filter(function(m){ return m.size==='mala'; });
 
+    var su = ET.useStore(); var store = su.store;
+    // Krok 5 (screening ACSM) domyślnie ukryty — włączany flagą w DevMenu
+    var showScreening = !!(store.devFlags && store.devFlags.screeningStep);
+    var totalSteps = showScreening ? 5 : 4;
+
     function finish() {
       var plan = ET.generatePlan(form);
+      if (showScreening) {
+        var scr = screeningResult();
+        if (scr) plan.screening = scr.clearance;
+      }
       props.onCreate(plan);
     }
 
-    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:'Kreator planu · krok '+step+'/4' },
+    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:'Kreator planu · krok '+step+'/'+totalSteps },
       step===1 && _h('div', null,
         _h('div', { style:{ fontWeight:700, marginBottom:10 } }, '🎯 Cel treningowy'),
         _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
@@ -440,6 +480,48 @@
         ),
         _h('div', { style:{ display:'flex', gap:8, marginTop:18 } },
           _h('button', { className:'btn btn-ghost', onClick:function(){ setStep(3); } }, '←'),
+          showScreening
+            ? _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:function(){ setStep(5); } }, 'Dalej →')
+            : _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:finish }, '✨ Wygeneruj plan')
+        )
+      ),
+
+      // ── KROK 5: screening ACSM + interferencja cardio (Wilson 2012) ──────
+      step===5 && _h('div', null,
+        _h('div', { style:{ fontWeight:700, marginBottom:6 } }, '🩺 Bezpieczeństwo (ACSM)'),
+        _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginBottom:10 } }, 'Trzy pytania kwalifikacyjne wg Riebe 2015 / ACSM 2021.'),
+        [
+          { k:'screenActive',   q:'Trenuję regularnie od ≥3 miesięcy (min. 30 min, 3×/tydz.)' },
+          { k:'screenDisease',  q:'Mam rozpoznaną chorobę serca, metaboliczną lub nerek' },
+          { k:'screenSymptoms', q:'Miewam ból w klatce, duszność lub zawroty przy wysiłku' },
+        ].map(function(item) {
+          var on = !!form[item.k];
+          return _h('div', { key:item.k, style:{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'9px 10px', background:'var(--s3)', borderRadius:'var(--r2)', marginBottom:6 } },
+            _h('div', { style:{ fontSize:'.76rem', flex:1 } }, item.q),
+            _h('button', { className:'btn btn-sm '+(on?'btn-primary':'btn-secondary'), style:{ minWidth:52 },
+              onClick:function(){ up(item.k, !on); } }, on?'Tak':'Nie')
+          );
+        }),
+        (function() {
+          var r = screeningResult();
+          if (!r) return null;
+          var color = r.clearance==='ok' ? 'var(--green)' : r.clearance==='start-moderate' ? 'var(--orange)' : 'var(--red)';
+          return _h('div', { style:{ fontSize:'.72rem', color:color, background:'var(--s3)', borderLeft:'3px solid '+color, borderRadius:'var(--r2)', padding:'8px 10px', margin:'10px 0', lineHeight:1.5 } },
+            (r.clearance==='ok'?'✅ ':'⚠️ ')+r.message);
+        })(),
+        (function() {
+          var warns = interferenceWarnings(store);
+          if (!warns.length) return null;
+          return _h('div', null,
+            _h('div', { style:{ fontWeight:700, fontSize:'.78rem', margin:'10px 0 6px' } }, '🏃 Twoje bieganie a ten plan'),
+            warns.map(function(w) {
+              return _h('div', { key:w.id, style:{ fontSize:'.7rem', color: w.severity==='warning'?'var(--orange)':'var(--t2)', background:'var(--s3)', borderRadius:'var(--r2)', padding:'7px 10px', marginBottom:5, lineHeight:1.5 } },
+                (w.severity==='warning'?'⚠️ ':'ℹ️ ')+w.message);
+            })
+          );
+        })(),
+        _h('div', { style:{ display:'flex', gap:8, marginTop:14 } },
+          _h('button', { className:'btn btn-ghost', onClick:function(){ setStep(4); } }, '←'),
           _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:finish }, '✨ Wygeneruj plan')
         )
       )
@@ -485,6 +567,16 @@
 
       _h('div', { className:'card card-accent', style:{ marginBottom:10, fontSize:'.82rem', color:'var(--t2)', lineHeight:1.6 } },
         '💡 Kreator używa silnika reguł (nie losuje): dobiera całe ciało, priorytetowe partie 2×, rotuje aktony mięśniowe, wyklucza ćwiczenia przy kontuzjach. Zamiana ↔ proponuje ćwiczenia na ten sam precyzyjny mięsień. „Zastosuj plan" wysyła go do Treningu Siłowego.'),
+
+      // ── AI COACH: walidacja treningu wg wytycznych (ACSM/NSCA/Issurin/Wilson)
+      (function() {
+        var insights = (ET.AIEngine && ET.AIEngine.coachPlan) ? ET.AIEngine.coachPlan(store) : [];
+        if (!insights.length) return null;
+        return _h('div', { style:{ marginBottom:14 } },
+          _h('div', { className:'section-hdr' }, _h('h2', null, '🧠 Zgodność z wytycznymi')),
+          ET.InsightList(insights)
+        );
+      })(),
 
       // Panel 7 zasad planowania (prompt 1.3)
       _h('div', { className:'card', style:{ marginBottom:14 } },

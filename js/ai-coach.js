@@ -266,6 +266,105 @@
   };
 
   // ═══════════════════════════════════════════════════════════════════════
+  //  AI COACH — WALIDATOR TRENINGU WG WYTYCZNYCH (ACSM/NSCA/Issurin/Wilson)
+  // ═══════════════════════════════════════════════════════════════════════
+  ET.AIEngine.coachPlan = function(store) {
+    var out = [];
+    if (!window.ETCore) return out;
+    var now = Date.now();
+    var workouts = store.workouts || [];
+    var runs = store.runs || [];
+
+    // 1. Objętość tygodniowa per partia (Schoenfeld: 10-20 serii/tydz.)
+    var week = workouts.filter(function(w){ return (now - new Date(w.date).getTime()) <= 7*86400000; });
+    if (week.length) {
+      var setsPerGroup = {};
+      week.forEach(function(w) {
+        (w.exercises||[]).forEach(function(ex) {
+          var db = (ET.EXERCISES_BASIC||[]).find(function(e){ return e.name===ex.name; });
+          var tag = db && (db.tags||[])[0];
+          if (!tag) return;
+          var n = (ex.setsData||[]).filter(function(s){ return s.done; }).length || ex.sets || 0;
+          setsPerGroup[tag] = (setsPerGroup[tag]||0) + n;
+        });
+      });
+      var vol = ETCore.WEEKLY_VOLUME;
+      Object.keys(setsPerGroup).forEach(function(tag) {
+        var grp = (ET.MUSCLE_GROUPS||[]).find(function(g){ return g.tag===tag; });
+        var label = grp ? grp.label : tag;
+        if (grp && grp.size==='duza' && setsPerGroup[tag] < vol.setsPerMuscleMin) {
+          out.push({ type:'info', icon:'📉', title:label+': mało objętości',
+            body: setsPerGroup[tag]+' serii w 7 dni — dla wzrostu mięśni zalecane '+vol.setsPerMuscleMin+'-'+vol.setsPerMuscleMax+' ('+vol.source.split(';')[0]+').' });
+        }
+        if (setsPerGroup[tag] > vol.setsPerMuscleMax) {
+          out.push({ type:'warning', icon:'📈', title:label+': bardzo dużo objętości',
+            body: setsPerGroup[tag]+' serii w 7 dni przekracza zalecane maksimum '+vol.setsPerMuscleMax+' — ryzyko przekroczenia zdolności regeneracji ('+vol.source.split(';')[0]+').' });
+        }
+      });
+    }
+
+    // 2. Efekty rezydualne (Issurin): zanik adaptacji przy przerwie
+    function daysSince(list) {
+      if (!list.length) return null;
+      var newest = Math.max.apply(null, list.map(function(x){ return new Date(x.date).getTime(); }));
+      return Math.floor((now - newest) / 86400000);
+    }
+    var dStr = daysSince(workouts);
+    if (dStr != null && dStr >= 3) {
+      var decay = ETCore.residualDecayPct('siła maksymalna', dStr);
+      if (decay != null && decay >= 66 && decay < 130) {
+        out.push({ type:'warning', icon:'⏳', title:'Siła: adaptacja zanika',
+          body: dStr+' dni bez treningu siłowego — efekt rezydualny siły utrzymuje się ~30 dni (Issurin 2010). Wróć do treningu, by nie tracić wypracowanej bazy.' });
+      }
+    }
+    var dRun = daysSince(runs);
+    if (dRun != null && dRun >= 20 && runs.length >= 3) {
+      var decayA = ETCore.residualDecayPct('wydolność tlenowa', dRun);
+      if (decayA != null && decayA >= 66 && decayA < 130) {
+        out.push({ type:'info', icon:'🫁', title:'Wydolność: przerwa w bieganiu',
+          body: dRun+' dni bez biegu — baza tlenowa utrzymuje się ~30 dni (Issurin 2010).' });
+      }
+    }
+
+    // 3. Kolejność ćwiczeń w ostatnim treningu (Ratamess/NSCA)
+    var last = workouts[0];
+    if (last && (last.exercises||[]).length >= 2 && ETCore.validateExerciseOrder) {
+      var metas = last.exercises.map(function(ex) {
+        var db = (ET.EXERCISES_BASIC||[]).find(function(e){ return e.name===ex.name; });
+        return db ? { isPower:db.isPower, isCompound:db.isCompound, isCore:db.isCoreEx } : {};
+      });
+      var viol = ETCore.validateExerciseOrder(metas);
+      if (viol.length) {
+        var v = viol[0];
+        out.push({ type:'info', icon:'🔀', title:'Kolejność ćwiczeń do poprawy',
+          body: '„'+last.exercises[v.laterIndex].name+'" (wielostawowe/moc) było po „'+last.exercises[v.earlierIndex].name+'" — duże, złożone ćwiczenia rób na początku sesji, gdy jesteś świeży (Ratamess 2009).' });
+      }
+    }
+
+    // 4. Interferencja cardio×siła (Wilson 2012) — z realnych danych 28 dni
+    var runs28 = runs.filter(function(r){ return (now - new Date(r.date).getTime()) <= 28*86400000; });
+    var str28 = workouts.filter(function(w){ return (now - new Date(w.date).getTime()) <= 28*86400000; });
+    if (runs28.length && str28.length && ETCore.concurrentTrainingCheck) {
+      var warns = ETCore.concurrentTrainingCheck({
+        goal: 'hypertrophy',
+        cardioSessionsPerWeek: Math.round(runs28.length/4*10)/10,
+        cardioMinutesPerWeek: Math.round(runs28.reduce(function(s,r){ return s+(+r.duration||0); },0)/4),
+        cardioType: 'running',
+        sameSessionAsStrength: false,
+      });
+      warns.forEach(function(wr) {
+        if (wr.severity==='warning') out.push({ type:'warning', icon:'🏃', title:'Interferencja bieganie × siłownia', body: wr.message+' ('+wr.source+')' });
+      });
+    }
+
+    if (!out.length && (workouts.length || runs.length)) {
+      out.push({ type:'positive', icon:'✅', title:'Trening zgodny z wytycznymi',
+        body:'Objętość, kolejność ćwiczeń i proporcje cardio/siła mieszczą się w zaleceniach ACSM/NSCA.' });
+    }
+    return out.slice(0, 6);
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
   //  WSPÓŁDZIELONY WIDOK LISTY WNIOSKÓW
   // ═══════════════════════════════════════════════════════════════════════
   var TYPE_COLOR = { positive:'var(--green)', warning:'var(--orange)', info:'var(--a-light)', achievement:'var(--yellow)' };

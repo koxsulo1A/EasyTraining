@@ -35,6 +35,14 @@ jobs:
       - name: Sync Capacitor (copies web + pod install)
         run: npx cap sync ios
 
+      - name: Add Live Activities widget extension
+        run: |
+          set -e
+          gem install xcodeproj --no-document
+          ruby scripts/ios-add-widgets.rb
+          # ponowny pod install — projekt zmieniony po dodaniu targetu
+          cd ios/App && pod install
+
       - name: Build unsigned archive
         run: |
           set -eo pipefail

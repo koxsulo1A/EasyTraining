@@ -473,7 +473,8 @@
       ),
 
       // ── BODY FAT (BMI/WHR/pas są w kafelkach powyżej) ────────────────────
-      last && (comp.bodyFat!=null || !comp.height) && _h('div', { className:'card', style:{ marginBottom:14 } },
+      // Karta zawsze widoczna gdy jest pomiar — z podpowiedzią czego brakuje do wyliczenia
+      last && _h('div', { className:'card', style:{ marginBottom:14 } },
         _h('div', { style:{ fontWeight:700, fontSize:'.82rem', color:'var(--t2)', marginBottom:10 } }, '🧬 Skład ciała'),
         comp.bodyFat!=null
           ? _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--s3)', borderRadius:'var(--r2)', padding:'10px 14px' } },
@@ -483,7 +484,16 @@
               ),
               comp.bodyFatCat && _h('span', { style:{ fontSize:'.72rem', fontWeight:700, color:comp.bodyFatCat.color } }, comp.bodyFatCat.label)
             )
-          : _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, '📐 Dodaj wzrost w Profilu, aby liczyć BMI i % tkanki tłuszczowej.')
+          : _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', lineHeight:1.5 } },
+              (function() {
+                if (!comp.height) return '📐 Dodaj wzrost w Profilu, aby liczyć BMI i % tkanki tłuszczowej.';
+                var missing = [];
+                if (last.neck==null)  missing.push('szyja');
+                if (last.waist==null) missing.push('pas');
+                if (comp.gender==='female' && last.hips==null) missing.push('biodra');
+                return '📐 Aby wyliczyć % tkanki tłuszczowej (US Navy), dodaj pomiar: '+(missing.join(', ')||'—')+'.';
+              })()
+            )
       ),
 
       // ── PORÓWNANIE Z PIERWSZYM POMIAREM (spec 8.3) ───────────────────────

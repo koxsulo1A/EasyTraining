@@ -405,6 +405,9 @@
     var sa = React.useState(false); var showAdd = sa[0], setShowAdd = sa[1];
     var tr = React.useState(0); var totalRestMs = tr[0], setTotalRestMs = tr[1];
     var restStartRef = React.useRef(null);
+    // Koniec przerwy jako timestamp (zegar ścienny) — timery JS są zamrażane
+    // przy zablokowanym telefonie, więc odliczanie MUSI liczyć się z Date.now().
+    var restEndRef = React.useRef(null);
 
     var ne = React.useState({ name:'', sets:3, reps:10, weight:0, tempo:'2-1-1', rpe:7, rir:3, rest:90 });
     var newEx = ne[0], setNewEx = ne[1];
@@ -429,21 +432,76 @@
       return function(){ clearInterval(t); };
     }, []);
 
-    // Rest countdown
+    // Live Activity (iOS): ekran blokady + Dynamic Island
+    React.useEffect(function() {
+      if (!ET.LiveActivity) return;
+      var first = plan.exercises && plan.exercises[0];
+      ET.LiveActivity.start(
+        { workoutType:'strength', planName:plan.name },
+        { startedAt:t0.current, exerciseName:first&&first.name, setNumber:1,
+          setTotal:first&&first.sets, weightKg:first&&first.weight||undefined,
+          plannedReps:first&&first.reps,
+          nextExercise:plan.exercises&&plan.exercises[1]&&plan.exercises[1].name }
+      );
+      return function(){ ET.LiveActivity.end(); };
+    }, []);
+
+    // Stan Live Activity po zaliczeniu serii w danym ćwiczeniu
+    function laState(esArr, exId, restSec) {
+      var idx = esArr.findIndex(function(e){ return e.id===exId; });
+      if (idx === -1) return null;
+      var ex = esArr[idx];
+      var done = ex.setsData.filter(function(s){ return s.done; }).length;
+      var nextEx = null;
+      // następne ćwiczenie = pierwsze (od bieżącego) z niedokończonymi seriami
+      for (var i=idx+1; i<esArr.length; i++) {
+        if (esArr[i].setsData.some(function(s){ return !s.done; })) { nextEx = esArr[i].name; break; }
+      }
+      var curSet = ex.setsData[Math.min(done, ex.setsData.length-1)];
+      return {
+        startedAt: t0.current,
+        exerciseName: ex.name,
+        setNumber: Math.min(done+1, ex.setsData.length),
+        setTotal: ex.setsData.length,
+        weightKg: curSet && curSet.weight || undefined,
+        plannedReps: curSet && curSet.reps || undefined,
+        nextExercise: nextEx || undefined,
+        restEndsAt: restSec ? (Date.now() + restSec*1000) : undefined
+      };
+    }
+
+    // Rest countdown — liczony z Date.now(), odporny na blokadę ekranu:
+    // po odblokowaniu następny tick przeskakuje do właściwej wartości.
+    function syncRest() {
+      if (!restEndRef.current) return;
+      var msLeft = restEndRef.current - Date.now();
+      var newR = Math.max(0, Math.ceil(msLeft / 1000));
+      if (newR === 0 && restStartRef.current) {
+        // Doliczamy DOKŁADNIE zaplanowaną przerwę (nie czas do odblokowania) —
+        // czas po końcu przerwy przy zablokowanym telefonie to już praca/oczekiwanie.
+        var planned = restEndRef.current - restStartRef.current;
+        setTotalRestMs(function(prev){ return prev + planned; });
+        restStartRef.current = null;
+        restEndRef.current = null;
+      }
+      setRestLeft(newR);
+    }
     React.useEffect(function() {
       if (!restLeft) return;
-      var t = setTimeout(function(){
-        setRestLeft(function(r) {
-          var newR = Math.max(0, r-1);
-          if (newR === 0 && restStartRef.current) {
-            setTotalRestMs(function(prev){ return prev + (Date.now() - restStartRef.current); });
-            restStartRef.current = null;
-          }
-          return newR;
-        });
-      }, 1000);
-      return function(){ clearTimeout(t); };
-    }, [restLeft]);
+      var t = setInterval(syncRest, 500);
+      return function(){ clearInterval(t); };
+    }, [restLeft > 0]);
+    // Natychmiastowa resynchronizacja liczników po powrocie z tła/odblokowaniu
+    React.useEffect(function() {
+      function onVisible() {
+        if (document.visibilityState === 'visible') {
+          setElapsed(Date.now() - t0.current);
+          syncRest();
+        }
+      }
+      document.addEventListener('visibilitychange', onVisible);
+      return function(){ document.removeEventListener('visibilitychange', onVisible); };
+    }, []);
 
     function upSet(exId, sId, field, val) {
       setExs(function(es) {
@@ -463,9 +521,20 @@
         setTotalRestMs(function(p){ return p + (Date.now() - restStartRef.current); });
       }
       restStartRef.current = Date.now();
+      restEndRef.current = Date.now() + rest * 1000;
       upSet(exId, sId, 'done', true);
       setRestLeft(rest);
       toast('Seria zaliczona! Przerwa '+rest+'s ⏳', 'success');
+      if (ET.LiveActivity) {
+        // setExs jeszcze nie zaaplikowane — policz stan na kopii z oznaczoną serią
+        var esNow = exs.map(function(e){
+          if (e.id!==exId) return e;
+          return Object.assign({}, e, { setsData:e.setsData.map(function(s){
+            return s.id===sId ? Object.assign({},s,{done:true}) : s; }) });
+        });
+        var st = laState(esNow, exId, rest);
+        if (st) ET.LiveActivity.update(st);
+      }
     }
 
     function skipRest() {
@@ -473,7 +542,10 @@
         setTotalRestMs(function(p){ return p + (Date.now() - restStartRef.current); });
         restStartRef.current = null;
       }
+      restEndRef.current = null;
       setRestLeft(0);
+      // Zgaś timer przerwy na ekranie blokady (restEndsAt=undefined go ukrywa)
+      if (ET.LiveActivity) ET.LiveActivity.update({ startedAt:t0.current });
     }
 
     function removeEx(exId) { setExs(function(es){ return es.filter(function(e){ return e.id!==exId; }); }); }
@@ -533,6 +605,7 @@
       });
       // Core (Faza 1): zdarzenie → Workout Engine liczy objętość per mięsień
       if (window.etcore) { try { window.etcore.bus.publish('WorkoutFinished', session, 'user'); } catch(e) { console.error('[core] publish:', e); } }
+      if (ET.LiveActivity) ET.LiveActivity.end();
       props.onFinish({ session:session, prs:prs });
     }
 
@@ -1152,12 +1225,72 @@
     });
   }
 
+  // ── CELE PLANU: mapowanie na strefy z bazy wiedzy (Ratamess/ACSM) ─────────
+  var PLAN_GOALS = [
+    { id:'hypertrophy', label:'💪 Masa',        tempo:'3-1-2' },
+    { id:'strength',    label:'🏋️ Siła',        tempo:'2-1-X' },
+    { id:'endurance',   label:'🔥 Redukcja',    tempo:'2-0-2' },
+    { id:'power',       label:'⚡ Moc',          tempo:'X-0-X' },
+  ];
+  var PLAN_LEVELS = [
+    { id:'novice',       label:'Początkujący' },
+    { id:'intermediate', label:'Średni' },
+    { id:'advanced',     label:'Zaawansowany' },
+  ];
+
+  // Parametry ćwiczenia wg wytycznych: cel+poziom → serie/powt./RIR/przerwa/tempo
+  function prescriptionFor(goal, level) {
+    if (!window.ETCore || !ETCore.prescribe) return null;
+    try {
+      var p = ETCore.prescribe(goal, level);
+      var g = PLAN_GOALS.find(function(x){ return x.id===goal; });
+      return {
+        sets: p.sets,
+        reps: Math.round((p.repsMin + p.repsMax) / 2),
+        rir: p.rir,
+        rest: p.restSec,
+        tempo: (g && g.tempo) || 'kontrola',
+        pctMin: p.pct1RMMin, pctMax: p.pct1RMMax,
+      };
+    } catch(e) { return null; }
+  }
+
   // ── EDYTOR PLANU (widok pojedynczego planu) ──────────────────────────────
   function PlanEditView(props) {
     var ep = React.useState(JSON.parse(JSON.stringify(props.plan)));
     var editing = ep[0], setEditing = ep[1];
+    var pf = React.useState(-1); var pickerFor = pf[0], setPickerFor = pf[1];
+    var pq = React.useState(''); var pickerQ = pq[0], setPickerQ = pq[1];
+    var pt = React.useState(''); var pickerTag = pt[0], setPickerTag = pt[1];
 
     function upE(key, val) { setEditing(function(p){ var o={}; o[key]=val; return Object.assign({},p,o); }); }
+
+    // Wybór ćwiczenia z bazy → auto-podstawienie parametrów wg celu planu
+    function pickExercise(i, dbEx) {
+      var goal = editing.goal || 'hypertrophy';
+      var level = editing.level || 'intermediate';
+      var pr = prescriptionFor(goal, level);
+      setEditing(function(p) {
+        var list = (p.exercises||[]).slice();
+        var cur = Object.assign({}, list[i], { name: dbEx.name });
+        if (pr) {
+          cur.sets = pr.sets; cur.reps = pr.reps; cur.rir = pr.rir;
+          cur.rest = pr.rest; cur.tempo = pr.tempo;
+          cur.plan = pr.sets + '×' + pr.reps;
+          // Sugestia ciężaru: 1RM Engine × tabela NSCA %1RM↔powt. (z zapasem RIR)
+          try {
+            var orm = window.etcore && ETCore.latestOrm ? ETCore.latestOrm(window.etcore, dbEx.name) : null;
+            if (orm && orm.orm1rm && ETCore.suggestLoad) {
+              var kg = ETCore.suggestLoad(orm.orm1rm, pr.reps, cur.rir);
+              if (kg) cur.weight = kg;
+            }
+          } catch(e) {}
+        }
+        list[i] = cur;
+        return Object.assign({}, p, { exercises:list });
+      });
+      setPickerFor(-1); setPickerQ('');
+    }
 
     function addWarmup() {
       setEditing(function(p){ return Object.assign({},p,{ warmup:(p.warmup||[]).concat([{ n:'', s:1, r:0, note:'' }]) }); });
@@ -1333,6 +1466,31 @@
         })
       ),
 
+      // ── CEL + POZIOM: sterują auto-parametrami przy wyborze ćwiczenia ────
+      _h('div', { className:'card card-sm', style:{ marginBottom:14 } },
+        _h('div', { style:{ fontWeight:700, fontSize:'.8rem', color:'var(--t2)', marginBottom:8 } }, '🎯 Cel planu (auto-parametry wg ACSM/NSCA)'),
+        _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 } },
+          PLAN_GOALS.map(function(g) {
+            var act = (editing.goal||'hypertrophy')===g.id;
+            return _h('button', { key:g.id, className:'btn btn-sm '+(act?'btn-primary':'btn-secondary'),
+              style:{ fontSize:'.72rem' }, onClick:function(){ upE('goal', g.id); } }, g.label);
+          })
+        ),
+        _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+          PLAN_LEVELS.map(function(l) {
+            var act = (editing.level||'intermediate')===l.id;
+            return _h('button', { key:l.id, className:'btn btn-sm '+(act?'btn-primary':'btn-secondary'),
+              style:{ fontSize:'.68rem' }, onClick:function(){ upE('level', l.id); } }, l.label);
+          })
+        ),
+        (function() {
+          var pr = prescriptionFor(editing.goal||'hypertrophy', editing.level||'intermediate');
+          if (!pr) return null;
+          return _h('div', { style:{ fontSize:'.66rem', color:'var(--a-light)', marginTop:8, background:'var(--a-dim)', borderRadius:'var(--r2)', padding:'5px 8px' } },
+            'Nowe ćwiczenia dostaną: '+pr.sets+' serie × '+pr.reps+' powt. · RIR '+pr.rir+' · przerwa '+pr.rest+'s · '+pr.pctMin+'-'+pr.pctMax+'% 1RM');
+        })()
+      ),
+
       _h('div', { style:{ marginBottom:14 } },
         _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
           _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, '💪 Ćwiczenia ('+((editing.exercises||[]).length)+')'),
@@ -1344,7 +1502,46 @@
             _h('div', { style:{ display:'flex', gap:6, alignItems:'center', marginBottom:8 } },
               _h('div', { style:{ fontSize:'.72rem', fontWeight:700, color:'var(--t3)', minWidth:22 } }, i+1+'.'),
               _h('input', { type:'text', value:ex.name, placeholder:'Nazwa ćwiczenia *', style:{ flex:1 }, onChange:function(e){ upExercise(i,'name',e.target.value); } }),
+              _h('button', { className:'btn btn-sm '+(pickerFor===i?'btn-primary':'btn-secondary'), style:{ flexShrink:0, padding:'6px 10px' }, title:'Wybierz z bazy ćwiczeń',
+                onClick:function(){ setPickerFor(pickerFor===i?-1:i); setPickerQ(''); setPickerTag(''); } }, '📚'),
               _h('button', { className:'btn btn-ghost btn-sm btn-icon', style:{ color:'var(--red)', flexShrink:0 }, onClick:function(){ rmExercise(i); } }, '✕')
+            ),
+            // ── PICKER: baza 90 ćwiczeń, filtr + auto-parametry po wyborze ──
+            pickerFor===i && _h('div', { style:{ marginBottom:8, background:'var(--s2)', border:'1px solid var(--b2)', borderRadius:'var(--r2)', padding:8 } },
+              _h('input', { type:'text', placeholder:'🔍 Szukaj ćwiczenia...', value:pickerQ, autoFocus:true, style:{ width:'100%', marginBottom:6 },
+                onChange:function(e){ setPickerQ(e.target.value); } }),
+              _h('div', { style:{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 } },
+                _h('button', { style:{ padding:'3px 8px', borderRadius:12, border:'1px solid '+(pickerTag===''?'var(--a)':'var(--b2)'), background:pickerTag===''?'var(--a-dim)':'var(--s3)', color:pickerTag===''?'var(--a-light)':'var(--t3)', cursor:'pointer', fontSize:'.62rem', fontWeight:600 },
+                  onClick:function(){ setPickerTag(''); } }, 'Wszystkie'),
+                (ET.MUSCLE_GROUPS||[]).map(function(g) {
+                  var active = pickerTag===g.tag;
+                  return _h('button', { key:g.tag, style:{ padding:'3px 8px', borderRadius:12, border:'1px solid '+(active?'var(--a)':'var(--b2)'), background:active?'var(--a-dim)':'var(--s3)', color:active?'var(--a-light)':'var(--t3)', cursor:'pointer', fontSize:'.62rem', fontWeight:600, whiteSpace:'nowrap' },
+                    onClick:function(){ setPickerTag(active?'':g.tag); } }, g.icon+' '+g.label);
+                })
+              ),
+              _h('div', { style:{ maxHeight:200, overflowY:'auto' } },
+                (function() {
+                  var q = pickerQ.trim().toLowerCase();
+                  var list = (ET.EXERCISES_BASIC||[]).filter(function(e) {
+                    if (pickerTag && (e.tags||[])[0]!==pickerTag) return false;
+                    return !q || e.name.toLowerCase().indexOf(q)!==-1;
+                  }).slice(0, 40);
+                  if (!list.length) return _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', padding:6 } }, 'Brak wyników');
+                  return list.map(function(dbEx) {
+                    var grp = (ET.MUSCLE_GROUPS||[]).find(function(g){ return (dbEx.tags||[])[0]===g.tag; });
+                    return _h('div', { key:dbEx.id,
+                      style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 8px', borderBottom:'1px solid var(--b1)', cursor:'pointer', borderRadius:4 },
+                      onClick:function(){ pickExercise(i, dbEx); } },
+                      _h('div', null,
+                        _h('div', { style:{ fontSize:'.78rem', fontWeight:600 } }, dbEx.name),
+                        _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)' } },
+                          (grp?grp.label:'')+(dbEx.isCompound?' · wielostawowe':' · izolowane'))
+                      ),
+                      _h('span', { style:{ fontSize:'.9rem' } }, grp?grp.icon:'🏋️')
+                    );
+                  });
+                })()
+              )
             ),
             _h('div', { style:{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:8 } },
               _h('div', { style:{ display:'flex', alignItems:'center', gap:4 } },
@@ -1387,46 +1584,182 @@
     );
   }
 
-  // ── EDYTOR PLANÓW (sheet z listą i nawigacją do edycji) ──────────────────
+  // ── JEDNOSTKA BIEGOWA — edytor ───────────────────────────────────────────
+  var RUN_TYPES = [
+    { id:'easy',     label:'🐢 Spokojny',    desc:'Zone 2, regeneracyjny' },
+    { id:'tempo',    label:'⚡ Tempo',        desc:'Zone 3-4, próg mleczanowy' },
+    { id:'interval', label:'🔥 Interwały',   desc:'Zone 4-5, prędkość' },
+    { id:'long',     label:'🛣️ Długi',       desc:'Zone 2, wytrzymałość' },
+    { id:'fartlek',  label:'🎲 Fartlek',     desc:'Mieszany, zabawa tempem' },
+  ];
+
+  function RunUnitEditView(props) {
+    var unit = props.unit;
+    var us = React.useState(JSON.parse(JSON.stringify(unit)));
+    var editing = us[0], setEditing = us[1];
+    function up(k,v) { setEditing(function(e){ var c=Object.assign({},e); c[k]=v; return c; }); }
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 } },
+        _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
+        _h('button', { className:'btn btn-primary btn-sm', onClick:function(){ props.onSave(editing); } }, '✓ Zapisz')
+      ),
+      _h('div', { className:'card', style:{ marginBottom:12 } },
+        _h('div', { style:{ fontSize:'.65rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', marginBottom:8 } }, 'Informacje'),
+        _h('div', { style:{ display:'flex', gap:8, marginBottom:8 } },
+          _h('div', { style:{ flex:1 } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Nazwa'),
+            _h('input', { type:'text', value:editing.name||'', style:{ width:'100%' }, onChange:function(e){ up('name',e.target.value); } })
+          ),
+          _h('div', { style:{ flex:1 } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Dzień'),
+            _h('input', { type:'text', value:editing.day||'', placeholder:'np. Wtorek', style:{ width:'100%' }, onChange:function(e){ up('day',e.target.value); } })
+          )
+        )
+      ),
+      _h('div', { className:'card', style:{ marginBottom:12 } },
+        _h('div', { style:{ fontSize:'.65rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', marginBottom:8 } }, 'Typ biegu'),
+        _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+          RUN_TYPES.map(function(rt) {
+            var active = editing.runType === rt.id;
+            return _h('button', { key:rt.id, style:{
+              padding:'8px 12px', borderRadius:'var(--r2)', border:'1px solid '+(active?'var(--green)':'var(--b2)'),
+              background:active?'rgba(34,197,94,.12)':'var(--s3)', color:active?'var(--green)':'var(--t2)',
+              cursor:'pointer', fontSize:'.72rem', fontWeight:600, textAlign:'left', flex:'1 1 45%', minWidth:130
+            }, onClick:function(){ up('runType',rt.id); } },
+              _h('div', null, rt.label),
+              _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', marginTop:2 } }, rt.desc)
+            );
+          })
+        )
+      ),
+      _h('div', { className:'card', style:{ marginBottom:12 } },
+        _h('div', { style:{ fontSize:'.65rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', marginBottom:8 } }, 'Parametry'),
+        _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+          _h('div', { style:{ flex:'1 1 100px' } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Dystans (km)'),
+            _h('input', { type:'number', min:0, step:0.5, value:editing.distance||0, style:{ width:'100%' }, onChange:function(e){ up('distance',+e.target.value); } })
+          ),
+          _h('div', { style:{ flex:'1 1 100px' } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Czas (min)'),
+            _h('input', { type:'number', min:0, value:editing.duration||0, style:{ width:'100%' }, onChange:function(e){ up('duration',+e.target.value); } })
+          ),
+          _h('div', { style:{ flex:'1 1 100px' } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Tempo (min/km)'),
+            _h('input', { type:'text', value:editing.pace||'', placeholder:'5:30', style:{ width:'100%' }, onChange:function(e){ up('pace',e.target.value); } })
+          )
+        ),
+        editing.runType === 'interval' && _h('div', { style:{ marginTop:8, display:'flex', gap:8 } },
+          _h('div', { style:{ flex:1 } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Powtórzenia'),
+            _h('input', { type:'number', min:1, value:editing.intervalReps||6, style:{ width:'100%' }, onChange:function(e){ up('intervalReps',+e.target.value); } })
+          ),
+          _h('div', { style:{ flex:1 } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Odcinek (m)'),
+            _h('input', { type:'number', min:100, step:100, value:editing.intervalDist||400, style:{ width:'100%' }, onChange:function(e){ up('intervalDist',+e.target.value); } })
+          ),
+          _h('div', { style:{ flex:1 } },
+            _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Przerwa (s)'),
+            _h('input', { type:'number', min:0, step:15, value:editing.intervalRest||90, style:{ width:'100%' }, onChange:function(e){ up('intervalRest',+e.target.value); } })
+          )
+        )
+      ),
+      _h('div', { className:'card' },
+        _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Notatki'),
+        _h('textarea', { rows:2, value:editing.notes||'', placeholder:'np. bieg w parku, nawodnienie...', style:{ width:'100%', resize:'vertical' },
+          onChange:function(e){ up('notes',e.target.value); } })
+      ),
+      props.onDelete && _h('button', { className:'btn btn-danger', style:{ width:'100%', marginTop:12 }, onClick:props.onDelete }, '🗑️ Usuń jednostkę')
+    );
+  }
+
+  // ── META-PLANY: grupowanie jednostek treningowych ─────────────────────────
+  function getMetaPlans(store) {
+    var saved = store.trainingPlans || [];
+    if (saved.length) return saved;
+    var units = getEffectivePlans(store).map(function(p) {
+      return Object.assign({}, p, { unitType:'strength' });
+    });
+    return [{ id:'default_plan', name:'Mój plan treningowy', icon:'📋', units:units }];
+  }
+
+  function saveMetaPlans(update, plans) {
+    update(function(s) { return Object.assign({}, s, { trainingPlans: plans }); });
+  }
+
+  // ── EDYTOR PLANÓW (3 poziomy: plany → jednostki → edycja) ──────────────────
   function PlanEditorSheet(props) {
     var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
-    var sv = React.useState(null); var selPlan = sv[0], setSelPlan = sv[1];
+    var ms = React.useState(null); var selMeta = ms[0], setSelMeta = ms[1];
+    var us = React.useState(null); var selUnit = us[0], setSelUnit = us[1];
 
-    function getPlans() { return getEffectivePlans(store); }
+    var metaPlans = getMetaPlans(store);
 
-    function savePlan(plan) {
-      if (plan._isCustom) {
-        update(function(s){
-          var isNew = !(s.customWorkoutPlans||[]).find(function(p){ return p.id===plan.id; });
-          var list = isNew ? (s.customWorkoutPlans||[]).concat([plan]) : (s.customWorkoutPlans||[]).map(function(p){ return p.id===plan.id?plan:p; });
-          return Object.assign({},s,{ customWorkoutPlans:list });
-        });
-      } else {
-        update(function(s){
-          var ov = Object.assign({},s.workoutPlans||{}); ov[plan.id]=plan;
-          return Object.assign({},s,{ workoutPlans:ov });
-        });
-      }
-      toast('Plan zapisany ✓','success');
-      setSelPlan(null);
+    function saveMetaPlan(metaPlan) {
+      var updated = metaPlans.map(function(m){ return m.id===metaPlan.id ? metaPlan : m; });
+      if (!metaPlans.find(function(m){ return m.id===metaPlan.id; })) updated = metaPlans.concat([metaPlan]);
+      saveMetaPlans(update, updated);
+
+      metaPlan.units.forEach(function(unit) {
+        if (unit.unitType !== 'strength') return;
+        if (unit._isCustom) {
+          update(function(s){
+            var list = (s.customWorkoutPlans||[]);
+            var exists = list.find(function(p){ return p.id===unit.id; });
+            return Object.assign({},s,{ customWorkoutPlans: exists ? list.map(function(p){ return p.id===unit.id?unit:p; }) : list.concat([unit]) });
+          });
+        } else {
+          update(function(s){
+            var ov = Object.assign({},s.workoutPlans||{}); ov[unit.id]=unit;
+            return Object.assign({},s,{ workoutPlans:ov });
+          });
+        }
+      });
     }
 
-    function resetPlan(planId) {
-      if (!confirm('Przywrócić oryginalny plan?')) return;
-      update(function(s){ var ov=Object.assign({},s.workoutPlans||{}); delete ov[planId]; return Object.assign({},s,{workoutPlans:ov}); });
-      toast('Plan przywrócony','default'); setSelPlan(null);
+    function saveUnit(unit) {
+      var mp = JSON.parse(JSON.stringify(selMeta));
+      var idx = mp.units.findIndex(function(u){ return u.id===unit.id; });
+      if (idx>=0) mp.units[idx] = unit; else mp.units.push(unit);
+      saveMetaPlan(mp);
+      setSelMeta(mp);
+      toast('Jednostka zapisana ✓','success');
+      setSelUnit(null);
     }
 
-    function deletePlan(planId) {
-      if (!confirm('Usunąć ten plan?')) return;
-      update(function(s){ return Object.assign({},s,{ customWorkoutPlans:(s.customWorkoutPlans||[]).filter(function(p){ return p.id!==planId; }) }); });
-      toast('Plan usunięty','default'); setSelPlan(null);
+    function deleteUnit(unitId) {
+      if (!confirm('Usunąć tę jednostkę?')) return;
+      var mp = JSON.parse(JSON.stringify(selMeta));
+      mp.units = mp.units.filter(function(u){ return u.id!==unitId; });
+      saveMetaPlan(mp);
+      setSelMeta(mp);
+      toast('Jednostka usunięta','default');
+      setSelUnit(null);
     }
 
-    function addNewPlan() {
-      var newPlan = { id:'custom_'+Date.now(), _isCustom:true, name:'Nowy plan', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
-      setSelPlan(newPlan);
+    function addNewMeta() {
+      var mp = { id:'plan_'+Date.now(), name:'Nowy plan', icon:'📋', units:[] };
+      var updated = metaPlans.concat([mp]);
+      saveMetaPlans(update, updated);
+      setSelMeta(mp);
+    }
+
+    function deleteMetaPlan(planId) {
+      if (!confirm('Usunąć cały plan?')) return;
+      saveMetaPlans(update, metaPlans.filter(function(m){ return m.id!==planId; }));
+      toast('Plan usunięty','default');
+      setSelMeta(null);
+    }
+
+    function addStrengthUnit() {
+      var unit = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, name:'Nowy trening', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
+      setSelUnit(unit);
+    }
+
+    function addRunUnit() {
+      var unit = { id:'rununit_'+Date.now(), unitType:'running', name:'Bieg', day:'', runType:'easy', distance:5, duration:30, pace:'6:00', notes:'' };
+      setSelUnit(unit);
     }
 
     function importCSV(e) {
@@ -1449,9 +1782,9 @@
             cooldown.push({ n:name, d:cols[7]||'' });
           }
         });
-        var imported = { id:'custom_'+Date.now(), _isCustom:true, name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
-        setSelPlan(imported);
-        toast('Wczytano plik — sprawdź i zapisz plan','success');
+        var imported = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
+        setSelUnit(imported);
+        toast('Wczytano plik — sprawdź i zapisz','success');
       };
       reader.readAsText(file, 'UTF-8');
       e.target.value='';
@@ -1464,64 +1797,150 @@
       return (last.endWeek||12)+' tyg.'+(deloads?' · '+deloads+'× deload':'');
     }
 
-    return _h('div', { className:'fade-in' },
-      selPlan
-        ? _h(PlanEditView, {
-            plan: selPlan,
-            onBack: function(){ setSelPlan(null); },
-            onSave: savePlan,
-            onReset: !selPlan._isCustom && (store.workoutPlans||{})[selPlan.id] ? function(){ resetPlan(selPlan.id); } : null,
-            onDelete: selPlan._isCustom ? function(){ deletePlan(selPlan.id); } : null
-          })
+    // ── Poziom 3: edycja konkretnej jednostki ──
+    if (selUnit) {
+      if (selUnit.unitType === 'running') {
+        return _h(RunUnitEditView, {
+          unit: selUnit,
+          onBack: function(){ setSelUnit(null); },
+          onSave: saveUnit,
+          onDelete: selMeta && selMeta.units.find(function(u){ return u.id===selUnit.id; }) ? function(){ deleteUnit(selUnit.id); } : null
+        });
+      }
+      return _h(PlanEditView, {
+        plan: selUnit,
+        onBack: function(){ setSelUnit(null); },
+        onSave: saveUnit,
+        onReset: null,
+        onDelete: selMeta && selMeta.units.find(function(u){ return u.id===selUnit.id; }) ? function(){ deleteUnit(selUnit.id); } : null
+      });
+    }
 
-        : _h('div', null,
-            _h('div', { className:'page-hdr' },
-              _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
-                _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onClose }, '←'),
-                _h('div', null,
-                  _h('h1', null, '📋 Edytor planów'),
-                  _h('p', null, getPlans().length+' planów treningowych')
-                )
-              ),
-              _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
-                _h('button', { className:'btn btn-primary', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:addNewPlan }, '+ Nowy plan'),
-                _h('label', { className:'btn btn-secondary', style:{ fontSize:'.75rem', padding:'8px 12px', cursor:'pointer' } },
-                  '📥 Import CSV',
-                  _h('input', { type:'file', accept:'.csv,.txt', style:{ display:'none' }, onChange:importCSV })
-                )
-              )
-            ),
-
-            _h('div', { className:'card card-sm', style:{ marginBottom:14, fontSize:'.72rem', color:'var(--t3)', lineHeight:1.7 } },
-              _h('div', { style:{ fontWeight:700, color:'var(--t2)', marginBottom:6 } }, '📄 Format CSV (Excel → Zapisz jako CSV)'),
-              _h('div', null, 'Nagłówek: typ,nazwa,serie,powt,ciezar,przerwa,tempo,rir,notatka'),
-              _h('div', null, 'Typy: ', _h('b', null, 'warmup'), ' / ', _h('b', null, 'exercise'), ' / ', _h('b', null, 'cooldown'))
-            ),
-
-            _h('div', { className:'grid-2', style:{ gap:10 } },
-              getPlans().map(function(p) {
-                var isModified = !p._isCustom && (store.workoutPlans||{})[p.id];
-                var summ = rangeSummary(p);
-                return _h('div', { key:p.id, className:'card card-interactive',
-                  style:{ cursor:'pointer', display:'flex', flexDirection:'column', gap:8, borderLeft:'3px solid '+(p.color||'var(--a)') },
-                  onClick:function(){ setSelPlan(JSON.parse(JSON.stringify(p))); }
-                },
-                  _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
-                    _h('div', { style:{ width:40, height:40, borderRadius:'var(--r2)', background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem', flexShrink:0 } }, p.icon),
-                    _h('div', { style:{ flex:1, minWidth:0 } },
-                      _h('div', { style:{ fontWeight:700, fontSize:'.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, p.name),
-                      _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:2 } }, (p.day?p.day+' · ':'')+((p.exercises||[]).length)+' ćwiczeń')
-                    )
-                  ),
-                  _h('div', { style:{ display:'flex', gap:5, flexWrap:'wrap' } },
-                    summ && _h('span', { className:'badge badge-blue', style:{ fontSize:'.58rem' } }, '📆 '+summ),
-                    isModified && _h('span', { className:'badge badge-orange', style:{ fontSize:'.58rem' } }, '✏️ Zmodyfikowany'),
-                    p._isCustom && _h('span', { className:'badge badge-teal', style:{ fontSize:'.58rem' } }, '⭐ Własny')
-                  )
-                );
-              })
+    // ── Poziom 2: jednostki w planie ──
+    if (selMeta) {
+      var strUnits = selMeta.units.filter(function(u){ return u.unitType!=='running'; });
+      var runUnits = selMeta.units.filter(function(u){ return u.unitType==='running'; });
+      return _h('div', { className:'fade-in' },
+        _h('div', { className:'page-hdr' },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+            _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ setSelMeta(null); } }, '←'),
+            _h('div', null,
+              _h('h1', null, selMeta.icon+' '+selMeta.name),
+              _h('p', null, selMeta.units.length+' jednostek treningowych')
+            )
+          ),
+          _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+            _h('button', { className:'btn btn-primary', style:{ fontSize:'.72rem', padding:'7px 10px' }, onClick:addStrengthUnit }, '💪 + Siłowy'),
+            _h('button', { className:'btn btn-secondary', style:{ fontSize:'.72rem', padding:'7px 10px' }, onClick:addRunUnit }, '🏃 + Biegowy'),
+            _h('label', { className:'btn btn-ghost', style:{ fontSize:'.72rem', padding:'7px 10px', cursor:'pointer' } },
+              '📥 CSV',
+              _h('input', { type:'file', accept:'.csv,.txt', style:{ display:'none' }, onChange:importCSV })
             )
           )
+        ),
+
+        _h('div', { style:{ display:'flex', gap:6, marginBottom:12 } },
+          _h('input', { type:'text', placeholder:'Nazwa planu', value:selMeta.name, style:{ flex:1 },
+            onChange:function(e) {
+              var mp = Object.assign({}, selMeta, { name:e.target.value });
+              setSelMeta(mp);
+              saveMetaPlan(mp);
+            }
+          })
+        ),
+
+        strUnits.length > 0 && _h('div', { style:{ marginBottom:16 } },
+          _h('div', { style:{ fontSize:'.65rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 } }, '💪 Treningi siłowe ('+strUnits.length+')'),
+          strUnits.map(function(p) {
+            var summ = rangeSummary(p);
+            return _h('div', { key:p.id, className:'card card-interactive',
+              style:{ cursor:'pointer', marginBottom:8, borderLeft:'3px solid '+(p.color||'var(--a)') },
+              onClick:function(){ setSelUnit(JSON.parse(JSON.stringify(p))); }
+            },
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+                _h('div', { style:{ width:36, height:36, borderRadius:'var(--r2)', background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', flexShrink:0 } }, p.icon||'🏋️'),
+                _h('div', { style:{ flex:1, minWidth:0 } },
+                  _h('div', { style:{ fontWeight:700, fontSize:'.85rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, p.name),
+                  _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)', marginTop:2 } },
+                    (p.day?p.day+' · ':'')+((p.exercises||[]).length)+' ćwiczeń'+(summ?' · '+summ:''))
+                ),
+                _h('span', { style:{ color:'var(--t3)', fontSize:'1.2rem' } }, '›')
+              )
+            );
+          })
+        ),
+
+        runUnits.length > 0 && _h('div', { style:{ marginBottom:16 } },
+          _h('div', { style:{ fontSize:'.65rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 } }, '🏃 Treningi biegowe ('+runUnits.length+')'),
+          runUnits.map(function(r) {
+            var rtDef = RUN_TYPES.find(function(t){ return t.id===r.runType; });
+            return _h('div', { key:r.id, className:'card card-interactive',
+              style:{ cursor:'pointer', marginBottom:8, borderLeft:'3px solid var(--green)' },
+              onClick:function(){ setSelUnit(JSON.parse(JSON.stringify(r))); }
+            },
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+                _h('div', { style:{ width:36, height:36, borderRadius:'var(--r2)', background:'rgba(34,197,94,.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', flexShrink:0 } }, '🏃'),
+                _h('div', { style:{ flex:1, minWidth:0 } },
+                  _h('div', { style:{ fontWeight:700, fontSize:'.85rem' } }, r.name||'Bieg'),
+                  _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)', marginTop:2 } },
+                    (r.day?r.day+' · ':'')+(rtDef?rtDef.label+' · ':'')+(r.distance?r.distance+' km':'')+(r.pace?' · '+r.pace+'/km':''))
+                ),
+                _h('span', { style:{ color:'var(--t3)', fontSize:'1.2rem' } }, '›')
+              )
+            );
+          })
+        ),
+
+        selMeta.units.length === 0 && _h('div', { className:'card', style:{ textAlign:'center', padding:'30px 16px', color:'var(--t3)' } },
+          _h('div', { style:{ fontSize:'2rem', marginBottom:8 } }, '📋'),
+          _h('div', { style:{ fontSize:'.82rem' } }, 'Brak jednostek — dodaj trening siłowy lub biegowy')
+        ),
+
+        _h('button', { className:'btn btn-danger btn-sm', style:{ marginTop:16 }, onClick:function(){ deleteMetaPlan(selMeta.id); } }, '🗑️ Usuń cały plan')
+      );
+    }
+
+    // ── Poziom 1: lista meta-planów ──
+    return _h('div', { className:'fade-in' },
+      _h('div', { className:'page-hdr' },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+          _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onClose }, '←'),
+          _h('div', null,
+            _h('h1', null, '📋 Edytor planów'),
+            _h('p', null, metaPlans.length+' '+(metaPlans.length===1?'plan treningowy':'planów treningowych'))
+          )
+        ),
+        _h('button', { className:'btn btn-primary', style:{ fontSize:'.75rem', padding:'8px 12px' }, onClick:addNewMeta }, '+ Nowy plan')
+      ),
+
+      metaPlans.map(function(mp) {
+        var strCount = mp.units.filter(function(u){ return u.unitType!=='running'; }).length;
+        var runCount = mp.units.filter(function(u){ return u.unitType==='running'; }).length;
+        var parts = [];
+        if (strCount) parts.push('💪 '+strCount+' siłow'+(strCount===1?'y':'ych'));
+        if (runCount) parts.push('🏃 '+runCount+' biegow'+(runCount===1?'y':'ych'));
+
+        return _h('div', { key:mp.id, className:'card card-interactive',
+          style:{ cursor:'pointer', marginBottom:10, borderLeft:'3px solid var(--a)' },
+          onClick:function(){ setSelMeta(JSON.parse(JSON.stringify(mp))); }
+        },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
+            _h('div', { style:{ width:48, height:48, borderRadius:'var(--r3)', background:'var(--s3)', border:'1px solid var(--b1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 } }, mp.icon||'📋'),
+            _h('div', { style:{ flex:1, minWidth:0 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.95rem' } }, mp.name),
+              _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:3 } },
+                parts.length ? parts.join(' · ') : 'Pusty plan — dotknij by dodać jednostki')
+            ),
+            _h('span', { style:{ color:'var(--t3)', fontSize:'1.3rem' } }, '›')
+          )
+        );
+      }),
+
+      metaPlans.length === 0 && _h('div', { className:'card', style:{ textAlign:'center', padding:'40px 16px', color:'var(--t3)' } },
+        _h('div', { style:{ fontSize:'2.5rem', marginBottom:12 } }, '📋'),
+        _h('div', { style:{ fontSize:'.88rem', marginBottom:6 } }, 'Brak planów treningowych'),
+        _h('div', { style:{ fontSize:'.72rem' } }, 'Utwórz nowy plan i dodaj jednostki siłowe lub biegowe')
+      )
     );
   }
 

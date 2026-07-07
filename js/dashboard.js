@@ -225,6 +225,288 @@
     );
   }
 
+  // ── SMART COACH (decision-tree chat) ───────────────────────────────────
+  var INTENTS = [
+    { id:'plateau',    label:'Dlaczego mam plateau?',         icon:'📊', needsExercise:true },
+    { id:'recovery',   label:'Czy dobrze regeneruję?',        icon:'😴', needsExercise:false },
+    { id:'plan',       label:'Czy mój plan jest dobry?',      icon:'📋', needsExercise:false },
+    { id:'load',       label:'Ile powinienem dać na sztangę?',icon:'🏋️', needsExercise:true },
+    { id:'deload',     label:'Czy potrzebuję deloadu?',       icon:'⏸️', needsExercise:false },
+    { id:'volume',     label:'Ile serii tygodniowo?',         icon:'📈', needsExercise:false },
+    { id:'cardio',     label:'Czy cardio szkodzi siłowni?',   icon:'🏃', needsExercise:false },
+    { id:'sleep_tip',  label:'Jak sen wpływa na trening?',    icon:'🌙', needsExercise:false },
+  ];
+
+  function getExerciseNames(store) {
+    var names = {};
+    (store.workouts||[]).forEach(function(w) {
+      (w.exercises||[]).forEach(function(e){ if(e.name) names[e.name]=true; });
+    });
+    return Object.keys(names).sort();
+  }
+
+  function analyzeIntent(id, exercise, store) {
+    var workouts = store.workouts || [];
+    var runs = store.runs || [];
+    var sleeps = store.sleepSessions || [];
+    var wellbeing = store.wellbeingEntries || [];
+    var now = Date.now();
+    var core = window.etcore;
+
+    function recentWorkouts(days) {
+      return workouts.filter(function(w){ return (now - new Date(w.date).getTime()) <= days*86400000; });
+    }
+    function avgField(arr, key, days) {
+      var recent = arr.filter(function(e){ return e.date && (now - new Date(e.date).getTime()) <= days*86400000; });
+      var vals = recent.filter(function(e){ return e[key]!=null; });
+      if (!vals.length) return null;
+      return vals.reduce(function(s,e){ return s+e[key]; },0)/vals.length;
+    }
+
+    if (id === 'plateau' && exercise) {
+      var ormHist = core && ETCore.ormHistory ? ETCore.ormHistory(core, exercise) : [];
+      var exWorkouts = workouts.filter(function(w){
+        return (w.exercises||[]).some(function(e){ return e.name===exercise; });
+      });
+      var weekSets = 0;
+      recentWorkouts(7).forEach(function(w){
+        (w.exercises||[]).forEach(function(e){
+          if (e.name===exercise) weekSets += (e.setsData||[]).filter(function(s){return s.done;}).length || e.sets || 0;
+        });
+      });
+      var avgRpe = avgField(wellbeing, 'energy', 14);
+      var sleepAvg = avgField(sleeps, 'duration', 14);
+      var daysSinceEx = exWorkouts.length ? Math.floor((now - new Date(exWorkouts[0].date).getTime())/86400000) : null;
+      var lastDeload = workouts.findIndex(function(w){ return w.name && w.name.toLowerCase().indexOf('deload')!==-1; });
+      var daysSinceDeload = lastDeload >= 0 ? Math.floor((now - new Date(workouts[lastDeload].date).getTime())/86400000) : 999;
+
+      var orm = core && ETCore.latestOrm ? ETCore.latestOrm(core, exercise) : null;
+      var trend = ormHist.length >= 2 ? (ormHist[0].orm - ormHist[ormHist.length > 3 ? ormHist.length-3 : ormHist.length-1].orm) : 0;
+
+      if (weekSets < 6) return '📊 Twoje 1RM na „'+exercise+'"'+(trend<=0?' stoi w miejscu':' rośnie')+'. Robisz tylko '+weekSets+' serii/tydzień — to mało. ACSM zaleca 6-10+ serii tygodniowo na grupę mięśniową. Dodaj 2-4 serie, żeby pobudzić adaptację.';
+      if (sleepAvg != null && sleepAvg < 6.5) return '🌙 Twoje 1RM na „'+exercise+'" stagnuje, a śpisz średnio '+sleepAvg.toFixed(1)+'h. Przy <7h regeneracja hormonalna (testosteron, GH) jest upośledzona. Zanim zmienisz plan — spróbuj 7.5h+ snu przez 2 tygodnie.';
+      if (daysSinceDeload > 42) return '⏸️ Nie miałeś deloadu od '+daysSinceDeload+' dni. Przy ciągłym obciążeniu centralny układ nerwowy się „wypala". Zrób tydzień na 50-60% obciążenia, a potem wróć — często to łamie plateau.';
+      if (orm && weekSets >= 10) return '📈 Robisz '+weekSets+' serii/tydz. na „'+exercise+'", wolumen OK. Spróbuj zmienić zakres powtórzeń (np. 3×3 zamiast 3×8) lub dodaj wariant (np. pauza na klatce, tempo 3-1-0). Periodyzacja bodźca to klucz.';
+      return '🔍 Analizuję „'+exercise+'": '+weekSets+' serii/tydz.'+(orm?', szacowane 1RM: '+orm.orm.toFixed(1)+' kg':'')+'. Upewnij się, że progresja obciążenia rośnie co 1-2 tygodnie, nawet o 1.25 kg. Jeśli nie — zmień schemat powtórzeń lub technikę.';
+    }
+
+    if (id === 'recovery') {
+      var sleepA = avgField(sleeps, 'duration', 7);
+      var sleepQ = avgField(sleeps, 'quality', 7);
+      var stress = avgField(wellbeing, 'stress', 7);
+      var energy = avgField(wellbeing, 'energy', 7);
+      var parts = [];
+      if (sleepA == null && stress == null) return '📊 Brak danych o śnie i samopoczuciu. Zaloguj sen i wpisy samopoczucia, żebym mógł ocenić Twoją regenerację.';
+      if (sleepA != null) {
+        if (sleepA < 6) parts.push('😴 Sen: średnio '+sleepA.toFixed(1)+'h — ZA MAŁO. Cel: minimum 7h, optymalnie 8h. Niedobór snu obniża syntezę białek mięśniowych o ~20%.');
+        else if (sleepA < 7) parts.push('😴 Sen: '+sleepA.toFixed(1)+'h — poniżej optymalnych 7-8h. Spróbuj 30 min wcześniej do łóżka.');
+        else parts.push('😴 Sen: '+sleepA.toFixed(1)+'h — dobry poziom!');
+      }
+      if (sleepQ != null) parts.push('Jakość snu: '+sleepQ.toFixed(1)+'/10'+(sleepQ<5?' — niska, sprawdź temperaturę pokoju i ekrany przed snem':sleepQ<7?' — przeciętna':' — świetna'));
+      if (stress != null) {
+        if (stress > 7) parts.push('😰 Stres: '+stress.toFixed(0)+'/10 — wysoki! Kortyzol hamuje regenerację. Rozważ spacer, medytację lub zmniejsz obciążenie treningowe.');
+        else if (stress > 4) parts.push('😰 Stres: '+stress.toFixed(0)+'/10 — umiarkowany');
+        else parts.push('😌 Stres: '+stress.toFixed(0)+'/10 — niski, dobrze');
+      }
+      if (energy != null) parts.push('⚡ Energia: '+energy.toFixed(0)+'/10'+(energy<4?' — NISKA. Możliwy deficyt kaloryczny lub przetrenowanie':''));
+      return parts.join('\n\n');
+    }
+
+    if (id === 'plan') {
+      var insights = ET.AIEngine.coachPlan ? ET.AIEngine.coachPlan(store) : [];
+      if (!insights.length) return '✅ Twój trening wygląda dobrze — objętość, kolejność ćwiczeń i proporcje cardio/siła mieszczą się w zaleceniach.';
+      return insights.map(function(ins){ return ins.icon+' **'+ins.title+'**: '+ins.body; }).join('\n\n');
+    }
+
+    if (id === 'load' && exercise) {
+      var ormData = core && ETCore.latestOrm ? ETCore.latestOrm(core, exercise) : null;
+      if (!ormData) return '📊 Brak danych 1RM dla „'+exercise+'". Wykonaj 1-2 serie na tym ćwiczeniu, żebym mógł oszacować Twoje maksimum.';
+      var orm1 = ormData.orm;
+      var lines = ['🏋️ Szacowane 1RM na „'+exercise+'": **'+orm1.toFixed(1)+' kg** (pewność '+Math.round(ormData.confidence*100)+'%)'];
+      lines.push('');
+      lines.push('Zalecane obciążenia:');
+      [[85,3,'Siła (3×3)'],[75,8,'Hipertrofia (3×8)'],[65,12,'Wytrzymałość (3×12)']].forEach(function(r){
+        var w = Math.round(orm1 * r[0]/100 / 2.5) * 2.5;
+        lines.push('• '+r[2]+': **'+w+' kg** ('+r[0]+'% 1RM × '+r[1]+' powt.)');
+      });
+      return lines.join('\n');
+    }
+
+    if (id === 'deload') {
+      var w14 = recentWorkouts(14);
+      var w28 = recentWorkouts(28);
+      var avgRpeW = null;
+      var rpeVals = [];
+      w14.forEach(function(w){ (w.exercises||[]).forEach(function(e){ (e.setsData||[]).forEach(function(s){ if(s.rpe) rpeVals.push(s.rpe); }); }); });
+      if (rpeVals.length) avgRpeW = rpeVals.reduce(function(a,b){return a+b;},0)/rpeVals.length;
+      var sleepD = avgField(sleeps, 'duration', 14);
+      var stressD = avgField(wellbeing, 'stress', 14);
+      var signs = [];
+      if (avgRpeW != null && avgRpeW > 8.5) signs.push('RPE średnie z 2 tyg.: '+avgRpeW.toFixed(1)+' — bardzo wysoko');
+      if (sleepD != null && sleepD < 6.5) signs.push('Sen '+sleepD.toFixed(1)+'h — niedobór');
+      if (stressD != null && stressD > 7) signs.push('Stres '+stressD.toFixed(0)+'/10 — wysoki');
+      if (w14.length >= 10) signs.push(w14.length+' treningów w 2 tygodnie — duża częstotliwość');
+      if (signs.length >= 2) return '⚠️ **Tak, rozważ deload.** Sygnały:\n\n• '+signs.join('\n• ')+'\n\nZrób tydzień z 50-60% obciążenia, zachowaj liczbę serii ale zmniejsz intensywność.';
+      if (signs.length === 1) return '🤔 Jest jeden sygnał: '+signs[0]+'. Jeszcze nie krytyczny, ale monitoruj. Jeśli w ciągu tygodnia dojdzie kolejny — zrób deload.';
+      return '✅ Na razie nie potrzebujesz deloadu. RPE'+(avgRpeW!=null?': '+avgRpeW.toFixed(1):' brak danych')+', sen'+(sleepD!=null?': '+sleepD.toFixed(1)+'h':' brak danych')+'. Trenuj dalej!';
+    }
+
+    if (id === 'volume') {
+      var w7 = recentWorkouts(7);
+      if (!w7.length) return '📊 Brak treningów z ostatnich 7 dni. Zaloguj kilka sesji, żebym policzył objętość.';
+      var groups = {};
+      w7.forEach(function(w){
+        (w.exercises||[]).forEach(function(ex) {
+          var db = (ET.EXERCISES_BASIC||[]).find(function(e){ return e.name===ex.name; });
+          var tag = db && (db.tags||[])[0]; if (!tag) return;
+          var n = (ex.setsData||[]).filter(function(s){return s.done;}).length || ex.sets || 0;
+          groups[tag] = (groups[tag]||0) + n;
+        });
+      });
+      var lines = ['📈 Objętość tygodniowa (Schoenfeld: 10-20 serii/grupę):',''];
+      var tags = Object.keys(groups).sort(function(a,b){ return groups[b]-groups[a]; });
+      tags.forEach(function(tag) {
+        var grp = (ET.MUSCLE_GROUPS||[]).find(function(g){ return g.tag===tag; });
+        var label = grp ? grp.label : tag;
+        var n = groups[tag];
+        var note = n < 10 ? ' ⚠️ mało' : n > 20 ? ' ⚠️ dużo' : ' ✅';
+        lines.push('• '+label+': **'+n+' serii**'+note);
+      });
+      return lines.join('\n');
+    }
+
+    if (id === 'cardio') {
+      var runs7 = runs.filter(function(r){ return (now - new Date(r.date).getTime()) <= 7*86400000; });
+      if (!runs7.length) return '🏃 Nie masz biegów w tym tygodniu. Umiarkowane cardio (2-3×/tyg., 20-30 min) nie szkodzi sile i poprawia regenerację.';
+      var freq = runs7.length;
+      var totalMin = runs7.reduce(function(s,r){ return s+(+r.duration||0); },0);
+      if (freq >= 5) return '⚠️ '+freq+' sesji cardio w tygodniu — to może hamować przyrosty siły i masy (Wilson 2012). Ogranicz do 2-3× i wybieraj rower/wiosła zamiast biegania (mniejsza interferencja z nogami).';
+      if (freq >= 3 && totalMin > 120) return '🤔 '+freq+'× cardio, '+totalMin+' min/tydzień. Na granicy — jeśli Twój cel to masa, rozważ skrócenie do 20 min/sesję lub zamień bieganie na jazdę na rowerze.';
+      return '✅ '+freq+'× cardio, '+totalMin+' min/tydzień. W normie — umiarkowane cardio wspiera regenerację bez szkody dla siły.';
+    }
+
+    if (id === 'sleep_tip') {
+      var sl = avgField(sleeps, 'duration', 14);
+      var sq = avgField(sleeps, 'quality', 14);
+      if (sl == null) return '📊 Brak danych o śnie. Zaloguj kilka nocy, żebym mógł ocenić wpływ na Twój trening.';
+      var lines = ['🌙 Twój sen (ostatnie 2 tyg.): średnio **'+sl.toFixed(1)+'h**'+(sq!=null?', jakość **'+sq.toFixed(1)+'/10**':'')+'',''];
+      lines.push('Jak sen wpływa na trening:');
+      lines.push('• <6h: synteza białek ↓20%, testosteron ↓10-15%, kortyzol ↑');
+      lines.push('• 7-9h: optymalna regeneracja, konsolidacja wzorców ruchowych');
+      lines.push('• Jakość > ilość: głęboki sen (fazy 3-4) jest kluczowy');
+      if (sl < 7) lines.push('\n⚠️ Twoje '+sl.toFixed(1)+'h to za mało. Popraw higienę snu: stała pora, brak ekranów 1h przed snem, chłodna sypialnia (18-20°C).');
+      else lines.push('\n✅ Twoje '+sl.toFixed(1)+'h jest w dobrej strefie. Utrzymuj!');
+      return lines.join('\n');
+    }
+
+    return '🤖 Nie mam wystarczających danych, by odpowiedzieć. Zaloguj więcej treningów i danych o samopoczuciu.';
+  }
+
+  function SmartCoach(props) {
+    var store = props.store;
+    var cs = React.useState([]); var chat = cs[0], setChat = cs[1];
+    var ps = React.useState('menu'); var phase = ps[0], setPhase = ps[1];
+    var is = React.useState(null); var selectedIntent = is[0], setSelectedIntent = is[1];
+    var es = React.useState(false); var expanded = es[0], setExpanded = es[1];
+
+    var exerciseNames = React.useMemo(function(){ return getExerciseNames(store); }, [store.workouts]);
+
+    function selectIntent(intent) {
+      setSelectedIntent(intent);
+      if (intent.needsExercise && exerciseNames.length > 0) {
+        setChat(function(c){ return c.concat({ from:'user', text:intent.icon+' '+intent.label }); });
+        setPhase('pick_exercise');
+      } else {
+        runAnalysis(intent, null);
+      }
+    }
+
+    function runAnalysis(intent, exercise) {
+      setChat(function(c){
+        var msgs = exercise
+          ? c.concat({ from:'user', text:exercise })
+          : c.concat({ from:'user', text:intent.icon+' '+intent.label });
+        var answer = analyzeIntent(intent.id, exercise, store);
+        return msgs.concat({ from:'coach', text:answer });
+      });
+      setPhase('done');
+    }
+
+    function reset() { setPhase('menu'); setSelectedIntent(null); }
+
+    if (!expanded) {
+      return _h('div', { className:'card', style:{ marginBottom:16, cursor:'pointer', display:'flex', alignItems:'center', gap:12 },
+        onClick:function(){ setExpanded(true); }
+      },
+        _h('div', { style:{ width:42, height:42, borderRadius:'50%', background:'linear-gradient(135deg, var(--a-dim), var(--a))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem', flexShrink:0 } }, '🧠'),
+        _h('div', { style:{ flex:1 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, 'Smart Coach'),
+          _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, 'Zapytaj o plateau, regenerację, obciążenie...')
+        ),
+        _h('div', { style:{ color:'var(--t3)', fontSize:'1.2rem' } }, '›')
+      );
+    }
+
+    return _h('div', { className:'card', style:{ marginBottom:16 } },
+      _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 } },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:8 } },
+          _h('div', { style:{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg, var(--a-dim), var(--a))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1rem' } }, '🧠'),
+          _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, 'Smart Coach')
+        ),
+        _h('button', { style:{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:'.78rem' },
+          onClick:function(){ setExpanded(false); setChat([]); setPhase('menu'); }
+        }, '✕')
+      ),
+
+      chat.length > 0 && _h('div', { style:{ maxHeight:300, overflowY:'auto', marginBottom:12, display:'flex', flexDirection:'column', gap:8 } },
+        chat.map(function(msg, i) {
+          var isUser = msg.from === 'user';
+          return _h('div', { key:i, style:{ alignSelf:isUser?'flex-end':'flex-start', maxWidth:'85%',
+            padding:'8px 12px', borderRadius:isUser?'12px 12px 2px 12px':'12px 12px 12px 2px',
+            background:isUser?'var(--a-dim)':'var(--s3)',
+            border:'1px solid '+(isUser?'var(--a)33':'var(--b1)'),
+            fontSize:'.78rem', color:isUser?'var(--a-light)':'var(--t2)', lineHeight:1.5,
+            whiteSpace:'pre-wrap'
+          } }, msg.text);
+        })
+      ),
+
+      phase === 'menu' && _h('div', { style:{ display:'flex', flexWrap:'wrap', gap:6 } },
+        INTENTS.map(function(intent) {
+          return _h('button', { key:intent.id, style:{
+            padding:'6px 10px', borderRadius:20, border:'1px solid var(--b2)',
+            background:'var(--s3)', color:'var(--t2)', cursor:'pointer',
+            fontSize:'.72rem', fontWeight:600, transition:'all .15s', whiteSpace:'nowrap'
+          },
+            onMouseEnter:function(e){ e.currentTarget.style.borderColor='var(--a)'; e.currentTarget.style.color='var(--a-light)'; },
+            onMouseLeave:function(e){ e.currentTarget.style.borderColor='var(--b2)'; e.currentTarget.style.color='var(--t2)'; },
+            onClick:function(){ selectIntent(intent); }
+          }, intent.icon+' '+intent.label);
+        })
+      ),
+
+      phase === 'pick_exercise' && _h('div', null,
+        _h('div', { style:{ fontSize:'.76rem', color:'var(--t3)', marginBottom:8, fontWeight:600 } }, 'Na jakim ćwiczeniu?'),
+        _h('div', { style:{ display:'flex', flexWrap:'wrap', gap:6, maxHeight:160, overflowY:'auto' } },
+          exerciseNames.slice(0,20).map(function(name) {
+            return _h('button', { key:name, style:{
+              padding:'5px 10px', borderRadius:16, border:'1px solid var(--b2)',
+              background:'var(--s3)', color:'var(--t2)', cursor:'pointer',
+              fontSize:'.7rem', transition:'all .15s'
+            },
+              onClick:function(){ runAnalysis(selectedIntent, name); }
+            }, name);
+          })
+        )
+      ),
+
+      phase === 'done' && _h('div', { style:{ display:'flex', gap:8, marginTop:8 } },
+        _h('button', { className:'btn btn-secondary btn-sm', onClick:reset }, 'Nowe pytanie'),
+        _h('button', { className:'btn btn-ghost btn-sm', onClick:function(){ setExpanded(false); setChat([]); setPhase('menu'); } }, 'Zamknij')
+      )
+    );
+  }
+
   // ── NEW DASHBOARD ────────────────────────────────────────────────────────
   function NewDashboard() {
     var su = ET.useStore(); var store = su.store;
@@ -294,6 +576,8 @@
       _h(RegenerationBar, { store:store }),
 
       _h(CoreScoresCard, null),
+
+      _h(SmartCoach, { store:store }),
 
       _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr', style:{ marginBottom:10 } },

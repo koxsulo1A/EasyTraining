@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2"
+    "@capacitor/ios": "^6.1.2",
+    "et-live-activity": "file:plugins/live-activity"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.2",

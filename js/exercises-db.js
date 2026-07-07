@@ -339,6 +339,63 @@
   };
   ET.EXERCISES_BASIC.forEach(function(ex){ ex.muscles = PRECISE[ex.id] || []; });
 
+  // ── METADANE NSCA (Etap 3 wytycznych) ────────────────────────────────────
+  // Wzorce ruchowe (Haff & Triplett 2016) + klasyfikacja + flagi populacyjne.
+  ET.MOVEMENT_PATTERNS = [
+    { id:'squat',    label:'Przysiad' },
+    { id:'hinge',    label:'Zawias biodrowy' },
+    { id:'lunge',    label:'Wykrok' },
+    { id:'push-h',   label:'Pchanie poziome' },
+    { id:'push-v',   label:'Pchanie pionowe' },
+    { id:'pull-h',   label:'Ciągnięcie poziome' },
+    { id:'pull-v',   label:'Ciągnięcie pionowe' },
+    { id:'carry',    label:'Przenoszenie' },
+    { id:'rotation', label:'Rotacja / antyrotacja' },
+    { id:'core',     label:'Stabilizacja tułowia' },
+    { id:'izolacja', label:'Izolacja' },
+  ];
+
+  // Kompaktowa mapa: p=wzorzec, c=wielostawowe, pw=moc/plyometria, cr=core,
+  // ny=NIE dla młodzieży (auto-plany), ns=NIE dla seniorów (auto-plany).
+  // Klasyfikacja: NSCA (core/assistance, multi/single-joint); flagi wg
+  // Faigenbaum 2009 (technika/obciążenie osiowe) i Fragala 2019 (równowaga/barki).
+  var NSCA = {
+    kp1:{p:'push-h',c:1}, kp2:{p:'push-h',c:1}, kp3:{p:'push-h',c:1}, kp4:{p:'izolacja'},
+    kp5:{p:'push-h',c:1}, kp6:{p:'push-h',c:1}, kp7:{p:'izolacja'}, kp8:{p:'push-v',c:1,ns:1},
+    kp9:{p:'push-h',c:1}, kp10:{p:'push-h',c:1,ns:1},
+    pl1:{p:'hinge',c:1,ny:1}, pl2:{p:'pull-v',c:1,ns:1}, pl3:{p:'pull-h',c:1}, pl4:{p:'pull-h',c:1},
+    pl5:{p:'pull-v',c:1}, pl6:{p:'pull-h',c:1}, pl7:{p:'izolacja'}, pl8:{p:'pull-h'},
+    pl9:{p:'hinge'}, pl10:{p:'pull-h',c:1},
+    no1:{p:'squat',c:1,ny:1}, no2:{p:'lunge',c:1,ns:1}, no3:{p:'hinge',c:1}, no4:{p:'hinge',c:1},
+    no5:{p:'lunge',c:1}, no6:{p:'squat',c:1}, no7:{p:'squat',c:1}, no8:{p:'lunge',c:1},
+    no9:{p:'squat',c:1,ny:1,ns:1}, no10:{p:'lunge',c:1},
+    bi1:{p:'izolacja'}, bi2:{p:'izolacja'}, bi3:{p:'izolacja'}, bi4:{p:'izolacja'}, bi5:{p:'izolacja'},
+    bi6:{p:'izolacja'}, bi7:{p:'izolacja'}, bi8:{p:'izolacja'}, bi9:{p:'izolacja'}, bi10:{p:'izolacja'},
+    tr1:{p:'izolacja'}, tr2:{p:'izolacja'}, tr3:{p:'push-v',c:1,ns:1}, tr4:{p:'izolacja'}, tr5:{p:'izolacja'},
+    tr6:{p:'push-h',c:1}, tr7:{p:'izolacja'}, tr8:{p:'push-h',c:1}, tr9:{p:'push-v',c:1,ns:1}, tr10:{p:'izolacja'},
+    ba1:{p:'push-v',c:1}, ba2:{p:'izolacja'}, ba3:{p:'izolacja'}, ba4:{p:'push-v',c:1},
+    ba5:{p:'izolacja'}, ba6:{p:'pull-v',c:1,ns:1}, ba7:{p:'izolacja'}, ba8:{p:'push-v',c:1,ny:1,ns:1},
+    ba9:{p:'izolacja'}, ba10:{p:'izolacja'},
+    ly1:{p:'izolacja'}, ly2:{p:'izolacja'}, ly3:{p:'izolacja'}, ly4:{p:'izolacja',ns:1}, ly5:{p:'izolacja'},
+    ly6:{p:'izolacja'}, ly7:{p:'izolacja',pw:1,ns:1}, ly8:{p:'izolacja'}, ly9:{p:'carry',c:1}, ly10:{p:'izolacja',pw:1,ns:1},
+    pr1:{p:'izolacja'}, pr2:{p:'izolacja'}, pr3:{p:'carry',c:1}, pr4:{p:'izolacja'}, pr5:{p:'izolacja'},
+    pr6:{p:'izolacja'}, pr7:{p:'izolacja'}, pr8:{p:'izolacja'}, pr9:{p:'izolacja'}, pr10:{p:'izolacja'},
+    co1:{p:'core',cr:1}, co2:{p:'core',cr:1}, co3:{p:'core',cr:1}, co4:{p:'core',cr:1,ns:1}, co5:{p:'rotation',cr:1},
+    co6:{p:'core',cr:1}, co7:{p:'core',cr:1,ns:1}, co8:{p:'rotation',cr:1}, co9:{p:'core',cr:1}, co10:{p:'core',cr:1},
+  };
+  ET.EXERCISES_BASIC.forEach(function(ex) {
+    var m = NSCA[ex.id] || {};
+    ex.pattern = m.p || 'izolacja';
+    ex.isCompound = !!m.c;
+    ex.isPower = !!m.pw;
+    ex.isCoreEx = !!m.cr;
+    ex.youthSafe = !m.ny;
+    ex.seniorFriendly = !m.ns;
+  });
+  ET.exercisesByPattern = function(pat) {
+    return ET.EXERCISES_BASIC.filter(function(e){ return e.pattern === pat; });
+  };
+
   // Wszystkie ćwiczenia razem
   ET.EXERCISES = ET.EXERCISES_BASIC.concat(ET.EXERCISES_CORRECTIVE);
 

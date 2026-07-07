@@ -1,0 +1,13 @@
+{
+  "name": "et-live-activity",
+  "version": "1.0.0",
+  "description": "EasyTraining Live Activities bridge (ActivityKit)",
+  "main": "dist/plugin.js",
+  "files": ["ios/", "EtLiveActivity.podspec", "dist/"],
+  "capacitor": {
+    "ios": { "src": "ios" }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=5.0.0"
+  }
+}

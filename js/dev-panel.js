@@ -695,6 +695,25 @@
               );
             })
           ),
+          _h('div', { className:'card', style:{ marginBottom:14 } },
+            _h('div', { style:{ fontWeight:700, marginBottom:8, fontSize:'.85rem' } }, '🧪 Flagi funkcji'),
+            (function() {
+              var on = !!(store.devFlags && store.devFlags.screeningStep);
+              return _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 } },
+                _h('div', null,
+                  _h('div', { style:{ fontSize:'.78rem', fontWeight:600 } }, 'Krok 5 kreatora: screening ACSM'),
+                  _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)' } }, 'Pytania bezpieczeństwa + interferencja cardio (Wilson)')
+                ),
+                _h('button', { className:'btn btn-sm '+(on?'btn-primary':'btn-secondary'), style:{ minWidth:64 },
+                  onClick:function(){
+                    update(function(s){
+                      var df = Object.assign({}, s.devFlags||{}); df.screeningStep = !on;
+                      return Object.assign({}, s, { devFlags: df });
+                    });
+                  } }, on?'Włączony':'Ukryty')
+              );
+            })()
+          ),
           _h('div', { className:'card', style:{ marginBottom:14, borderColor:'var(--red)' } },
             _h('div', { style:{ fontWeight:700, marginBottom:8, fontSize:'.85rem', color:'var(--red)' } }, '⚠️ Strefa niebezpieczna'),
             _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },

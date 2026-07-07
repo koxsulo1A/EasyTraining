@@ -94,6 +94,8 @@
     return _h('div', { className:'sheet-overlay', onClick:props.onClose },
       _h('div', { className:'sheet', onClick:function(e){ e.stopPropagation(); } },
         _h('div', { className:'sheet-handle' }),
+        // Zawsze widoczny przycisk zamknięcia — tap w tło bywa niedostępny na telefonie
+        _h('button', { className:'sheet-close', 'aria-label':'Zamknij', onClick:props.onClose }, '✕'),
         props.title && _h('h2', null, props.title),
         props.children
       )

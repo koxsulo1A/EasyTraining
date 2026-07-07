@@ -45,15 +45,18 @@
           if (pool.indexOf(ex) === -1) pool.push(ex);
         });
       });
-      // Klucz sortowania: poziom trudności (główny) + rozrzut wg seed (poboczny)
+      // Stabilna kolejność (trudność, potem hash), a seed ROTUJE okno wyboru —
+      // dzięki temu "Regeneruj" naprawdę zmienia ćwiczenia, gdy pula > 2.
       pool.sort(function(a,b) {
-        var ka = (a.difficulty||1)*1000 + ((hashId(a.id)+seed) % 1000);
-        var kb = (b.difficulty||1)*1000 + ((hashId(b.id)+seed) % 1000);
+        var ka = (a.difficulty||1)*1000 + (hashId(a.id) % 1000);
+        var kb = (b.difficulty||1)*1000 + (hashId(b.id) % 1000);
         return ka - kb;
       });
+      var off = pool.length ? ((seed*2) % pool.length) : 0;
       var picked = 0;
       for (var i=0;i<pool.length && picked<2;i++) {
-        if (block.indexOf(pool[i]) === -1) { block.push(pool[i]); picked++; }
+        var ex = pool[(off+i) % pool.length];
+        if (block.indexOf(ex) === -1) { block.push(ex); picked++; }
       }
     });
 

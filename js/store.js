@@ -15,6 +15,7 @@
     importedPlans: [], customPlans: [],
     acwrSettings: { method:'external', threshold:1.3, notifications:false },
     fitnessTests: [], postureAssessments: [], checkins: [],
+    trainingPlans: [],
   };
 
   function loadStore() {

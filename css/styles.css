@@ -37,7 +37,8 @@ a{color:inherit;text-decoration:none}
 @media(max-width:768px){
   .sidebar{display:none}
   /* pad below fixed mobile nav + iOS home bar */
-  .main{padding-bottom:calc(var(--bnh) + env(safe-area-inset-bottom,0px))}
+  .main{padding-bottom:calc(var(--bnh) + env(safe-area-inset-bottom,0px));scrollbar-width:none}
+  .main::-webkit-scrollbar{display:none}
   .page-content{padding:16px 14px 8px}
 }
 
@@ -132,7 +133,9 @@ a{color:inherit;text-decoration:none}
 
 /* ── SHEET ── */
 .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s ease}
-.sheet{background:var(--s2);border-radius:var(--r4) var(--r4) 0 0;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:20px;animation:slideUp .25s ease}
+.sheet{background:var(--s2);border-radius:var(--r4) var(--r4) 0 0;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));animation:slideUp .25s ease;position:relative}
+.sheet-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;background:var(--s4);color:var(--t2);font-size:.85rem;display:flex;align-items:center;justify-content:center;z-index:2}
+.sheet-close:active{background:var(--s5)}
 .sheet-handle{width:36px;height:4px;background:var(--s4);border-radius:2px;margin:0 auto 16px}
 .sheet h2{font-size:1.05rem;font-weight:700;margin-bottom:16px}
 
@@ -233,6 +236,13 @@ a{color:inherit;text-decoration:none}
 .page-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .page-hdr h1{font-size:1.4rem;font-weight:700}
 .page-hdr p{font-size:.78rem;color:var(--t3);margin-top:2px}
+@media(max-width:768px){
+  /* nagłówki stron: tytuł może się kurczyć, przyciski zawsze w prawym górnym rogu */
+  .page-hdr{align-items:flex-start;gap:8px}
+  .page-hdr>div:first-child{min-width:0}
+  .page-hdr h1{font-size:1.15rem}
+  .page-hdr .btn{flex-shrink:0;white-space:nowrap}
+}
 
 /* ── ANIMATIONS ── */
 .fade-in{animation:fadeIn .3s ease}

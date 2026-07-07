@@ -92,10 +92,16 @@
     var tf = React.useState('all'); var termFilter = tf[0], setTermFilter = tf[1];
     var goals = store.goals||[];
 
-    var exerciseNames = [];
+    var ep = React.useState(false); var showExPicker = ep[0], setShowExPicker = ep[1];
+
+    // Ćwiczenia do wyboru: historia treningów + pełna biblioteka
+    var allExerciseNames = [];
     (store.workouts||[]).forEach(function(w){ (w.exercises||[]).forEach(function(ex){
-      if (ex.name && exerciseNames.indexOf(ex.name)===-1) exerciseNames.push(ex.name);
+      if (ex.name && allExerciseNames.indexOf(ex.name)===-1) allExerciseNames.push(ex.name);
     }); });
+    (ET.EXERCISES_BASIC||[]).forEach(function(ex){
+      if (ex.name && allExerciseNames.indexOf(ex.name)===-1) allExerciseNames.push(ex.name);
+    });
 
     function save() {
       if (!f.title) { toast('Podaj nazwę celu', 'error'); return; }
@@ -256,10 +262,21 @@
         ),
         f.linkType==='exercise' && _h('div', { className:'field' },
           _h('label', null, 'Ćwiczenie do śledzenia *'),
-          _h('input', { type:'text', list:'goal-exercise-list', placeholder:'np. Przysiad', value:f.exercise||'', onChange:function(e){ upF('exercise',e.target.value); } }),
-          _h('datalist', { id:'goal-exercise-list' },
-            exerciseNames.map(function(n){ return _h('option', { key:n, value:n }); })
-          )
+          // datalist nie działa w iOS WKWebView — własny picker (lista inline z filtrem)
+          _h('input', { type:'text', placeholder:'np. Przysiad — wpisz lub wybierz z listy', value:f.exercise||'',
+            onFocus:function(){ setShowExPicker(true); },
+            onChange:function(e){ upF('exercise',e.target.value); setShowExPicker(true); } }),
+          showExPicker && (function() {
+            var q = (f.exercise||'').trim().toLowerCase();
+            var list = allExerciseNames.filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; }).slice(0, 30);
+            if (!list.length) return null;
+            return _h('div', { style:{ maxHeight:180, overflowY:'auto', background:'var(--s3)', border:'1px solid var(--b1)', borderRadius:'var(--r2)', marginTop:4 } },
+              list.map(function(n) {
+                return _h('div', { key:n, style:{ padding:'9px 12px', fontSize:'.8rem', cursor:'pointer', borderBottom:'1px solid var(--b1)' },
+                  onClick:function(){ upF('exercise', n); setShowExPicker(false); } }, n);
+              })
+            );
+          })()
         ),
         f.linkType && f.linkType!=='none' && _h('div', { style:{ fontSize:'.68rem', color:'var(--a-light)', background:'var(--a-dim)', borderRadius:'var(--r2)', padding:'6px 10px', marginBottom:12 } },
           '🤖 Postęp zaktualizuje się automatycznie po zapisaniu '+(f.linkType==='exercise'?'treningu z tym ćwiczeniem (najlepszy ciężar)':f.linkType==='running'?'biegu (dystans)':'sesji sauny (czas trwania)')+'. Podaj wartość docelową poniżej.'

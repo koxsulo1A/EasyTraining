@@ -470,10 +470,103 @@
     { id:'post-competition',icon:'🏅', label:'Po zawodach',         desc:'Protokół regeneracji' },
   ];
 
+  // ── PORÓWNANIE OKRESÓW: bieżący vs poprzedni (tydzień/miesiąc) ────────────
+  function comparePeriods(store, days) {
+    var now = Date.now();
+    function inRange(dateStr, fromDays, toDays) {
+      var age = (now - new Date(dateStr).getTime()) / 86400000;
+      return age >= fromDays && age < toDays;
+    }
+    function slice(fromDays, toDays) {
+      var ws = (store.workouts||[]).filter(function(w){ return inRange(w.date, fromDays, toDays); });
+      var rs = (store.runs||[]).filter(function(r){ return inRange(r.date, fromDays, toDays); });
+      var sl = (store.sleepSessions||[]).filter(function(s){ return inRange(s.date, fromDays, toDays); });
+      var sets = 0, volume = 0, rpeSum = 0, rpeN = 0;
+      var perEx = {};   // nazwa → najlepszy ciężar w okresie
+      ws.forEach(function(w) {
+        volume += (+w.volume||0);
+        (w.exercises||[]).forEach(function(ex) {
+          (ex.setsData||[]).forEach(function(s) {
+            if (!s.done) return;
+            sets++;
+            if (s.rpe) { rpeSum += +s.rpe; rpeN++; }
+            var wgt = +s.weight||0;
+            if (wgt > (perEx[ex.name]||0)) perEx[ex.name] = wgt;
+          });
+        });
+      });
+      return {
+        workouts: ws.length, sets: sets, volume: Math.round(volume),
+        runs: rs.length,
+        runKm: Math.round(rs.reduce(function(s,r){ return s+(+r.distance||0); },0)*10)/10,
+        sleepAvg: sl.length ? Math.round(sl.reduce(function(s,x){ return s+(+x.duration||0); },0)/sl.length*10)/10 : null,
+        rpeAvg: rpeN ? Math.round(rpeSum/rpeN*10)/10 : null,
+        perEx: perEx,
+      };
+    }
+    var cur = slice(0, days), prev = slice(days, days*2);
+    var exNames = Object.keys(cur.perEx);
+    Object.keys(prev.perEx).forEach(function(n){ if (exNames.indexOf(n)===-1) exNames.push(n); });
+    var exRows = exNames.map(function(n) {
+      return { name:n, prev: prev.perEx[n]||null, cur: cur.perEx[n]||null };
+    }).sort(function(a,b){ return (b.cur||b.prev||0)-(a.cur||a.prev||0); }).slice(0, 8);
+    return { cur:cur, prev:prev, exRows:exRows, days:days };
+  }
+
+  // ── EKSPORT RAPORTU: udostępnij (iOS) lub pobierz .txt ────────────────────
+  function exportReport(report, cmp, toast) {
+    var L = [];
+    L.push('=== ' + report.title + ' ===');
+    L.push(report.period);
+    L.push('');
+    (report.stats||[]).forEach(function(s){ L.push(s.label + ': ' + s.value); });
+    if (cmp) {
+      var lbl = cmp.days===7 ? 'TYDZIEŃ DO TYGODNIA' : 'MIESIĄC DO MIESIĄCA';
+      L.push(''); L.push('— ' + lbl + ' (poprzedni → bieżący) —');
+      L.push('Treningi: ' + cmp.prev.workouts + ' → ' + cmp.cur.workouts);
+      L.push('Serie: ' + cmp.prev.sets + ' → ' + cmp.cur.sets);
+      L.push('Objętość: ' + cmp.prev.volume + ' kg → ' + cmp.cur.volume + ' kg');
+      L.push('Biegi: ' + cmp.prev.runs + ' (' + cmp.prev.runKm + ' km) → ' + cmp.cur.runs + ' (' + cmp.cur.runKm + ' km)');
+      if (cmp.cur.sleepAvg!=null || cmp.prev.sleepAvg!=null) L.push('Sen śr.: ' + (cmp.prev.sleepAvg||'—') + 'h → ' + (cmp.cur.sleepAvg||'—') + 'h');
+      if (cmp.cur.rpeAvg!=null || cmp.prev.rpeAvg!=null) L.push('RPE śr.: ' + (cmp.prev.rpeAvg||'—') + ' → ' + (cmp.cur.rpeAvg||'—'));
+      if (cmp.exRows.length) {
+        L.push(''); L.push('— ĆWICZENIA (najlepszy ciężar) —');
+        cmp.exRows.forEach(function(r) {
+          var d = (r.prev!=null && r.cur!=null) ? (r.cur-r.prev) : null;
+          L.push(r.name + ': ' + (r.prev!=null?r.prev+' kg':'—') + ' → ' + (r.cur!=null?r.cur+' kg':'—') +
+            (d!=null && d!==0 ? ' ('+(d>0?'+':'')+Math.round(d*10)/10+' kg)' : ''));
+        });
+      }
+    }
+    if ((report.recommendations||[]).length) {
+      L.push(''); L.push('— REKOMENDACJE —');
+      report.recommendations.forEach(function(r){ L.push('• ' + r); });
+    }
+    L.push(''); L.push('Wygenerowano: ' + new Date().toLocaleString('pl-PL') + ' · EasyTraining');
+    var text = L.join('\n');
+    if (navigator.share) {
+      navigator.share({ title: report.title, text: text }).catch(function(){});
+      return;
+    }
+    try {
+      var blob = new Blob([text], { type:'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'raport-' + ET.dstr() + '.txt';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      toast && toast('Raport pobrany ✓', 'success');
+    } catch(e) {
+      toast && toast('Eksport nieudany', 'error');
+    }
+  }
+
   function AICoachReportTab(props) {
     var store = props.store;
+    var toast = ET.useToast();
     var rt = React.useState(null); var reportType = rt[0]; var setReportType = rt[1];
     var report = reportType && typeof ET.AIEngine !== 'undefined' ? ET.AIEngine.report(reportType, store) : null;
+    var cmp = report && (reportType==='weekly' || reportType==='monthly')
+      ? comparePeriods(store, reportType==='weekly' ? 7 : 30) : null;
     var typeColor = {positive:'var(--green)', warning:'var(--orange)', achievement:'var(--yellow)', info:'var(--a-light)'};
 
     return _h('div', { className:'fade-in' },
@@ -506,6 +599,52 @@
             })
           )
         ),
+
+        // ── PORÓWNANIE OKRES DO OKRESU (tylko raport tygodniowy/miesięczny) ──
+        cmp && (function() {
+          var rows = [
+            { l:'Treningi',  p:cmp.prev.workouts, c:cmp.cur.workouts, u:'' },
+            { l:'Serie',     p:cmp.prev.sets,     c:cmp.cur.sets,     u:'' },
+            { l:'Objętość',  p:cmp.prev.volume,   c:cmp.cur.volume,   u:' kg' },
+            { l:'Bieganie',  p:cmp.prev.runKm,    c:cmp.cur.runKm,    u:' km' },
+            { l:'Sen śr.',   p:cmp.prev.sleepAvg, c:cmp.cur.sleepAvg, u:'h' },
+            { l:'RPE śr.',   p:cmp.prev.rpeAvg,   c:cmp.cur.rpeAvg,   u:'', invert:true },
+          ].filter(function(r){ return r.p!=null || r.c!=null; });
+          return _h('div', { className:'card', style:{ marginBottom:14 } },
+            _h('div', { style:{ fontWeight:700, marginBottom:10, fontSize:'.88rem' } },
+              cmp.days===7 ? '📊 Tydzień do tygodnia' : '📊 Miesiąc do miesiąca'),
+            _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)', marginBottom:8 } }, 'poprzedni okres → bieżący okres'),
+            rows.map(function(r, i) {
+              var delta = (r.p!=null && r.c!=null) ? Math.round((r.c-r.p)*10)/10 : null;
+              var good = delta==null ? null : (r.invert ? delta<0 : delta>0);
+              var col = delta==null||delta===0 ? 'var(--t3)' : good ? 'var(--green)' : 'var(--red)';
+              return _h('div', { key:i, style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:i<rows.length-1?'1px solid var(--b1)':'none', fontSize:'.78rem' } },
+                _h('span', { style:{ color:'var(--t2)' } }, r.l),
+                _h('span', null,
+                  _h('span', { style:{ color:'var(--t3)' } }, (r.p!=null?r.p+r.u:'—')+' → '),
+                  _h('span', { style:{ fontWeight:700 } }, r.c!=null?r.c+r.u:'—'),
+                  delta!=null && delta!==0 && _h('span', { style:{ color:col, fontWeight:700, marginLeft:6, fontSize:'.7rem' } },
+                    (delta>0?'▲ +':'▼ ')+delta+r.u)
+                )
+              );
+            }),
+            cmp.exRows.length>0 && _h('div', { style:{ marginTop:10 } },
+              _h('div', { style:{ fontSize:'.68rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 } }, '🏋️ Ćwiczenia — najlepszy ciężar'),
+              cmp.exRows.map(function(r, i) {
+                var d = (r.prev!=null && r.cur!=null) ? Math.round((r.cur-r.prev)*10)/10 : null;
+                var col = d==null||d===0 ? 'var(--t3)' : d>0 ? 'var(--green)' : 'var(--red)';
+                return _h('div', { key:i, style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 0', borderBottom:i<cmp.exRows.length-1?'1px solid var(--b1)':'none' } },
+                  _h('span', { style:{ fontSize:'.74rem', color:'var(--t2)', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, r.name),
+                  _h('span', { style:{ fontSize:'.74rem', flexShrink:0, marginLeft:8 } },
+                    _h('span', { style:{ color:'var(--t3)' } }, (r.prev!=null?r.prev:'—')+' → '),
+                    _h('span', { style:{ fontWeight:700 } }, (r.cur!=null?r.cur:'—')+' kg'),
+                    d!=null && d!==0 && _h('span', { style:{ color:col, fontWeight:700, marginLeft:6, fontSize:'.68rem' } }, (d>0?'+':'')+d)
+                  )
+                );
+              })
+            )
+          );
+        })(),
 
         // Recovery
         report.recovery && (function() {
@@ -573,7 +712,11 @@
               );
             })
           )
-        )
+        ),
+
+        // ── EKSPORT RAPORTU ──────────────────────────────────────────────────
+        _h('button', { className:'btn btn-secondary', style:{ width:'100%', marginBottom:14 },
+          onClick:function(){ exportReport(report, cmp, toast); } }, '📤 Eksportuj raport')
       )
     );
   }
