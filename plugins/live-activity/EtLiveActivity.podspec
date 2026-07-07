@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.author = 'EasyTraining'
   s.source = { :git => 'https://github.com/koxsulo1A/EasyTraining.git', :tag => s.version.to_s }
   s.source_files = 'ios/Plugin/**/*.{swift,h,m}'
-  s.ios.deployment_target = '14.0'
+  s.ios.deployment_target = '13.0'
   s.dependency 'Capacitor'
   s.swift_version = '5.7'
 end
