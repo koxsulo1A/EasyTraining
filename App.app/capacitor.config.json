@@ -1,0 +1,11 @@
+{
+	"appId": "com.easytraining.app",
+	"appName": "EasyTraining",
+	"webDir": "www",
+	"ios": {
+		"contentInset": "always"
+	},
+	"packageClassList": [
+		"LiveActivityPlugin"
+	]
+}

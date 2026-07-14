@@ -46,7 +46,9 @@ struct WorkoutLiveActivity: Widget {
                             Text(timerInterval: Date()...end, countsDown: true)
                                 .font(.title2.monospacedDigit().weight(.bold))
                                 .foregroundColor(.orange)
-                                .frame(maxWidth: 70)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .frame(width: 84, alignment: .trailing)
                         }
                     }
                 }
@@ -57,18 +59,24 @@ struct WorkoutLiveActivity: Widget {
                     Text(timerInterval: Date()...end, countsDown: true)
                         .font(.caption2.monospacedDigit())
                         .foregroundColor(.orange)
-                        .frame(maxWidth: 44)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .frame(width: 46, alignment: .trailing)
                 } else {
                     Text(timerInterval: context.state.startedAt...Date().addingTimeInterval(8*3600), countsDown: false)
                         .font(.caption2.monospacedDigit())
-                        .frame(maxWidth: 44)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .frame(width: 52, alignment: .trailing)
                 }
             } minimal: {
                 if let end = context.state.restEndsAt, end > Date() {
                     Text(timerInterval: Date()...end, countsDown: true)
                         .font(.caption2.monospacedDigit())
                         .foregroundColor(.orange)
-                        .frame(maxWidth: 36)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .frame(width: 40)
                 } else {
                     Text("💪")
                 }
@@ -89,7 +97,9 @@ private struct LockScreenView: View {
                 Text(timerInterval: context.state.startedAt...Date().addingTimeInterval(8*3600), countsDown: false)
                     .font(.caption.monospacedDigit())
                     .foregroundColor(.secondary)
-                    .frame(maxWidth: 60)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(width: 72, alignment: .trailing)
             }
 
             if let ex = context.state.exerciseName {
@@ -112,7 +122,9 @@ private struct LockScreenView: View {
                             Text(timerInterval: Date()...end, countsDown: true)
                                 .font(.title.monospacedDigit().weight(.bold))
                                 .foregroundColor(.orange)
-                                .frame(maxWidth: 90)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .frame(width: 108, alignment: .trailing)
                                 .multilineTextAlignment(.trailing)
                         }
                     }

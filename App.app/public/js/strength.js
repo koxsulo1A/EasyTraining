@@ -150,18 +150,6 @@
     );
   }
 
-  // RIR na osi (suwak) — używany w trakcie aktywnego treningu
-  function RirSlider(props) {
-    var val = props.value != null ? props.value : 2;
-    var idx = RIR_SCALE.indexOf(val);
-    if (idx === -1) idx = 3;
-    return _h('div', { style:{ display:'flex', alignItems:'center', gap:6, minWidth:96 } },
-      _h('input', { type:'range', min:0, max:RIR_SCALE.length-1, step:1, value:idx, style:{ width:64, margin:0 },
-        onChange:function(e){ props.onChange(RIR_SCALE[+e.target.value]); } }),
-      _h('span', { style:{ fontSize:'.75rem', fontWeight:700, color:'var(--a-light)', minWidth:22, fontVariantNumeric:'tabular-nums' } }, RIR_SCALE[idx])
-    );
-  }
-
   // ── Budowa serii — obsługa ćwiczeń jednostronnych (L/P) ───────────────────
   function buildSetsData(sets, reps, weight, isUnilateral) {
     if (!isUnilateral) {
@@ -963,7 +951,7 @@
                         }, isRunning ? ('⏱ '+liveSec+'s') : (s.reps ? s.reps+'s' : '▶ Start')))
                       : _h('td', null, _h('input', { type:'number', value:s.reps, min:1, onChange:function(e){ upSet(ex.id,s.id,'reps',e.target.value); } })),
                     _h('td', null, _h('input', { type:'number', value:s.weight, min:0, step:2.5, onChange:function(e){ upSet(ex.id,s.id,'weight',e.target.value); } })),
-                    _h('td', null, _h(RirSlider, { value:s.rpe!=null?s.rpe:2, onChange:function(v){ upSet(ex.id,s.id,'rpe',v); } })),
+                    _h('td', null, _h(RirPicker, { value:s.rpe!=null?s.rpe:2, onChange:function(v){ upSet(ex.id,s.id,'rpe',v); } })),
                     _h('td', { style:{ color:'var(--a-light)', fontWeight:600 } }, calc1RM(s.weight,s.reps)||'—'),
                     _h('td', null, _h('div', { className:'set-done-btn'+(s.done?' done':''), title:s.done?'Anuluj serię':'Zalicz serię', onClick:function(){ toggleSet(ex.id,s.id,ex.rest); } }, s.done?'✓':'○')),
                     _h('td', null, _h('button', { style:{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.85rem', padding:'2px 4px', lineHeight:1 }, onClick:function(){ removeSet(ex.id,s.id); } }, '✕'))
