@@ -23,3 +23,7 @@ Thumbs.db
 
 # Przypadkowa kopia całego projektu (backup) — nie commitujemy
 BLOKI TXT/new/
+
+# Artefakty buildów pobrane z CI (lokalne)
+App.app/
+*.app.zip
