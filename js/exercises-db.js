@@ -13,6 +13,7 @@
     { tag:'lydki',            label:'Łydki',             icon:'🦿', size:'mala' },
     { tag:'przedramiona',     label:'Przedramiona',      icon:'🤙', size:'mala' },
     { tag:'core_brzuch',      label:'Core / Brzuch',     icon:'🧘', size:'mala' },
+    { tag:'rozciaganie',      label:'Rozciąganie',       icon:'🤸‍♂️', size:'stretch' },
   ];
 
   // ── REGIONY CIAŁA (ćwiczenia korekcyjne) ─────────────────────────────────
@@ -160,6 +161,20 @@
     B('co8','Pallof press','core_brzuch','Wyciąg',1,'Stań bokiem do wyciągu. Wypychaj linkę przed siebie, opierając się rotacji.','Rotacja tułowia w stronę wyciągu'),
     B('co9','Hollow body hold','core_brzuch','Brak',2,'Leżenie tyłem, ręce za głową, nogi proste uniesione ~15 cm. Lędźwie dociśnięte.','Odrywanie lędźwi od maty'),
     B('co10','Cable crunch','core_brzuch','Wyciąg górny, lina',2,'Klęcząc, linka przy głowie. Zwijaj tułów w dół. Pełny zakres z obciążeniem.','Ciągnięcie ramionami, brak zgięcia tułowia'),
+
+    // A10. ROZCIĄGANIE (statyczne/mobilizacja — liczone w sekundach)
+    B('st1','Rozciąganie klatki w framudze','rozciaganie','Framuga',1,'Przedramiona na framudze, łokcie na wys. barków. Zrób krok w przód, aż poczujesz rozciąganie klatki. 30-60 s.','Wzruszanie barków, przeprost lędźwi'),
+    B('st2','Rozciąganie zginaczy bioder w wykroku','rozciaganie','Mata',1,'Klęk jednonóż, biodra pchnij w przód przy napiętym pośladku. 30-60 s na stronę.','Przeprost w lędźwiach zamiast ruchu bioder'),
+    B('st3','Rozciąganie dwugłowych uda (skłon)','rozciaganie','Brak',1,'Nogi wyprostowane, skłon z prostymi plecami do uczucia ciągnięcia z tyłu uda. 30-45 s.','Zaokrąglanie pleców, szarpanie'),
+    B('st4','Rozciąganie czworogłowego stojąc','rozciaganie','Ściana (opcja)',1,'Chwyć stopę za sobą, kolana razem, biodro dopchnij w przód. 30-45 s na stronę.','Odchylanie kolana w bok, wyginanie lędźwi'),
+    B('st5','Rozciąganie łydek przy ścianie','rozciaganie','Ściana',1,'Wykrok do ściany, tylna noga prosta, pięta w podłodze. 30-45 s, potem wersja z ugiętym kolanem.','Odrywanie pięty, za krótka pozycja'),
+    B('st6','Pozycja gołębia','rozciaganie','Mata',2,'Przednia noga zgięta przed tułowiem, tylna prosta. Opuszczaj biodra do maty. 45-60 s na stronę.','Skręcanie miednicy, ból w kolanie (cofnij zakres)'),
+    B('st7','Rozciąganie najszerszego (zwis boczny)','rozciaganie','Drążek/drabinka',1,'Chwyć drążek, odchyl biodra w bok — czuj rozciąganie wzdłuż boku tułowia. 30 s na stronę.','Wzruszanie barku do ucha'),
+    B('st8','Rozciąganie tricepsa za głową','rozciaganie','Brak',1,'Łokieć nad głową, dłoń między łopatki, drugą ręką dociśnij łokieć. 30 s na stronę.','Wypychanie głowy w przód'),
+    B('st9','Rozciąganie bicepsa o ścianę','rozciaganie','Ściana',1,'Dłoń na ścianie za sobą, prostuj ramię i odwróć tułów. 30 s na stronę.','Ból w barku — zmniejsz zakres'),
+    B('st10','Kot-krowa (mobilizacja kręgosłupa)','rozciaganie','Mata',1,'Klęk podparty. Na wdechu wygnij grzbiet w dół, na wydechu zaokrąglij. 8-10 powolnych cykli.','Ruch tylko z lędźwi, brak synchronizacji z oddechem'),
+    B('st11','Rozciąganie karku w bok','rozciaganie','Brak',1,'Przechyl głowę do barku, dłonią delikatnie dociśnij. 30 s na stronę.','Wzruszanie przeciwnego barku, dociskanie na siłę'),
+    B('st12','Motyl (przywodziciele)','rozciaganie','Mata',1,'Siad, stopy złączone, kolana opadają na boki. Delikatnie dociskaj uda łokciami. 45-60 s.','Zaokrąglone plecy, sprężynowanie'),
   ];
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -395,6 +410,26 @@
   ET.exercisesByPattern = function(pat) {
     return ET.EXERCISES_BASIC.filter(function(e){ return e.pattern === pat; });
   };
+
+  // ── isUnilateral / measurementType — klasyfikacja wszystkich ćwiczeń ─────
+  // Rozpoznanie po nazwie (PL/EN warianty) + ręczne wyjątki tam, gdzie nazwa
+  // nie zdradza jednostronności (np. "z hantlą na kolanie siedząc").
+  var UNILATERAL_KW = [
+    'jednorącz','jednonóż','jednej nodze','jednej ręki','single-leg','single leg',
+    'split squat','bułgarski','step-up','pistol','unilateral','wykrok','lunge',
+    'suitcase carry','bottoms-up','koncentrowane','kickback','gripper','plate pinch'
+  ];
+  var SECONDS_KW = ['plank','deska','wall sit','izometr','martwy punkt'];
+  var UNILATERAL_OVERRIDE = { ly8:true, it5:true, ns5:true }; // jednostronne bez charakterystycznego słowa w nazwie
+  function classifyUnilateralAndMeasurement(ex) {
+    var n = (ex.name||'').toLowerCase();
+    ex.isUnilateral = UNILATERAL_KW.some(function(k){ return n.indexOf(k)!==-1; }) || !!UNILATERAL_OVERRIDE[ex.id];
+    // Rozciąganie zawsze liczone w sekundach
+    var isStretch = (ex.tags||[])[0]==='rozciaganie';
+    ex.measurementType = (isStretch || SECONDS_KW.some(function(k){ return n.indexOf(k)!==-1; })) ? 'seconds' : 'reps';
+  }
+  ET.EXERCISES_BASIC.forEach(classifyUnilateralAndMeasurement);
+  ET.EXERCISES_CORRECTIVE.forEach(classifyUnilateralAndMeasurement);
 
   // Wszystkie ćwiczenia razem
   ET.EXERCISES = ET.EXERCISES_BASIC.concat(ET.EXERCISES_CORRECTIVE);

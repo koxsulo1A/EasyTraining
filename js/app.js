@@ -52,9 +52,26 @@
     }
   }
 
+  // ── USTAWIENIA MENU (Profil → Ustawienia): ukrywanie + kolejność ─────────
+  // ms = { hidden:[ids], order:[ids] } — sortowanie wg pozycji w order, reszta na końcu w oryginalnej kolejności.
+  function applyMenuSettings(items, ms) {
+    var hidden = (ms && ms.hidden) || [];
+    var order  = (ms && ms.order)  || [];
+    var vis = items.filter(function(i){ return hidden.indexOf(i.id)===-1; });
+    if (!order.length) return vis;
+    return vis.slice().sort(function(a,b){
+      var ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+      if (ia===-1 && ib===-1) return items.indexOf(a)-items.indexOf(b);
+      if (ia===-1) return 1; if (ib===-1) return -1;
+      return ia-ib;
+    });
+  }
+  ET.applyMenuSettings = applyMenuSettings;
+
   // ── SIDEBAR ──────────────────────────────────────
   function Sidebar() {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
+    var su = ET.useStore(); var msSide = (su.store.menuSettings||{}).sidebar;
     return _h('aside', { className:'sidebar' },
       _h('div', { className:'sb-logo' },
         _h('div', { className:'sb-logo-icon' }, '⚡'),
@@ -64,9 +81,11 @@
         )
       ),
       ET.NAV_GROUPS.map(function(g, gi) {
+        var items = applyMenuSettings(g.items, msSide);
+        if (!items.length) return null;
         return _h('div', { className:'sb-section', key:gi },
           g.s && _h('div', { className:'sb-section-label' }, g.s),
-          g.items.map(function(item) {
+          items.map(function(item) {
             return _h('div', { key:item.id, className:'sb-item'+(current===item.id?' active':''), onClick:function(){ navigate(item.id); } },
               _h('span', { className:'sb-item-icon' }, item.icon),
               _h('span', null, item.label)
@@ -81,20 +100,22 @@
   function MobileNav() {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
     var ms = React.useState(false); var showMore = ms[0], setShowMore = ms[1];
+    var su = ET.useStore(); var msMob = (su.store.menuSettings||{}).mobile;
+    var mobileTabs = applyMenuSettings(ET.MOBILE_TABS, msMob);
 
-    // Grupy w sheet "Więcej" (wszystko poza MOBILE_TABS)
-    var tabIds = ET.MOBILE_TABS.map(function(t){ return t.id; });
+    // Grupy w sheet "Więcej" (wszystko poza widocznymi tabami)
+    var tabIds = mobileTabs.map(function(t){ return t.id; });
     var moreGroups = ET.NAV_GROUPS.map(function(g){
       return Object.assign({}, g, { items: g.items.filter(function(i){ return tabIds.indexOf(i.id)===-1; }) });
     }).filter(function(g){ return g.items.length > 0; });
 
     function goTo(id) { setShowMore(false); navigate(id); }
 
-    var isMoreActive = !ET.MOBILE_TABS.some(function(t){ return t.id===current; });
+    var isMoreActive = !mobileTabs.some(function(t){ return t.id===current; });
 
     return _h('div', null,
       _h('nav', { className:'mobile-nav' },
-        ET.MOBILE_TABS.map(function(item) {
+        mobileTabs.map(function(item) {
           return _h('div', { key:item.id, className:'mn-item'+(current===item.id?' active':''), onClick:function(){ setShowMore(false); navigate(item.id); } },
             _h('span', { className:'mn-item-icon' }, item.icon),
             _h('span', { className:'mn-item-label' }, item.label)

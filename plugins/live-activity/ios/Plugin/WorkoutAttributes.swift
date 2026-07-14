@@ -19,6 +19,8 @@ struct WorkoutAttributes: ActivityAttributes {
         var weightKg: Double?
         var plannedReps: Int?
         var nextExercise: String?
+        var doneSets: Int?      // postęp całego treningu (zaliczone serie)
+        var totalSets: Int?
         var restEndsAt: Date?
         // bieg (LA-2) — pola już w kontrakcie, by nie zmieniać schematu później
         var distanceKm: Double?

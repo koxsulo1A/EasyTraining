@@ -99,6 +99,8 @@ public class LiveActivityPlugin: CAPPlugin {
         st.weightKg = call.getDouble("weightKg")
         st.plannedReps = call.getInt("plannedReps")
         st.nextExercise = call.getString("nextExercise")
+        st.doneSets = call.getInt("doneSets")
+        st.totalSets = call.getInt("totalSets")
         if let restMs = call.getDouble("restEndsAt") {
             st.restEndsAt = Date(timeIntervalSince1970: restMs / 1000)
         }
@@ -110,7 +112,7 @@ public class LiveActivityPlugin: CAPPlugin {
 
     @available(iOS 16.2, *)
     private static func stateKey(_ s: WorkoutAttributes.ContentState) -> String {
-        return "\(s.exerciseName ?? "")|\(s.setNumber ?? -1)|\(s.weightKg ?? -1)|\(s.restEndsAt?.timeIntervalSince1970 ?? -1)|\(s.distanceKm ?? -1)|\(s.heartRate ?? -1)"
+        return "\(s.exerciseName ?? "")|\(s.setNumber ?? -1)|\(s.weightKg ?? -1)|\(s.restEndsAt?.timeIntervalSince1970 ?? -1)|\(s.doneSets ?? -1)|\(s.distanceKm ?? -1)|\(s.heartRate ?? -1)"
     }
     #endif
 }

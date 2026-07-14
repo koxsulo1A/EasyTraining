@@ -53,6 +53,42 @@
     return db.find(function(x){ return x.name.toLowerCase() === nl; }) || null;
   }
 
+  // ── Tagi przyjmowania (z czym brać) — z bazy + znane grupy rozpuszczalne w tłuszczach ──
+  function intakeTags(name) {
+    var db = findDbEntry(name);
+    var txt = db ? ((db.howToTake||[]).join(' ')+' '+(db.absorb||[]).join(' ')).toLowerCase() : '';
+    var n = (name||'').toLowerCase();
+    var tags = [];
+    var fatSoluble = /witamina d|witamina k|witamina a|witamina e|omega|kryla|wiesiołka|kurkumina|koenzym q10|astaksantyna|luteina|zeaksantyna|likopen|cla\b/.test(n);
+    if (fatSoluble || /tłuszcz/.test(txt)) tags.push({ t:'🥑 z tłuszczem', c:'var(--yellow)' });
+    if (/pusty żołądek|na czczo/.test(txt)) tags.push({ t:'⭕ na czczo', c:'var(--purple)' });
+    else if (/z posiłkiem/.test(txt)) tags.push({ t:'🍽 z posiłkiem', c:'var(--green)' });
+    if (/z wodą|dużą ilością wody|rozpuścić w wodzie/.test(txt)) tags.push({ t:'💧 z wodą', c:'var(--a-light)' });
+    return tags.slice(0,3);
+  }
+
+  // ── Pary suplementów, których NIE należy przyjmować razem (rozdziel min. 2 h) ──
+  var INTERACTIONS = [
+    ['żelazo','wapń'], ['żelazo','cynk'], ['żelazo','magnez'],
+    ['żelazo','kofeina'], ['żelazo','zielonej herbaty'], ['żelazo','guarana'],
+    ['cynk','wapń'], ['cynk','miedź'], ['wapń','magnez'],
+    ['melatonina','kofeina'], ['zma','wapń'], ['zma','żelazo'],
+  ];
+  function conflictsWithin(entry, group) {
+    var n = (entry.name||'').toLowerCase();
+    var out = [];
+    group.forEach(function(o){
+      if (o.id===entry.id) return;
+      var on = (o.name||'').toLowerCase();
+      INTERACTIONS.forEach(function(p){
+        if ((n.indexOf(p[0])!==-1 && on.indexOf(p[1])!==-1) || (n.indexOf(p[1])!==-1 && on.indexOf(p[0])!==-1)) {
+          if (out.indexOf(o.name)===-1) out.push(o.name);
+        }
+      });
+    });
+    return out;
+  }
+
   // ── Baza Detail Sheet ─────────────────────────────────────────────────────
   function SuppDetail(props) {
     var s = props.supp;
@@ -375,8 +411,10 @@
               _h('div', { style:{ fontSize:'.65rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:5 } }, t.icon+' '+t.label),
               grp.map(function(s) {
                 var checked = !!todayChecks[s.id];
+                var confl = conflictsWithin(s, grp);
+                var tags = intakeTags(s.name);
                 return _h('div', { key:s.id, className:'suppl-item'+(checked?' checked':''),
-                  style:{ display:'flex', alignItems:'center', gap:10 }
+                  style:{ display:'flex', alignItems:'center', gap:10, borderLeft:confl.length?'3px solid var(--red)':'none', paddingLeft:confl.length?8:0 }
                 },
                   _h('div', {
                     className:'suppl-check',
@@ -388,7 +426,12 @@
                     onClick:function(){ setPlanDetail(s); }
                   },
                     _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, s.name),
-                    s.dose && _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, s.dose+' '+s.unit)
+                    s.dose && _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, s.dose+' '+s.unit),
+                    tags.length>0 && _h('div', { style:{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 } },
+                      tags.map(function(tg){ return _h('span', { key:tg.t, style:{ fontSize:'.58rem', padding:'1px 6px', borderRadius:99, background:'var(--s3)', border:'1px solid var(--b1)', color:tg.c, fontWeight:600 } }, tg.t); })
+                    ),
+                    confl.length>0 && _h('div', { style:{ fontSize:'.62rem', color:'var(--red)', marginTop:3, fontWeight:600 } },
+                      '⚠ Nie łącz z: '+confl.join(', ')+' — rozdziel min. 2 h')
                   ),
                   _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', flexShrink:0, opacity:0.5 } }, 'ℹ')
                 );
@@ -474,4 +517,7 @@
   }
 
   ET.SupplementsModule = SupplementsModule;
+  // Helpery współdzielone z arkuszem suplementów na Dashboardzie
+  ET.suppIntakeTags = intakeTags;
+  ET.suppConflictsWithin = conflictsWithin;
 })();

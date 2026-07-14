@@ -97,6 +97,33 @@
     var doneCount    = weekDays.reduce(function(t,d){ return t+plansForDay(d).filter(function(p){ return p.type!=='rest' && isCompleted(store,p,d); }).length; }, 0);
     var pct = plannedCount > 0 ? Math.round(doneCount/plannedCount*100) : 0;
 
+    // Treningi do ukończenia tygodnia — z jednostek AKTYWNEGO planu (aktywny segment).
+    // Przy kilku planach aktywny = ten, z którego pochodzi ostatnio wykonany trening.
+    var weekRemaining = (function(){
+      if (typeof ET.getMetaPlans !== 'function') return null;
+      var metas = ET.getMetaPlans(store) || [];
+      if (!metas.length) return null;
+      var active = metas[0];
+      var lastW = (store.workouts||[])[0];
+      if (metas.length > 1 && lastW) {
+        var m = metas.find(function(mp){ return (mp.units||[]).some(function(u){ return u.id===lastW.planId; }); });
+        if (m) active = m;
+      }
+      var segs = (active.segments && active.segments.length) ? active.segments : [{ id:'seg_default' }];
+      var lastSeg = segs[segs.length-1].id;
+      var units = (active.units||[]).filter(function(u){ return (u.segmentId||segs[0].id)===lastSeg; });
+      if (!units.length) return null;
+      var runsThisWeek = (store.runs||[]).filter(function(r){ return weekDays.indexOf(r.date)!==-1; }).length;
+      var runSeen = 0, doneCount = 0, remainingUnits = [];
+      units.forEach(function(u){
+        var done;
+        if (u.unitType==='running') { done = runSeen < runsThisWeek; if (done) runSeen++; }
+        else done = (store.workouts||[]).some(function(w){ return w.planId===u.id && weekDays.indexOf(w.date)!==-1; });
+        if (done) doneCount++; else remainingUnits.push(u);
+      });
+      return { total:units.length, done:doneCount, remaining:remainingUnits.length, units:remainingUnits, planName:active.name };
+    })();
+
     return _h('div', null,
       // ── Nav header ────────────────────────────────────────────────────────
       _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 } },
@@ -108,6 +135,28 @@
           )
         ),
         _h('button', { className:'btn btn-ghost btn-sm', onClick:function(){ setWeekOffset(weekOffset+1); } }, '›')
+      ),
+
+      // ── Treningi do ukończenia tygodnia (z aktywnego planu treningowego) ──
+      weekRemaining && _h('div', { className:'card', style:{ marginBottom:14, padding:'12px 16px' } },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
+          _h('div', { style:{ fontSize:'1.4rem' } }, weekRemaining.remaining===0 ? '🏆' : '🏋️'),
+          _h('div', { style:{ flex:1 } },
+            _h('div', { style:{ fontSize:'.8rem', fontWeight:600, color:'var(--t2)' } }, 'Treningi do ukończenia tygodnia'),
+            _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:2 } },
+              weekRemaining.planName+' · wykonano '+weekRemaining.done+' z '+weekRemaining.total+(weekRemaining.remaining===0?' — tydzień zaliczony!':''))
+          ),
+          _h('div', { style:{ fontSize:'1.5rem', fontWeight:800, color:weekRemaining.remaining===0?'var(--green)':'var(--a-light)' } }, weekRemaining.remaining)
+        ),
+        // Konkretne jednostki pozostałe do wykonania w tym tygodniu
+        weekRemaining.units.length > 0 && _h('div', { style:{ display:'flex', gap:5, flexWrap:'wrap', marginTop:10, paddingTop:10, borderTop:'1px solid var(--b1)' } },
+          weekRemaining.units.map(function(u){
+            return _h('span', { key:u.id, style:{ display:'inline-flex', alignItems:'center', gap:5, fontSize:'.68rem', fontWeight:600, padding:'4px 10px', borderRadius:99, background:'var(--s3)', border:'1px solid var(--b1)', color:'var(--t2)' } },
+              _h('span', null, u.unitType==='running' ? '🏃' : (u.icon||'💪')),
+              u.name + (u.day ? ' ('+u.day+')' : '')
+            );
+          })
+        )
       ),
 
       // ── Summary bar ───────────────────────────────────────────────────────

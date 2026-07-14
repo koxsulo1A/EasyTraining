@@ -90,7 +90,10 @@
 
   // ── WORKOUT PICKER SHEET ─────────────────────────────────────────────────
   function WorkoutPickerSheet(props) {
-    var plans = (typeof ET.WORKOUT_PLANS !== 'undefined') ? ET.WORKOUT_PLANS : [];
+    // Plany z nadpisaniami z edytora (store.workoutPlans/customWorkoutPlans), nie statyczne
+    var su = ET.useStore(); var store = su.store;
+    var plans = (typeof ET.getEffectivePlans === 'function') ? ET.getEffectivePlans(store)
+      : (typeof ET.WORKOUT_PLANS !== 'undefined') ? ET.WORKOUT_PLANS : [];
     return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:'Wybierz trening' },
       plans.map(function(plan) {
         return _h('div', { key:plan.id,
@@ -140,14 +143,23 @@
             ),
             suppls.map(function(s) {
               var taken = !!todayChecks[s.id];
+              // Tagi/konflikty — te same helpery co w module Suplementy
+              var tags = ET.suppIntakeTags ? ET.suppIntakeTags(s.name) : [];
+              var sameTiming = suppls.filter(function(o){ return o.timing===s.timing; });
+              var confl = ET.suppConflictsWithin ? ET.suppConflictsWithin(s, sameTiming) : [];
               return _h('div', { key:s.id,
-                style:{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--b1)', cursor:'pointer' },
+                style:{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--b1)', cursor:'pointer', borderLeft:confl.length?'3px solid var(--red)':'none', paddingLeft:confl.length?8:0 },
                 onClick:function(){ toggle(s.id); }
               },
                 _h('div', { style:{ width:30, height:30, borderRadius:8, border:'2px solid '+(taken?'var(--green)':'var(--b2)'), background:taken?'var(--green-d)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all .15s', fontSize:'.9rem', color:'var(--green)' } }, taken ? '✓' : ''),
                 _h('div', { style:{ flex:1 } },
                   _h('div', { style:{ fontWeight:600, fontSize:'.88rem', color: taken ? 'var(--t3)' : 'var(--t1)', textDecoration: taken ? 'line-through' : 'none' } }, s.name),
-                  (s.dose || s.timing) && _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', marginTop:2 } }, [s.dose && s.unit ? s.dose+' '+s.unit : '', s.timing ? s.timing : ''].filter(Boolean).join(' · '))
+                  (s.dose || s.timing) && _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', marginTop:2 } }, [s.dose && s.unit ? s.dose+' '+s.unit : '', s.timing ? ({ morning:'🌅 Rano', preworkout:'⚡ Przed treningiem', postworkout:'💪 Po treningu', evening:'🌙 Wieczór', night:'😴 Na noc' }[s.timing] || s.timing) : ''].filter(Boolean).join(' · ')),
+                  tags.length>0 && _h('div', { style:{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 } },
+                    tags.map(function(tg){ return _h('span', { key:tg.t, style:{ fontSize:'.58rem', padding:'1px 6px', borderRadius:99, background:'var(--s3)', border:'1px solid var(--b1)', color:tg.c, fontWeight:600 } }, tg.t); })
+                  ),
+                  confl.length>0 && _h('div', { style:{ fontSize:'.62rem', color:'var(--red)', marginTop:3, fontWeight:600 } },
+                    '⚠ Nie łącz z: '+confl.join(', ')+' — rozdziel min. 2 h')
                 )
               );
             }),
@@ -564,6 +576,18 @@
       },
     ];
 
+    // Dodatkowe kafelki z puli (Profil → Ustawienia → Dodatkowe kafelki)
+    var FLAT_NAV = (ET.NAV_GROUPS||[]).reduce(function(a,g){ return a.concat(g.items); }, []);
+    (store.quickTiles||[]).forEach(function(id){
+      var item = FLAT_NAV.find(function(i){ return i.id===id; });
+      if (!item) return;
+      QUICK.push({ icon:item.icon, label:item.label, color:'var(--a)', sub:'Otwórz moduł', onClick:function(){ navigate(id); } });
+    });
+
+    // Widoczność widgetów — konfigurowana w Profil → Ustawienia Dashboardu
+    var dw = store.dashboardWidgets || {};
+    function widgetOn(id) { return dw[id] !== false; }
+
     return _h('div', { className:'fade-in' },
 
       _h('div', { style:{ marginBottom:18 } },
@@ -571,15 +595,15 @@
         _h('div', { className:'dash-date' }, new Date().toLocaleDateString('pl-PL', { weekday:'long', day:'numeric', month:'long' }))
       ),
 
-      _h(ReadinessCard, { readiness:readiness, setReadiness:setReadiness, onOpen:function(){ setShowReadiness(true); } }),
+      widgetOn('readiness') && _h(ReadinessCard, { readiness:readiness, setReadiness:setReadiness, onOpen:function(){ setShowReadiness(true); } }),
 
-      _h(RegenerationBar, { store:store }),
+      widgetOn('regen') && _h(RegenerationBar, { store:store }),
 
-      _h(CoreScoresCard, null),
+      widgetOn('coreScores') && _h(CoreScoresCard, null),
 
-      _h(SmartCoach, { store:store }),
+      widgetOn('smartCoach') && _h(SmartCoach, { store:store }),
 
-      _h('div', { style:{ marginBottom:20 } },
+      widgetOn('quickStart') && _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr', style:{ marginBottom:10 } },
           _h('h2', null, 'Szybki start')
         ),
@@ -599,7 +623,7 @@
         )
       ),
 
-      _h('div', { style:{ marginBottom:20 } },
+      widgetOn('recent') && _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr' }, _h('h2', null, 'Ostatnie aktywności')),
         _h('div', { className:'dash-cards-scroll' },
           [
@@ -623,7 +647,7 @@
         )
       ),
 
-      activeGoals.length > 0 && _h('div', { style:{ marginBottom:20 } },
+      widgetOn('goals') && activeGoals.length > 0 && _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr' },
           _h('h2', null, 'Aktywne cele'),
           _h('button', { className:'btn btn-ghost btn-sm', onClick:function(){ navigate('goals'); } }, 'Wszystkie →')
@@ -640,7 +664,7 @@
       ),
 
       // ── WKRÓTCE (coming soon) — szara półprzezroczysta nakładka ──────────
-      _h('div', { style:{ marginBottom:20 } },
+      widgetOn('comingSoon') && _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr', style:{ marginBottom:10 } }, _h('h2', null, 'Wkrótce')),
         _h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 } },
           [{ icon:'📓', label:'Dziennik' }, { icon:'✅', label:'Nawyki' }].map(function(q) {
@@ -792,4 +816,15 @@
 
   ET.Dashboard = Dashboard;
   ET.OldDashboard = OldDashboard;
+  // Lista widgetów Dashboardu — konfiguracja widoczności w Profil → Ustawienia
+  ET.DASHBOARD_WIDGETS = [
+    { id:'readiness',  label:'Gotowość do treningu', icon:'📊' },
+    { id:'regen',      label:'Pasek regeneracji',    icon:'🔋' },
+    { id:'coreScores', label:'Wskaźniki core',       icon:'🧠' },
+    { id:'smartCoach', label:'Smart Coach',          icon:'🧠' },
+    { id:'quickStart', label:'Szybki start',         icon:'⚡' },
+    { id:'recent',     label:'Ostatnie aktywności',  icon:'🕘' },
+    { id:'goals',      label:'Aktywne cele',         icon:'🎯' },
+    { id:'comingSoon', label:'Wkrótce',              icon:'🔜' },
+  ];
 })();

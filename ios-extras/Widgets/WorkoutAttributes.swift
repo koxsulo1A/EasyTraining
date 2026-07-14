@@ -14,6 +14,8 @@ struct WorkoutAttributes: ActivityAttributes {
         var weightKg: Double?
         var plannedReps: Int?
         var nextExercise: String?
+        var doneSets: Int?      // postęp całego treningu (zaliczone serie)
+        var totalSets: Int?
         var restEndsAt: Date?
         var distanceKm: Double?
         var paceSecPerKm: Int?

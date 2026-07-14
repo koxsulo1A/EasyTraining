@@ -75,3 +75,68 @@ jobs:
           name: EasyTraining-unsigned-ipa
           path: EasyTraining-unsigned.ipa
           if-no-files-found: error
+
+  # Build pod symulator iOS (do testów w przeglądarce, np. appetize.io)
+  build-simulator-app:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build core bundle
+        run: npm run build:core
+
+      - name: Build web assets (-> www)
+        run: npm run build:web
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Sync Capacitor (copies web + pod install)
+        run: npx cap sync ios
+
+      - name: Add Live Activities widget extension
+        run: |
+          set -e
+          gem install xcodeproj --no-document
+          ruby scripts/ios-add-widgets.rb
+          cd ios/App && pod install
+
+      - name: Build simulator .app
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$PWD/build/sim" \
+            build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip simulator app
+        run: |
+          set -e
+          APP="build/sim/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$APP" || { echo "App.app not found"; find build/sim -name "*.app" -maxdepth 6 || true; exit 1; }
+          cd "$(dirname "$APP")"
+          zip -r -y "$GITHUB_WORKSPACE/EasyTraining-simulator.app.zip" App.app >/dev/null
+          ls -lh "$GITHUB_WORKSPACE/EasyTraining-simulator.app.zip"
+
+      - name: Upload simulator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyTraining-simulator-app
+          path: EasyTraining-simulator.app.zip
+          if-no-files-found: error

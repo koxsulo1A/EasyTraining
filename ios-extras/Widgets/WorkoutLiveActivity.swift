@@ -24,7 +24,7 @@ struct WorkoutLiveActivity: Widget {
                         Text(context.state.exerciseName ?? context.attributes.planName)
                             .font(.headline).lineLimit(1)
                         if let n = context.state.setNumber, let t = context.state.setTotal {
-                            Text("Seria \(n)/\(t)").font(.caption).foregroundStyle(.secondary)
+                            Text("Seria \(n)/\(t)").font(.caption).foregroundColor(.secondary)
                         }
                     }
                 }
@@ -34,18 +34,18 @@ struct WorkoutLiveActivity: Widget {
                             Text("\(fmtKg(w)) × \(r)").font(.headline)
                         }
                         if let next = context.state.nextExercise {
-                            Text("→ \(next)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            Text("→ \(next)").font(.caption2).foregroundColor(.secondary).lineLimit(1)
                         }
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if let end = context.state.restEndsAt, end > Date() {
                         HStack {
-                            Text("Przerwa").font(.caption).foregroundStyle(.secondary)
+                            Text("Przerwa").font(.caption).foregroundColor(.secondary)
                             Spacer()
                             Text(timerInterval: Date()...end, countsDown: true)
                                 .font(.title2.monospacedDigit().weight(.bold))
-                                .foregroundStyle(.orange)
+                                .foregroundColor(.orange)
                                 .frame(maxWidth: 70)
                         }
                     }
@@ -56,7 +56,7 @@ struct WorkoutLiveActivity: Widget {
                 if let end = context.state.restEndsAt, end > Date() {
                     Text(timerInterval: Date()...end, countsDown: true)
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.orange)
+                        .foregroundColor(.orange)
                         .frame(maxWidth: 44)
                 } else {
                     Text(timerInterval: context.state.startedAt...Date().addingTimeInterval(8*3600), countsDown: false)
@@ -67,7 +67,7 @@ struct WorkoutLiveActivity: Widget {
                 if let end = context.state.restEndsAt, end > Date() {
                     Text(timerInterval: Date()...end, countsDown: true)
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.orange)
+                        .foregroundColor(.orange)
                         .frame(maxWidth: 36)
                 } else {
                     Text("💪")
@@ -84,11 +84,11 @@ private struct LockScreenView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(context.attributes.workoutType == "run" ? "🏃 " : "💪 ")
-                    + Text(context.attributes.planName).font(.caption).foregroundStyle(.secondary)
+                    + Text(context.attributes.planName).font(.caption).foregroundColor(.secondary)
                 Spacer()
                 Text(timerInterval: context.state.startedAt...Date().addingTimeInterval(8*3600), countsDown: false)
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.secondary)
                     .frame(maxWidth: 60)
             }
 
@@ -98,7 +98,7 @@ private struct LockScreenView: View {
                         Text(ex).font(.headline).lineLimit(1)
                         HStack(spacing: 8) {
                             if let n = context.state.setNumber, let t = context.state.setTotal {
-                                Text("Seria \(n)/\(t)").font(.caption).foregroundStyle(.secondary)
+                                Text("Seria \(n)/\(t)").font(.caption).foregroundColor(.secondary)
                             }
                             if let w = context.state.weightKg, let r = context.state.plannedReps {
                                 Text("\(fmtKg(w)) × \(r)").font(.caption.weight(.semibold))
@@ -108,10 +108,10 @@ private struct LockScreenView: View {
                     Spacer()
                     if let end = context.state.restEndsAt, end > Date() {
                         VStack(alignment: .trailing, spacing: 0) {
-                            Text("PRZERWA").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+                            Text("PRZERWA").font(.system(size: 9, weight: .bold)).foregroundColor(.secondary)
                             Text(timerInterval: Date()...end, countsDown: true)
                                 .font(.title.monospacedDigit().weight(.bold))
-                                .foregroundStyle(.orange)
+                                .foregroundColor(.orange)
                                 .frame(maxWidth: 90)
                                 .multilineTextAlignment(.trailing)
                         }
@@ -135,7 +135,18 @@ private struct LockScreenView: View {
             }
 
             if let next = context.state.nextExercise {
-                Text("Następne: \(next)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                Text("Następne: \(next)").font(.caption2).foregroundColor(.secondary).lineLimit(1)
+            }
+
+            // Postęp całego treningu — pasek zaliczonych serii
+            if let done = context.state.doneSets, let total = context.state.totalSets, total > 0 {
+                VStack(alignment: .leading, spacing: 3) {
+                    ProgressView(value: Double(done), total: Double(total))
+                        .tint(.orange)
+                    Text("\(done)/\(total) serii")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .padding(14)
@@ -143,7 +154,7 @@ private struct LockScreenView: View {
 
     private func metric(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 9, weight: .bold)).foregroundColor(.secondary)
             Text(value).font(.callout.monospacedDigit().weight(.semibold))
         }
     }

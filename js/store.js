@@ -16,6 +16,9 @@
     acwrSettings: { method:'external', threshold:1.3, notifications:false },
     fitnessTests: [], postureAssessments: [], checkins: [],
     trainingPlans: [],
+    dashboardWidgets: {},
+    menuSettings: {},   // { sidebar:{hidden:[],order:[]}, mobile:{hidden:[],order:[]} }
+    quickTiles: [],     // dodatkowe kafelki na Dashboardzie (id tras)
   };
 
   function loadStore() {
