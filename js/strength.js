@@ -13,6 +13,12 @@
         { n:'Band Pull Apart', s:2, r:15, note:'Łopatki do tyłu!' },
         { n:'Rotacja gumą', s:2, r:12 },
         { n:'Scapular Push Ups', s:2, r:10 },
+        // Rampa ciężaru przed 5×5 na 72,5 kg — bez tego pierwsza właściwa seria
+        // to wejście z zimnego wprost w ciężar submaksymalny.
+        { n:'Wyciskanie sztangi — pusty gryf', s:1, r:10, note:'Rampa do 72,5 kg — tor ruchu' },
+        { n:'Wyciskanie sztangi — 40 kg', s:1, r:5 },
+        { n:'Wyciskanie sztangi — 55 kg', s:1, r:3 },
+        { n:'Wyciskanie sztangi — 65 kg', s:1, r:1, note:'Ostatnia rampa przed właściwym 72,5 kg' },
       ],
       exercises:[
         { name:'Wyciskanie sztangi',    plan:'5×5',   sets:5, reps:5,  weight:72.5, rir:2, tempo:'3-1-1',   rest:180, prog:'+2.5 kg/tydz' },
@@ -185,6 +191,52 @@
   ];
 
   function calc1RM(w, r) { return (!w||!r) ? 0 : Math.round(w*(1+r/30)); }
+
+  // ── DOBÓR ĆWICZEŃ KOREKCYJNYCH: rotacja + sprawiedliwość między dolegliwościami ──
+  // Zamiast zawsze tych samych 4 pozycji: deterministyczna rotacja zależna od
+  // dnia i planu (zmienia się między sesjami, ale stabilna w obrębie dnia),
+  // a przy kilku dolegliwościach — po jednym reprezentancie z każdej po kolei.
+  function hashSeed(str) {
+    var h = 0;
+    for (var i=0; i<str.length; i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
+    return h;
+  }
+  function rotatePick(arr, seed, n) {
+    if (!arr.length) return [];
+    var start = hashSeed(seed) % arr.length;
+    var out = [];
+    for (var j=0; j<Math.min(n, arr.length); j++) out.push(arr[(start+j) % arr.length]);
+    return out;
+  }
+  // Ogólna profilaktyka postawy (używana, gdy brak zapisanych dolegliwości) —
+  // szeroka pula z różnych regionów (barki/łopatki, biodro/miednica, kręgosłup, kolano)
+  var GENERAL_CORRECTIVE_POOL = ['pb2','pb3','pb5','pb8','pb11','pm2','pm4','pm5','pm11','dl2','dl4','dl7','dl11','cp5','cp6','kv2','kv4','kv11'];
+  function pickCorrectiveExercises(store, seedKey, count) {
+    count = count || 4;
+    var list = ET.EXERCISES_CORRECTIVE || [];
+    var tags = store.ailments || [];
+    if (!tags.length) {
+      var pool = list.filter(function(e){ return GENERAL_CORRECTIVE_POOL.indexOf(e.id)!==-1; });
+      return rotatePick(pool, seedKey, count);
+    }
+    var byTag = {};
+    tags.forEach(function(t){ byTag[t] = list.filter(function(e){ return (e.condition_tags||[]).indexOf(t)!==-1; }); });
+    var picks = [], round = 0, guard = 0;
+    while (picks.length < count && guard < 20) {
+      var addedAny = false;
+      tags.forEach(function(t){
+        if (picks.length >= count) return;
+        var poolT = byTag[t] || [];
+        if (!poolT.length) return;
+        var rotated = rotatePick(poolT, seedKey+t, poolT.length);
+        var candidate = rotated[round % rotated.length];
+        if (candidate && picks.indexOf(candidate)===-1) { picks.push(candidate); addedAny = true; }
+      });
+      round++; guard++;
+      if (!addedAny) break;
+    }
+    return picks.slice(0, count);
+  }
 
   function fmtMs(ms) {
     var s = Math.round(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
@@ -1042,15 +1094,8 @@
     }
 
     // Ćwiczenia korekcyjne: dobrane pod dolegliwości użytkownika, inaczej zestaw postawy
-    var corrective = (function(){
-      var tags = store.ailments || [];
-      var list = ET.EXERCISES_CORRECTIVE || [];
-      var out = tags.length
-        ? list.filter(function(e){ return (e.condition_tags||[]).some(function(t){ return tags.indexOf(t)!==-1; }); })
-        : [];
-      if (!out.length) out = list.filter(function(e){ return ['pb3','pb5','pm5','dl7'].indexOf(e.id)!==-1; });
-      return out.slice(0,4);
-    })();
+    // Rotacja zależna od dnia + planu — inny zestaw niż wczoraj, ale stabilny w obrębie sesji
+    var corrective = pickCorrectiveExercises(store, (props.plan.id||'')+'-'+ET.dstr(), 4);
 
     return _h('div', { className:'fade-in' },
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },

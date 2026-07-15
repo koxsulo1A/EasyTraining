@@ -162,6 +162,16 @@
     B('co9','Hollow body hold','core_brzuch','Brak',2,'Leżenie tyłem, ręce za głową, nogi proste uniesione ~15 cm. Lędźwie dociśnięte.','Odrywanie lędźwi od maty'),
     B('co10','Cable crunch','core_brzuch','Wyciąg górny, lina',2,'Klęcząc, linka przy głowie. Zwijaj tułów w dół. Pełny zakres z obciążeniem.','Ciągnięcie ramionami, brak zgięcia tułowia'),
 
+    // A10b. NOWE ĆWICZENIA (uzupełnienie luk w bazie)
+    B('pl11','Wiosłowanie T-bar','plecy','Sztanga T-bar/landmine',2,'Tułów pochylony ~45°, uchwyt równoległy. Przyciągaj do dolnej części klatki, ściągając łopatki.','Zaokrąglone plecy, szarpanie ciężaru'),
+    B('no11','Martwy ciąg sumo','nogi','Sztanga',3,'Szeroki rozstaw stóp, palce na zewnątrz, chwyt wewnątrz nóg. Biodra i barki wstają razem.','Zaokrąglone plecy, kolana zapadają się do środka'),
+    B('no12','Odwodzenie bioder na maszynie','nogi','Maszyna',1,'Siedząc, poduszki na zewnętrznej stronie ud. Rozpychaj kolana na zewnątrz kontrolowanie.','Bujanie tułowiem, zbyt szybkie tempo'),
+    B('ba11','Pompki Pike (pike push-up)','barki','Brak',2,'Biodra wysoko (odwrócone V), głowa opada między dłonie. Wypychaj do góry — kalistenika zamiast OHP.','Zbyt płaski kąt bioder (→ klatka), brak pełnego zakresu'),
+    B('bi11','Spider curl','biceps','Ławka skośna, sztanga EZ',2,'Klatka oparta o skośną ławkę, ramiona zwisają pionowo. Uginaj bez pomocy tułowia.','Bujanie, niepełny zakres na górze'),
+    B('tr11','Wyciskanie francuskie na maszynie','triceps','Maszyna',1,'Łokcie ustawione w osi obrotu maszyny. Prostuj przedramiona bez odrywania łokci od podpórki.','Odrywanie łokci, za duży ciężar'),
+    B('co11','Ab wheel rollout','core_brzuch','Kółko do brzucha',3,'Klęk, kółko przed sobą. Wytocz się do przodu z napiętym brzuchem, wróć kontrolowanie.','Przeprost w lędźwiach, zbyt duży zakres na start'),
+    B('pr11','Suitcase carry','przedramiona','Hantla/kettlebell',2,'Chwyć ciężar w jednej ręce, idź prosto trzymając tułów pionowo bez przechylania na bok.','Przechylanie tułowia w stronę obciążenia'),
+
     // A10. ROZCIĄGANIE (statyczne/mobilizacja — liczone w sekundach)
     B('st1','Rozciąganie klatki w framudze','rozciaganie','Framuga',1,'Przedramiona na framudze, łokcie na wys. barków. Zrób krok w przód, aż poczujesz rozciąganie klatki. 30-60 s.','Wzruszanie barków, przeprost lędźwi'),
     B('st2','Rozciąganie zginaczy bioder w wykroku','rozciaganie','Mata',1,'Klęk jednonóż, biodra pchnij w przód przy napiętym pośladku. 30-60 s na stronę.','Przeprost w lędźwiach zamiast ruchu bioder'),
@@ -300,6 +310,12 @@
     C('it8','Lateral lunges','ITBS','kolano','Odwodziciele, przywodziciele','Krok w bok, przysiad na jednej nodze, druga prosta',1,'Brak'),
     C('it9','Banded bridge + abduction','ITBS','kolano','Pośladek średni','Guma nad kolanami, unieś biodra i odwiedź kolana na górze',1,'Guma'),
     C('it10','Pallof press + lunge','ITBS','kolano','Core + biodro','Wypchnij linkę i zejdź do wykroku — stabilizacja przy ruchu nogi',2,'Wyciąg'),
+
+    // B11. NOWE ĆWICZENIA KOREKCYJNE (poszerzenie puli rotacji)
+    C('pb11','Prone Y-raise','protrakcja_barkow','barki_lopatki','Dolne pułapki, tylny naramienny','Leżenie przodem, unoszenie ramion w literę Y — aktywacja dolnych stabilizatorów łopatki',1,'Ławka/mata'),
+    C('pm11','Marsz ze zgięciem biodra w staniu','przodopochylenie_miednicy','biodro_miednica','Zginacze/prostowniki biodra, core','Naprzemienne unoszenie kolana z utrzymaniem neutralnej miednicy — uczy kontroli w staniu',1,'Brak'),
+    C('dl11','Segmentalne toczenie kręgosłupa','dyskopatia_L','kregoslup','Mobilność segmentalna','Powolne zwijanie/rozwijanie kręgosłupa kręg po kręgu — poprawia kontrolę ruchu bez obciążenia osiowego',2,'Brak'),
+    C('kv11','Mostek jednonóż (single-leg glute bridge)','kolana_valgus','kolano','Pośladek wielki, stabilizacja kolana','Unoszenie bioder na jednej nodze — uczy kontroli kolana w osi bez obciążenia osiowego',1,'Brak'),
   ];
 
   // ── PRECYZYJNE TAGI MIĘŚNIOWE (akton/mięsień) — prompt 1.2.1 ─────────────
