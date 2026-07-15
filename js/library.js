@@ -65,11 +65,82 @@
     return _h('div', { key:ex.id, className:'card card-interactive', style:{ marginBottom:8, cursor:'pointer', padding:'12px 14px' }, onClick:onClick },
       _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 } },
         _h('div', { style:{ flex:1 } },
-          _h('div', { style:{ fontWeight:700, fontSize:'.9rem', marginBottom:3 } }, ex.name),
-          _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, '🧰 '+(ex.equipment||'—'))
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:6 } },
+            _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, ex.name),
+            ex.source==='web' && _h('span', { className:'badge badge-teal', style:{ fontSize:'.55rem' } }, '🌐 web')
+          ),
+          _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginTop:3 } }, '🧰 '+(ex.equipment||'—'))
         ),
         levelBadge(ex.difficulty)
       )
+    );
+  }
+
+  // ── DODAJ ĆWICZENIE (Web/Admin) — trafia do shared_exercises, widoczne wszędzie ──
+  function AddExerciseSheet(props) {
+    var toast = ET.useToast();
+    var fs = React.useState({ name:'', tag:(ET.MUSCLE_GROUPS||[])[0] && ET.MUSCLE_GROUPS[0].tag, equipment:'', difficulty:1,
+      instructions:'', common_mistakes:'', isUnilateral:false, measurementType:'reps' });
+    var f = fs[0], setF = fs[1];
+    var saving = React.useState(false); var isSaving = saving[0], setSaving = saving[1];
+    function upF(k,v){ setF(function(p){ var o={}; o[k]=v; return Object.assign({},p,o); }); }
+
+    function save() {
+      if (!f.name.trim()) { toast('Podaj nazwę ćwiczenia', 'error'); return; }
+      setSaving(true);
+      ET.addSharedExercise({
+        name: f.name.trim(), type:'podstawowe', tags:[f.tag], equipment:f.equipment, difficulty:+f.difficulty,
+        instructions:f.instructions, common_mistakes:f.common_mistakes,
+        isUnilateral: !!f.isUnilateral, measurementType: f.measurementType
+      }).then(function() {
+        setSaving(false);
+        toast('Ćwiczenie dodane — widoczne dla wszystkich ✓', 'success');
+        props.onClose();
+      }).catch(function(e) {
+        setSaving(false);
+        toast('Błąd: '+(e && e.message || e), 'error');
+      });
+    }
+
+    return _h(ET.Sheet, { open:props.open, onClose:props.onClose, title:'➕ Nowe ćwiczenie (współdzielone)' },
+      _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginBottom:14, lineHeight:1.5 } },
+        'Dodane tu ćwiczenie trafia do wspólnej bazy — zobaczą je wszyscy użytkownicy (na telefonie i w przeglądarce).'),
+      _h('div', { className:'field' }, _h('label', null, 'Nazwa *'), _h('input', { type:'text', value:f.name, placeholder:'np. Wyciskanie hantli nad głową', onChange:function(e){ upF('name', e.target.value); } })),
+      _h('div', { className:'grid-2' },
+        _h('div', { className:'field' },
+          _h('label', null, 'Grupa mięśniowa'),
+          _h('select', { value:f.tag, onChange:function(e){ upF('tag', e.target.value); } },
+            (ET.MUSCLE_GROUPS||[]).map(function(g){ return _h('option', { key:g.tag, value:g.tag }, g.icon+' '+g.label); })
+          )
+        ),
+        _h('div', { className:'field' }, _h('label', null, 'Sprzęt'), _h('input', { type:'text', value:f.equipment, placeholder:'np. Hantle', onChange:function(e){ upF('equipment', e.target.value); } }))
+      ),
+      _h('div', { className:'field' },
+        _h('label', null, 'Trudność'),
+        _h('div', { style:{ display:'flex', gap:6 } },
+          [1,2,3].map(function(lvl){
+            var active = +f.difficulty === lvl;
+            return _h('button', { key:lvl, className:'tag-btn'+(active?' active':''), onClick:function(){ upF('difficulty', lvl); } }, (ET.LEVEL_LABELS && ET.LEVEL_LABELS[lvl]) || ('Poz. '+lvl));
+          })
+        )
+      ),
+      _h('div', { className:'field' }, _h('label', null, 'Opis wykonania'), _h('textarea', { value:f.instructions, style:{ minHeight:60 }, onChange:function(e){ upF('instructions', e.target.value); } })),
+      _h('div', { className:'field' }, _h('label', null, 'Częste błędy'), _h('textarea', { value:f.common_mistakes, style:{ minHeight:50 }, onChange:function(e){ upF('common_mistakes', e.target.value); } })),
+      _h('div', { className:'grid-2' },
+        _h('div', { className:'field' },
+          _h('label', null, 'Pomiar'),
+          _h('select', { value:f.measurementType, onChange:function(e){ upF('measurementType', e.target.value); } },
+            _h('option', { value:'reps' }, 'Powtórzenia'), _h('option', { value:'seconds' }, 'Czas (sekundy)')
+          )
+        ),
+        _h('div', { className:'field' },
+          _h('label', { style:{ display:'flex', alignItems:'center', gap:6, marginTop:20 } },
+            _h('input', { type:'checkbox', checked:f.isUnilateral, onChange:function(e){ upF('isUnilateral', e.target.checked); } }),
+            'Jednostronne (L/P)'
+          )
+        )
+      ),
+      _h('button', { className:'btn btn-primary', style:{ width:'100%' }, disabled:isSaving, onClick:save }, isSaving ? '...' : 'Dodaj ćwiczenie')
     );
   }
 
@@ -79,6 +150,10 @@
     var tp = React.useState('podstawowe'); var typeFilter = tp[0], setTypeFilter = tp[1];
     var gf = React.useState('all'); var groupFilter = gf[0], setGroupFilter = gf[1];
     var sel = React.useState(null); var selected = sel[0], setSelected = sel[1];
+    var showAdd = React.useState(false); var isAdding = showAdd[0], setIsAdding = showAdd[1];
+    ET.useSharedExercisesVersion && ET.useSharedExercisesVersion(); // re-render po doładowaniu/dodaniu współdzielonych ćwiczeń
+    var auth = ET.useAuth ? ET.useAuth() : null;
+    var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
 
     var qlc = query.trim().toLowerCase();
     function matchQuery(ex) {
@@ -119,7 +194,7 @@
           _h('h1', null, '📚 Biblioteka ćwiczeń'),
           _h('p', null, basicTotal+' podstawowych · '+corrTotal+' korekcyjnych')
         ),
-        _h('div', null)
+        isAdmin && _h('button', { className:'btn btn-primary', style:{ fontSize:'.78rem', padding:'8px 12px' }, onClick:function(){ setIsAdding(true); } }, '➕ Dodaj ćwiczenie')
       ),
 
       // Wyszukiwarka
@@ -155,7 +230,8 @@
             );
           }),
 
-      _h(ExerciseDetail, { open:!!selected, exercise:selected, onClose:function(){ setSelected(null); } })
+      _h(ExerciseDetail, { open:!!selected, exercise:selected, onClose:function(){ setSelected(null); } }),
+      isAdmin && _h(AddExerciseSheet, { open:isAdding, onClose:function(){ setIsAdding(false); } })
     );
   }
 

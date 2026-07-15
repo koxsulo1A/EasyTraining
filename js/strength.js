@@ -1731,6 +1731,46 @@
     return acc;
   }
 
+  // ── WAŻONE SERIE / TYDZIEŃ: moc serii zależy od intensywności ─────────────
+  // Ciężkie, niskopowtórzeniowe serie męczą bardziej: 5×5 liczy się ×1,5,
+  // 5×10 ×1,0, serie 15+ powt. ×0,8. Limit praktyczny (MRV): ~20 ważonych
+  // serii na grupę mięśniową tygodniowo.
+  var WEIGHTED_SETS_MAX = 20;
+  function setFatigueFactor(reps) {
+    reps = +reps || 10;
+    if (reps <= 6) return 1.5;
+    if (reps <= 9) return 1.2;
+    if (reps <= 12) return 1.0;
+    return 0.8;
+  }
+  function weeklyWeightedSets(units) {
+    var acc = {}, total = 0;
+    units.forEach(function(u){
+      if (u.unitType==='running') return;
+      (u.exercises||[]).forEach(function(ex){
+        var sets = +ex.sets||0; if (!sets||!ex.name) return;
+        var db = dbForName(ex.name);
+        // Rozciąganie nie generuje zmęczenia treningowego — poza licznikiem
+        if (db && (db.tags||[])[0]==='rozciaganie') return;
+        var weighted = sets * setFatigueFactor(ex.reps);
+        total += weighted;
+        var groups = [];
+        if (db && db.muscles && db.muscles.length) {
+          var seen = {};
+          db.muscles.forEach(function(m){ var g=groupForMuscle(m); if(!seen[g]){ seen[g]=1; groups.push(g); } });
+        } else if (db && db.tags && db.tags[0]) {
+          groups = [db.tags[0]];
+        } else {
+          groups = groupsFromName(ex.name);
+        }
+        if (!groups.length) return;
+        var share = weighted / groups.length;
+        groups.forEach(function(g){ acc[g] = (acc[g]||0) + share; });
+      });
+    });
+    return { perGroup:acc, total:total };
+  }
+
   // ── EDYTOR PERIODYZACJI (wspólny dla jednostki i całego planu) ───────────
   // Jeden mechanizm: te same zakresy tygodni, tryby i przeliczenia na obu poziomach.
   var RANGE_COLORS = ['var(--a)','var(--green)','var(--purple)','var(--orange)','var(--teal)'];
@@ -2507,6 +2547,39 @@
             ),
             _h('div', { style:{ fontSize:'.62rem', color:'var(--t3)', marginTop:8 } },
               '🟡 <4 mało · 🔵 4-9 OK · 🟢 10+ optimum hipertrofii (10-20 serii/tydz. na mięsień)')
+          );
+        })(),
+
+        // Licznik MAKSYMALNEJ liczby serii / tydzień — ważony intensywnością
+        // (ciężkie 5×5 męczy bardziej niż 5×10; limit ~20 ważonych serii/mięsień)
+        (function(){
+          var ws = weeklyWeightedSets(segUnits);
+          var rows = ET.MUSCLE_GROUPS.filter(function(g){ return ws.perGroup[g.tag] > 0; });
+          if (!rows.length) return null;
+          var over = rows.filter(function(g){ return ws.perGroup[g.tag] > WEIGHTED_SETS_MAX; });
+          return _h('div', { className:'card', style:{ marginBottom:12, borderLeft:'3px solid '+(over.length?'var(--red)':'var(--teal)') } },
+            _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:4 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.88rem', flex:1 } }, '🔋 Maks. serie / tydzień (ważone)'),
+              _h('div', { style:{ fontSize:'1.2rem', fontWeight:800, color:over.length?'var(--red)':'var(--teal)' } },
+                Math.round(ws.total*10)/10)
+            ),
+            _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginBottom:10 } },
+              'Moc serii wg powtórzeń: ≤6 powt. ×1,5 · 7-9 ×1,2 · 10-12 ×1,0 · 13+ ×0,8 · limit '+WEIGHTED_SETS_MAX+'/mięsień'),
+            rows.map(function(g){
+              var v = Math.round(ws.perGroup[g.tag]*10)/10;
+              var pct = Math.min(100, v/WEIGHTED_SETS_MAX*100);
+              var col = v > WEIGHTED_SETS_MAX ? 'var(--red)' : v >= 14 ? 'var(--orange)' : 'var(--teal)';
+              return _h('div', { key:g.tag, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:5 } },
+                _h('div', { style:{ width:120, fontSize:'.68rem', color:'var(--t2)', flexShrink:0 } }, g.icon+' '+g.label),
+                _h('div', { style:{ flex:1, height:7, borderRadius:4, background:'var(--s3)', overflow:'hidden' } },
+                  _h('div', { style:{ width:pct+'%', height:'100%', borderRadius:4, background:col } })
+                ),
+                _h('div', { style:{ width:58, fontSize:'.66rem', textAlign:'right', flexShrink:0, fontWeight:700, color:col } },
+                  v+' / '+WEIGHTED_SETS_MAX)
+              );
+            }),
+            over.length > 0 && _h('div', { style:{ fontSize:'.65rem', color:'var(--red)', marginTop:6, fontWeight:600 } },
+              '⚠ Przekroczony limit: '+over.map(function(g){ return g.label; }).join(', ')+' — rozważ mniej serii lub lżejsze zakresy powtórzeń.')
           );
         })(),
 

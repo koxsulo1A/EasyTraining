@@ -150,6 +150,42 @@
         )
       ),
 
+      // 👤 Konto — status logowania/synchronizacji
+      (function() {
+        var auth = ET.useAuth ? ET.useAuth() : null;
+        if (!auth) return null;
+        if (!auth.available) {
+          return _h('div', { className:'card', style:{ marginBottom:14 } },
+            _h('div', { style:{ fontWeight:700, marginBottom:4, fontSize:'.9rem' } }, '👤 Konto'),
+            _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)' } }, 'Synchronizacja niedostępna (brak połączenia z serwerem). Aplikacja działa offline.')
+          );
+        }
+        if (auth.status === 'authed') {
+          var roleLabel = { user:'Użytkownik', admin:'Administrator', trainer:'Trener' }[auth.profile && auth.profile.role] || 'Użytkownik';
+          return _h('div', { className:'card', style:{ marginBottom:14 } },
+            _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
+              _h('div', { style:{ width:42, height:42, borderRadius:'50%', background:'var(--a-dim)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', flexShrink:0 } }, '👤'),
+              _h('div', { style:{ flex:1, minWidth:0 } },
+                _h('div', { style:{ fontWeight:700, fontSize:'.85rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, auth.profile && auth.profile.email),
+                _h('div', { style:{ fontSize:'.68rem', color:'var(--a-light)', marginTop:2 } }, '✓ Zsynchronizowano · '+roleLabel)
+              ),
+              _h('button', { className:'btn btn-ghost btn-sm', onClick:auth.signOut }, 'Wyloguj')
+            )
+          );
+        }
+        // guest (tryb offline)
+        return _h('div', { className:'card', style:{ marginBottom:14 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
+            _h('div', { style:{ width:42, height:42, borderRadius:'50%', background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', flexShrink:0 } }, '👤'),
+            _h('div', { style:{ flex:1 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.85rem' } }, 'Tryb offline'),
+              _h('div', { style:{ fontSize:'.68rem', color:'var(--t3)', marginTop:2 } }, 'Dane tylko na tym urządzeniu')
+            ),
+            _h('button', { className:'btn btn-primary btn-sm', onClick:auth.loginFromSettings }, 'Zaloguj się')
+          )
+        );
+      })(),
+
       // ⚙ Ustawienia — kafelek rozwijany: widgety, menu boczne/dolne, kafelki
       _h('div', { className:'card', style:{ marginBottom:14, cursor:'pointer' }, onClick:function(){ setShowSettings(!showSettings); } },
         _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
