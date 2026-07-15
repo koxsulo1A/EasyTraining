@@ -525,7 +525,9 @@
       if (!ranges.length || ranges[0].startWeek == null) return null;
       var wi = metaOfPlan ? planWeekInfo(store, metaOfPlan.units) : null;
       var week = wi ? wi.currentWeek : 1;
-      var rg = ranges.find(function(r){ return week>=r.startWeek && week<=r.endWeek; }) || ranges[ranges.length-1];
+      // Znalezienie bloku i logika przeliczeń — w core (ETCore.findPeriodBlock/applyPeriodization)
+      var rg = window.ETCore && ETCore.findPeriodBlock ? ETCore.findPeriodBlock(ranges, week)
+        : (ranges.find(function(r){ return week>=r.startWeek && week<=r.endWeek; }) || ranges[ranges.length-1]);
       var volPct = rg.volumePct != null ? rg.volumePct : 100;
       var isDeload = rg.mode === 'deload';
       if (volPct === 100 && !isDeload) return { week:week, range:rg, neutral:true };
@@ -533,13 +535,17 @@
     })();
     function applyPeriodization(sets, weight, rir) {
       if (!periodInfo || periodInfo.neutral) return { sets:sets, weight:weight, rir:rir };
+      if (window.ETCore && ETCore.applyPeriodization) {
+        var r = ETCore.applyPeriodization({ sets:sets, weight:weight, rir:rir }, periodInfo.range);
+        return { sets:r.sets, weight:r.weight, rir:r.rir };
+      }
       var s = Math.max(1, Math.round(sets * periodInfo.volPct / 100));
-      var w = weight, r = rir;
+      var w = weight, rr = rir;
       if (periodInfo.isDeload) {
         w = Math.round(weight * (1 - periodInfo.deloadPct/100) * 2) / 2;
-        r = Math.min(3, (rir != null ? rir : 2) + 2);
+        rr = Math.min(3, (rir != null ? rir : 2) + 2);
       }
-      return { sets:s, weight:w, rir:r };
+      return { sets:s, weight:w, rir:rr };
     }
 
     // Ciężary z historii: najwyższy ciężar WPISANY przez użytkownika (zaliczone serie)
@@ -581,10 +587,11 @@
         // podstaw najwyższy ciężar użytkownika z ostatnich 12 tygodni.
         if (ov.weight == null && weight > 0) {
           var lastKg = lastWeightFor(e.name);
-          if (lastKg != null && lastKg < weight) {
-            var bestKg = bestRecentWeight(e.name);
-            if (bestKg > 0) weight = bestKg;
-          }
+          var bestKg = bestRecentWeight(e.name);
+          // Decyzja "jaki ciężar podstawić" — w core (ETCore.pickSuggestedWeight)
+          weight = window.ETCore && ETCore.pickSuggestedWeight
+            ? ETCore.pickSuggestedWeight(weight, lastKg, bestKg)
+            : (lastKg != null && lastKg < weight && bestKg > 0 ? bestKg : weight);
         }
         // Blok periodyzacji (deload/objętość) przeliczany przy starcie treningu
         var pz = applyPeriodization(sets, weight, rir);
@@ -1585,8 +1592,12 @@
         var sessionKg = 0;
         sessions.forEach(function(e){ (e.setsData||[]).forEach(function(s){ if (s.done && +s.weight > sessionKg) sessionKg = +s.weight; }); });
         if (ov[ex.name] && ov[ex.name].weight != null && ov[ex.name].weight > sessionKg) return;
-        var next = Math.max(cur + 0.5, Math.round(cur * 1.025 * 2) / 2);
-        out.push({ planId:p.id, planName:p.name, exName:ex.name, from:cur, to:next, rir:plannedRir });
+        // Decyzja "ile podnieść" — w core (ETCore.computeProgressionProposal)
+        var prop = window.ETCore && ETCore.computeProgressionProposal
+          ? ETCore.computeProgressionProposal(cur, true)
+          : { to: Math.max(cur + 0.5, Math.round(cur * 1.025 * 2) / 2) };
+        if (!prop) return;
+        out.push({ planId:p.id, planName:p.name, exName:ex.name, from:cur, to:prop.to, rir:plannedRir });
       });
     });
     return out;
@@ -1661,10 +1672,17 @@
   function planWeekInfo(store, units) {
     var str = (units||[]).filter(function(u){ return u.unitType!=='running'; });
     if (!str.length) return null;
-    var counts = str.map(function(u){
-      return (store.workouts||[]).filter(function(w){ return w.planId===u.id; }).length;
+    var now = Date.now();
+    var inputs = str.map(function(u){
+      var count = (store.workouts||[]).filter(function(w){ return w.planId===u.id; }).length;
+      var ageDays = u.createdAt ? (now - new Date(u.createdAt).getTime())/86400000 : undefined;
+      return { count:count, ageDays:ageDays };
     });
-    var completed = Math.min.apply(null, counts);
+    // Logika w core (ETCore.computeWeekInfo): świeżo dodana jednostka (0 sesji,
+    // <7 dni od utworzenia) nie cofa tygodnia całego planu do 1.
+    if (window.ETCore && ETCore.computeWeekInfo) return ETCore.computeWeekInfo(inputs);
+    var mature = inputs.filter(function(u){ return u.count>0 || u.ageDays===undefined || u.ageDays>=7; });
+    var completed = mature.length ? Math.min.apply(null, mature.map(function(u){ return u.count; })) : 0;
     return { completedWeeks:completed, currentWeek:completed+1 };
   }
 
@@ -2318,12 +2336,12 @@
     }
 
     function addStrengthUnit() {
-      var unit = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, segmentId:currentSegId(), name:'Nowy trening', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
+      var unit = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, segmentId:currentSegId(), createdAt:new Date().toISOString(), name:'Nowy trening', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
       setSelUnit(unit);
     }
 
     function addRunUnit() {
-      var unit = { id:'rununit_'+Date.now(), unitType:'running', segmentId:currentSegId(), name:'Bieg', day:'', runType:'easy', distance:5, duration:30, pace:'6:00', notes:'' };
+      var unit = { id:'rununit_'+Date.now(), unitType:'running', segmentId:currentSegId(), createdAt:new Date().toISOString(), name:'Bieg', day:'', runType:'easy', distance:5, duration:30, pace:'6:00', notes:'' };
       setSelUnit(unit);
     }
 
@@ -2347,7 +2365,7 @@
             cooldown.push({ n:name, d:cols[7]||'' });
           }
         });
-        var imported = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, segmentId:currentSegId(), name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
+        var imported = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, segmentId:currentSegId(), createdAt:new Date().toISOString(), name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
         setSelUnit(imported);
         toast('Wczytano plik — sprawdź i zapisz','success');
       };

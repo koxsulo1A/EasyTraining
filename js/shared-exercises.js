@@ -58,9 +58,47 @@
       });
   }
 
+  // Import wielu ćwiczeń naraz (CSV) — jeden zbiorczy insert zamiast N pojedynczych.
+  function addSharedExercisesBulk(list) {
+    if (!ET.supabase) return Promise.reject(new Error('Brak połączenia z serwerem'));
+    if (!list || !list.length) return Promise.resolve([]);
+    var rows = list.map(function(exFields){ return { name: exFields.name, data: exFields }; });
+    return ET.supabase.from('shared_exercises').insert(rows).select()
+      .then(function(res) {
+        if (res.error) throw res.error;
+        mergeIntoBasic(res.data || []);
+        return res.data;
+      });
+  }
+
+  // Parsuje CSV: nazwa,grupa,sprzet,trudnosc,opis,bledy,jednostronne,pomiar
+  function parseExerciseCsv(text) {
+    var lines = text.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    var out = [], errors = [];
+    lines.slice(1).forEach(function(line, i) {
+      var cols = line.split(',').map(function(c){ return c.trim().replace(/^"|"$/g,''); });
+      var name = cols[0];
+      if (!name) { errors.push('Wiersz '+(i+2)+': brak nazwy'); return; }
+      out.push({
+        name: name,
+        type: 'podstawowe',
+        tags: [cols[1] || 'core_brzuch'],
+        equipment: cols[2] || '',
+        difficulty: +cols[3] || 1,
+        instructions: cols[4] || '',
+        common_mistakes: cols[5] || '',
+        isUnilateral: /^(tak|true|1)$/i.test(cols[6]||''),
+        measurementType: /^sec/i.test(cols[7]||'') ? 'seconds' : 'reps'
+      });
+    });
+    return { rows: out, errors: errors };
+  }
+
   Object.assign(ET, {
     SharedExercisesLoader: SharedExercisesLoader,
     addSharedExercise: addSharedExercise,
+    addSharedExercisesBulk: addSharedExercisesBulk,
+    parseExerciseCsv: parseExerciseCsv,
     useSharedExercisesVersion: useSharedExercisesVersion
   });
 })();

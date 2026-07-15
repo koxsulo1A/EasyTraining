@@ -119,3 +119,13 @@ export type {
   HypertrophyRule, ConcurrentInput, ConcurrentWarning,
   ScreeningInput, ScreeningResult, CardioZone,
 } from './knowledge/guidelines-b';
+
+// Reguły treningowe aplikacji (periodyzacja/tydzień planu/ciężar/progresja/deload)
+export {
+  findPeriodBlock, applyPeriodization, computeWeekInfo,
+  pickSuggestedWeight, computeProgressionProposal, shouldSuggestDeload,
+} from './engines/training-rules';
+export type {
+  PeriodRangeBlock, PeriodBase, PeriodResult, UnitWeekInput, WeekInfo,
+  DeloadSignals, DeloadVerdict,
+} from './engines/training-rules';

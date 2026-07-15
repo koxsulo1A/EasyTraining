@@ -144,6 +144,61 @@
     );
   }
 
+  // ── IMPORT CSV (Web/Admin) — wiele ćwiczeń naraz ──────────────────────────
+  function ImportExercisesCsvSheet(props) {
+    var toast = ET.useToast();
+    var preview = React.useState(null); var parsed = preview[0], setParsed = preview[1]; // {rows, errors}
+    var saving = React.useState(false); var isSaving = saving[0], setSaving = saving[1];
+    var fileRef = React.useRef(null);
+
+    function onFile(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        setParsed(ET.parseExerciseCsv(ev.target.result));
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    function doImport() {
+      if (!parsed || !parsed.rows.length) return;
+      setSaving(true);
+      ET.addSharedExercisesBulk(parsed.rows).then(function(rows) {
+        setSaving(false);
+        toast((rows||[]).length+' ćwiczeń zaimportowanych — widoczne dla wszystkich ✓', 'success');
+        setParsed(null);
+        props.onClose();
+      }).catch(function(e) {
+        setSaving(false);
+        toast('Błąd: '+(e && e.message || e), 'error');
+      });
+    }
+
+    return _h(ET.Sheet, { open:props.open, onClose:function(){ setParsed(null); props.onClose(); }, title:'📥 Import ćwiczeń z CSV' },
+      _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginBottom:12, lineHeight:1.6 } },
+        'Plik CSV z nagłówkiem, kolumny w kolejności:',
+        _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'8px 10px', marginTop:6, fontFamily:'monospace', fontSize:'.68rem', color:'var(--t2)' } },
+          'nazwa,grupa,sprzet,trudnosc,opis,bledy,jednostronne,pomiar'),
+        _h('div', { style:{ marginTop:6 } }, 'grupa = tag (np. klatka_piersiowa, plecy, nogi...) · jednostronne = tak/nie · pomiar = reps/seconds')
+      ),
+      _h('input', { type:'file', accept:'.csv,.txt', ref:fileRef, onChange:onFile, style:{ marginBottom:14 } }),
+      parsed && _h('div', { style:{ marginBottom:14 } },
+        parsed.errors.length > 0 && _h('div', { style:{ background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.3)', borderRadius:'var(--r2)', padding:'8px 10px', marginBottom:10, fontSize:'.7rem', color:'var(--red)' } },
+          parsed.errors.map(function(e,i){ return _h('div', { key:i }, '⚠ '+e); })
+        ),
+        _h('div', { style:{ fontSize:'.78rem', fontWeight:700, marginBottom:8 } }, parsed.rows.length+' ćwiczeń do zaimportowania:'),
+        _h('div', { style:{ maxHeight:200, overflowY:'auto' } },
+          parsed.rows.map(function(r, i) {
+            return _h('div', { key:i, style:{ padding:'6px 0', borderBottom:'1px solid var(--b1)', fontSize:'.78rem' } },
+              _h('b', null, r.name), ' — ', r.tags[0], r.isUnilateral?' · L/P':'', r.measurementType==='seconds'?' · sekundy':'');
+          })
+        )
+      ),
+      _h('button', { className:'btn btn-primary', style:{ width:'100%' }, disabled:!parsed || !parsed.rows.length || isSaving, onClick:doImport },
+        isSaving ? '...' : (parsed ? 'Importuj '+parsed.rows.length+' ćwiczeń' : 'Wybierz plik CSV powyżej'))
+    );
+  }
+
   // ── MODUŁ ────────────────────────────────────────────────────────────────
   function LibraryModule() {
     var q = React.useState(''); var query = q[0], setQuery = q[1];
@@ -151,6 +206,7 @@
     var gf = React.useState('all'); var groupFilter = gf[0], setGroupFilter = gf[1];
     var sel = React.useState(null); var selected = sel[0], setSelected = sel[1];
     var showAdd = React.useState(false); var isAdding = showAdd[0], setIsAdding = showAdd[1];
+    var showImp = React.useState(false); var isImporting = showImp[0], setIsImporting = showImp[1];
     ET.useSharedExercisesVersion && ET.useSharedExercisesVersion(); // re-render po doładowaniu/dodaniu współdzielonych ćwiczeń
     var auth = ET.useAuth ? ET.useAuth() : null;
     var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
@@ -194,7 +250,10 @@
           _h('h1', null, '📚 Biblioteka ćwiczeń'),
           _h('p', null, basicTotal+' podstawowych · '+corrTotal+' korekcyjnych')
         ),
-        isAdmin && _h('button', { className:'btn btn-primary', style:{ fontSize:'.78rem', padding:'8px 12px' }, onClick:function(){ setIsAdding(true); } }, '➕ Dodaj ćwiczenie')
+        isAdmin && _h('div', { style:{ display:'flex', gap:6 } },
+          _h('button', { className:'btn btn-secondary', style:{ fontSize:'.78rem', padding:'8px 12px' }, onClick:function(){ setIsImporting(true); } }, '📥 Import CSV'),
+          _h('button', { className:'btn btn-primary', style:{ fontSize:'.78rem', padding:'8px 12px' }, onClick:function(){ setIsAdding(true); } }, '➕ Dodaj ćwiczenie')
+        )
       ),
 
       // Wyszukiwarka
@@ -231,7 +290,8 @@
           }),
 
       _h(ExerciseDetail, { open:!!selected, exercise:selected, onClose:function(){ setSelected(null); } }),
-      isAdmin && _h(AddExerciseSheet, { open:isAdding, onClose:function(){ setIsAdding(false); } })
+      isAdmin && _h(AddExerciseSheet, { open:isAdding, onClose:function(){ setIsAdding(false); } }),
+      isAdmin && _h(ImportExercisesCsvSheet, { open:isImporting, onClose:function(){ setIsImporting(false); } })
     );
   }
 
