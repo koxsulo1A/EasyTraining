@@ -13,12 +13,6 @@
         { n:'Band Pull Apart', s:2, r:15, note:'Łopatki do tyłu!' },
         { n:'Rotacja gumą', s:2, r:12 },
         { n:'Scapular Push Ups', s:2, r:10 },
-        // Rampa ciężaru przed 5×5 na 72,5 kg — bez tego pierwsza właściwa seria
-        // to wejście z zimnego wprost w ciężar submaksymalny.
-        { n:'Wyciskanie sztangi — pusty gryf', s:1, r:10, note:'Rampa do 72,5 kg — tor ruchu' },
-        { n:'Wyciskanie sztangi — 40 kg', s:1, r:5 },
-        { n:'Wyciskanie sztangi — 55 kg', s:1, r:3 },
-        { n:'Wyciskanie sztangi — 65 kg', s:1, r:1, note:'Ostatnia rampa przed właściwym 72,5 kg' },
       ],
       exercises:[
         { name:'Wyciskanie sztangi',    plan:'5×5',   sets:5, reps:5,  weight:72.5, rir:2, tempo:'3-1-1',   rest:180, prog:'+2.5 kg/tydz' },
@@ -1093,9 +1087,15 @@
       setCorrChecked(function(c){ var n={}; n[id]=!c[id]; return Object.assign({},c,n); });
     }
 
-    // Ćwiczenia korekcyjne: dobrane pod dolegliwości użytkownika, inaczej zestaw postawy
-    // Rotacja zależna od dnia + planu — inny zestaw niż wczoraj, ale stabilny w obrębie sesji
-    var corrective = pickCorrectiveExercises(store, (props.plan.id||'')+'-'+ET.dstr(), 4);
+    // Ćwiczenia korekcyjne: dobrane pod dolegliwości użytkownika, inaczej zestaw postawy.
+    // Rotacja co 12 TYGODNI TRENINGOWYCH (nie kalendarzowych) — ten sam zestaw
+    // przez cały blok 12 tygodni, potem zmiana na kolejny; liczone tym samym
+    // mechanizmem co tydzień planu (ETCore.computeWeekInfo).
+    var metaForCorrective = findMetaForUnit(store, props.plan.id);
+    var wiForCorrective = metaForCorrective ? planWeekInfo(store, metaForCorrective.units) : null;
+    var trainingWeek = wiForCorrective ? wiForCorrective.currentWeek : 1;
+    var block12 = Math.floor((trainingWeek - 1) / 12);
+    var corrective = pickCorrectiveExercises(store, (props.plan.id||'')+'-block'+block12, 4);
 
     return _h('div', { className:'fade-in' },
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
@@ -1129,7 +1129,7 @@
       corrective.length > 0 && _h('div', { className:'card', style:{ marginBottom:14 } },
         _h('div', { style:{ fontWeight:700, marginBottom:4, fontSize:'.88rem' } }, '🩹 Ćwiczenia korekcyjne'),
         _h('div', { style:{ fontSize:'.66rem', color:'var(--t3)', marginBottom:10 } },
-          (store.ailments||[]).length ? 'Dobrane pod Twoje dolegliwości' : 'Profilaktyka postawy — opcjonalnie po treningu'),
+          ((store.ailments||[]).length ? 'Dobrane pod Twoje dolegliwości' : 'Profilaktyka postawy — opcjonalnie po treningu') + ' · tydzień '+trainingWeek+' (zmiana co 12 tyg.)'),
         corrective.map(function(e) {
           var done = !!corrChecked[e.id];
           return _h('div', { key:e.id, className:'suppl-item'+(done?' checked':''), onClick:function(){ toggleCorr(e.id); } },
