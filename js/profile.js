@@ -21,6 +21,9 @@
     var f = fs[0], setF = fs[1];
     function upF(key, val) { setF(function(prev){ var o={}; o[key]=val; return Object.assign({},prev,o); }); }
 
+    var authTop = ET.useAuth ? ET.useAuth() : null;
+    var isAdmin = !!(authTop && authTop.profile && authTop.profile.role === 'admin');
+
     // ── Ustawienia (⚙): widgety Dashboardu, menu boczne/dolne, kafelki ──────
     var sset = React.useState(false); var showSettings = sset[0], setShowSettings = sset[1];
     var FLAT_NAV = (ET.NAV_GROUPS||[]).reduce(function(a,g){ return a.concat(g.items); }, []);
@@ -264,7 +267,10 @@
               else toast('Nie działa: '+(r.reason||'nieznany powód'), 'error');
             });
           } }, '🧪 Testuj Live Activity')
-        )
+        ),
+
+        // (f) Panel kont — tylko dla Administratora
+        isAdmin && _h(ET.AdminPanel, null)
       ),
 
       _h('div', { className:'card', style:{ marginBottom:14 } },
