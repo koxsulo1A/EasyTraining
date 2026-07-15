@@ -237,13 +237,15 @@
     );
   }
 
-  // ── BRAMKA LOGOWANIA (auth + sync) ────────────────
+  // ── BRAMKA LOGOWANIA ──────────────────────────────
+  // SyncManager i SharedExercisesLoader renderowane POZA bramką (zawsze
+  // zamontowane) — SyncManager musi widzieć przejście authed→needsAuth
+  // (wylogowanie), żeby zdążyć wyczyścić lokalne dane przed odmontowaniem.
   function AuthGate(props) {
     var auth = ET.useAuth();
     if (auth.status === 'loading') return _h(ET.AuthLoadingScreen, null);
     if (auth.status === 'needsAuth') return _h(ET.AuthScreen, null);
-    // 'guest' (offline) lub 'authed' — pokaż aplikację; SyncManager/loader działają no-op na gościu
-    return _h(React.Fragment, null, _h(ET.SyncManager, null), _h(ET.SharedExercisesLoader, null), props.children);
+    return props.children;
   }
 
   // ── APP ──────────────────────────────────────────
@@ -261,18 +263,22 @@
           _h(ET.ToastProvider, null,
             _h(ET.NavProvider, null,
               _h(ErrorBoundary, null,
-                _h(AuthGate, null,
-                  _h('div', { className:'app' },
-                    _h(Sidebar, null),
-                    _h('main', { className:'main' },
-                      _h('div', { className:'page-content' },
-                        _h(ErrorBoundary, null,
-                          _h(Router, null)
+                _h(React.Fragment, null,
+                  _h(ET.SyncManager, null),
+                  _h(ET.SharedExercisesLoader, null),
+                  _h(AuthGate, null,
+                    _h('div', { className:'app' },
+                      _h(Sidebar, null),
+                      _h('main', { className:'main' },
+                        _h('div', { className:'page-content' },
+                          _h(ErrorBoundary, null,
+                            _h(Router, null)
+                          )
                         )
-                      )
-                    ),
-                    _h(MobileNav, null),
-                    _h(DailyWellbeingCheck, null)
+                      ),
+                      _h(MobileNav, null),
+                      _h(DailyWellbeingCheck, null)
+                    )
                   )
                 )
               )

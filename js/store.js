@@ -53,5 +53,9 @@
 
   function useStore() { return React.useContext(StoreCtx); }
 
-  Object.assign(window.ET, { StoreCtx: StoreCtx, StoreProvider: StoreProvider, useStore: useStore });
+  // Świeża kopia pustego store'u — używana przy wylogowaniu, żeby dane jednego
+  // konta nie "przeciekały" do gościa/innego konta na tym samym urządzeniu.
+  function emptyStoreSnapshot() { return JSON.parse(JSON.stringify(emptyStore)); }
+
+  Object.assign(window.ET, { StoreCtx: StoreCtx, StoreProvider: StoreProvider, useStore: useStore, emptyStoreSnapshot: emptyStoreSnapshot });
 })();
