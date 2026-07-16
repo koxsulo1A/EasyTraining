@@ -63,6 +63,17 @@
       if (!p || !active) return Promise.resolve();
       active = false;
       return p.end({}).catch(function(e){ console.warn('[live-activity] end:', e); });
+    },
+
+    // Sprząta OSIEROCONĄ aktywność z poprzedniej sesji (np. użytkownik zabił
+    // appkę w trakcie treningu — Live Activity żyje niezależnie od procesu
+    // appki, więc zostaje zawieszona na ekranie blokady bez aktualizacji).
+    // Wołane raz przy każdym starcie appki — nieaktywna flaga JS-owa (`active`)
+    // celowo pomijana, bo natywna aktywność mogła przetrwać restart procesu.
+    cleanupOrphaned: function() {
+      var p = getPlugin();
+      if (!p) return Promise.resolve();
+      return p.end({}).catch(function(e){ console.warn('[live-activity] cleanup:', e); });
     }
   };
 })();

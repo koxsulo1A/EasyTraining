@@ -254,6 +254,10 @@
     React.useEffect(function() {
       document.getElementById('boot').style.display = 'none';
       document.getElementById('root').style.display = 'block';
+      // Sprzątnij osieroconą Live Activity z ewentualnej poprzedniej sesji
+      // (np. appka została zabita w trakcie treningu) — świeży start appki
+      // nigdy nie wznawia treningu w toku, więc bezpiecznie zamknąć każdą.
+      if (ET.LiveActivity && ET.LiveActivity.cleanupOrphaned) ET.LiveActivity.cleanupOrphaned();
     }, []);
 
     var result;
