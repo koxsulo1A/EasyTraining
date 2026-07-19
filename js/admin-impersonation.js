@@ -56,9 +56,9 @@
   function ImpersonationBanner() {
     var imp = useImpersonation();
     if (!imp || !imp.impersonating) return null;
-    return _h('div', { style:{ position:'sticky', top:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, padding:'8px 16px', background:'var(--orange)', color:'#1a1200', fontSize:'.78rem', fontWeight:700 } },
-      _h('span', null, '🔑 Edytujesz dane: '+imp.targetEmail+' — zmiany NIE dotyczą Twojego konta'),
-      _h('button', { className:'btn btn-sm', style:{ background:'#1a1200', color:'#fff', border:'none' }, onClick:imp.stop }, 'Wyjdź')
+    return _h('div', { style:{ position:'sticky', top:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'3px 10px', minHeight:22, background:'var(--orange)', color:'#1a1200', fontSize:'.64rem', fontWeight:700, lineHeight:1.3 } },
+      _h('span', { style:{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, '🔑 Wejdź jako: '+imp.targetEmail),
+      _h('button', { style:{ flexShrink:0, background:'none', border:'none', color:'#1a1200', textDecoration:'underline', cursor:'pointer', fontSize:'.64rem', fontWeight:700, padding:0 }, onClick:imp.stop }, 'Wyjdź')
     );
   }
 
