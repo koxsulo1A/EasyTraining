@@ -1652,7 +1652,10 @@
   function getEffectivePlans(store) {
     var overrides = store.workoutPlans || {};
     var customs = store.customWorkoutPlans || [];
-    var base = WORKOUT_PLANS.map(function(p) {
+    var hidden = store.hiddenPlanIds || [];
+    // Wbudowane plany są na sztywno w kodzie (nie da się ich fizycznie usunąć) —
+    // usunięcie przez użytkownika oznacza je jako ukryte, custom po prostu znikają z tablicy.
+    var base = WORKOUT_PLANS.filter(function(p){ return hidden.indexOf(p.id)===-1; }).map(function(p) {
       return overrides[p.id] ? Object.assign({}, p, overrides[p.id]) : p;
     });
     // każdy plan ma periodyzację (zakresy tygodni + deload) — domyślnie 1-4/5-8/9-12
@@ -2356,12 +2359,23 @@
       setSelUnit(null);
     }
 
+    // Usuwa jednostkę TRWALE (nie tylko z listy meta-planu) — inaczej wbudowane/
+    // custom plany nadal pojawiały się w "Twoje plany treningowe" i na Dashboardzie,
+    // mimo usunięcia z planu (bug: getEffectivePlans czytał osobną, niezależną listę).
     function deleteUnit(unitId) {
       if (!confirm('Usunąć tę jednostkę?')) return;
       var mp = JSON.parse(JSON.stringify(selMeta));
+      var removed = mp.units.find(function(u){ return u.id===unitId; });
       mp.units = mp.units.filter(function(u){ return u.id!==unitId; });
       saveMetaPlan(mp);
       setSelMeta(mp);
+      if (removed && removed.unitType !== 'running') {
+        if (removed._isCustom) {
+          update(function(s){ return Object.assign({}, s, { customWorkoutPlans:(s.customWorkoutPlans||[]).filter(function(p){ return p.id!==unitId; }) }); });
+        } else {
+          update(function(s){ var h=(s.hiddenPlanIds||[]).slice(); if(h.indexOf(unitId)===-1) h.push(unitId); return Object.assign({}, s, { hiddenPlanIds:h }); });
+        }
+      }
       toast('Jednostka usunięta','default');
       setSelUnit(null);
     }
@@ -2375,7 +2389,22 @@
 
     function deleteMetaPlan(planId) {
       if (!confirm('Usunąć cały plan?')) return;
+      var mp = metaPlans.find(function(m){ return m.id===planId; });
       saveMetaPlans(update, metaPlans.filter(function(m){ return m.id!==planId; }));
+      // Kaskadowo usuń jego jednostki z "Twoje plany treningowe" / Dashboardu — ta sama
+      // przyczyna co w deleteUnit (getEffectivePlans nie wie nic o meta-planach).
+      if (mp) {
+        var customIds = (mp.units||[]).filter(function(u){ return u._isCustom && u.unitType!=='running'; }).map(function(u){ return u.id; });
+        var builtinIds = (mp.units||[]).filter(function(u){ return !u._isCustom && u.unitType!=='running'; }).map(function(u){ return u.id; });
+        update(function(s){
+          var h = (s.hiddenPlanIds||[]).slice();
+          builtinIds.forEach(function(id){ if (h.indexOf(id)===-1) h.push(id); });
+          return Object.assign({}, s, {
+            customWorkoutPlans: (s.customWorkoutPlans||[]).filter(function(p){ return customIds.indexOf(p.id)===-1; }),
+            hiddenPlanIds: h
+          });
+        });
+      }
       toast('Plan usunięty','default');
       setSelMeta(null);
     }

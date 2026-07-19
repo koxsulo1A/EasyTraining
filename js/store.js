@@ -19,6 +19,7 @@
     dashboardWidgets: {},
     menuSettings: {},   // { sidebar:{hidden:[],order:[]}, mobile:{hidden:[],order:[]} }
     quickTiles: [],     // dodatkowe kafelki na Dashboardzie (id tras)
+    hiddenPlanIds: [],  // usunięte wbudowane plany (customWorkoutPlans po prostu znika z tablicy)
   };
 
   function loadStore() {
