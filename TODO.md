@@ -67,12 +67,21 @@ osobną pozycję w menu bocznym "👥 Konta" widoczną tylko dla roli `admin`
 (analogicznie do reszty `NAV_GROUPS`), prowadzącą wprost do listy kont +
 zmiany ról (funkcjonalność już zbudowana, tylko przenieść/zdublować wejście).
 
-## 7. Zdalna edycja danych użytkownika przez admina (tryb "wejdź jako")
-Kliknięcie w konto na liście (z punktu 6) ma pozwalać adminowi zmieniać
-WSZYSTKIE parametry aplikacji tego użytkownika — plany treningowe, ćwiczenia
-w planie, ustawienia itd. — z poziomu panelu admina (bez znajomości hasła
-użytkownika). To wymaga:
-- nowej tabeli/RPC w Supabase pozwalającej adminowi zapisywać do cudzego
-  `user_data` (dziś RLS pozwala tylko `auth.uid() = user_id`)
-- UI "wejdź jako [użytkownik]" ładujące jego store do podglądu/edycji
-- to największy punkt na liście — realnie osobna, duża sesja
+## 7. Zdalna edycja danych użytkownika przez admina (tryb "wejdź jako") ✅
+Zrobione: przycisk "🔑 Wejdź jako" przy każdym koncie (poza własnym) w
+panelu Konta (`js/admin-panel.js`). Kliknięcie wczytuje `user_data` tego
+usera z Supabase i podmienia `StoreCtx` dla całej widocznej aplikacji
+(Sidebar + Router) przez `ET.ImpersonationProvider` (`js/admin-impersonation.js`)
+— admin widzi i edytuje WSZYSTKIE moduły (plany treningowe, ćwiczenia,
+ustawienia itd.) tak, jakby był zalogowany na tym koncie, bez znajomości
+hasła. Zmiany zapisują się z powrotem do `user_data` tego usera (debounce
+1.5s, jak w `sync.js`). Stały, pomarańczowy banner na górze appki pokazuje
+czyje dane są edytowane + przycisk "Wyjdź". `SyncManager`/
+`SharedExercisesLoader` siedzą POZA podmienionym kontekstem, więc własne
+konto admina nie jest w żaden sposób ruszane w trakcie impersonacji.
+
+Wymaga jednorazowej akcji w Supabase: w SQL Editorze uruchom nowy blok
+`user_data_admin_all` z `supabase/schema.sql` (policy pozwalająca adminowi
+czytać/pisać CUDZE `user_data` — bez tego przycisk "Wejdź jako" zwróci
+błąd braku uprawnień, bo istniejąca `user_data_own` ogranicza dostęp tylko
+do `auth.uid() = user_id`).

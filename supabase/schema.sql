@@ -31,6 +31,16 @@ alter table public.user_data enable row level security;
 create policy "user_data_own" on public.user_data
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Admin może czytać i zapisywać dane KAŻDEGO użytkownika (tryb "wejdź jako"
+-- w panelu Konta — podgląd/edycja aplikacji innego usera przez admina).
+-- Permisywna policy: dodaje się do "user_data_own" (OR), nie ją zastępuje.
+create policy "user_data_admin_all" on public.user_data
+  for all using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  ) with check (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+  );
+
 -- ── ĆWICZENIA DODANE PRZEZ ADMINA (widoczne dla wszystkich w apce) ───────
 create table if not exists public.shared_exercises (
   id uuid primary key default gen_random_uuid(),

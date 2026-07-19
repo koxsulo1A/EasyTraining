@@ -13,9 +13,18 @@
   function AdminPanel() {
     var auth = ET.useAuth ? ET.useAuth() : null;
     var toast = ET.useToast();
+    var nav = ET.useNav ? ET.useNav() : null;
+    var imp = ET.useImpersonation ? ET.useImpersonation() : null;
     var ls = React.useState(true); var loading = ls[0], setLoading = ls[1];
     var pr = React.useState([]); var profiles = pr[0], setProfiles = pr[1];
     var busy = React.useState(null); var busyId = busy[0], setBusyId = busy[1];
+
+    function enterAs(row) {
+      if (!imp) return;
+      if (!confirm('Wejść jako '+row.email+'? Zobaczysz i będziesz mógł edytować całą jego aplikację, dopóki nie klikniesz "Wyjdź".')) return;
+      imp.start(row.id, row.email);
+      if (nav) nav.navigate('dashboard');
+    }
 
     function load() {
       if (!ET.supabase) return;
@@ -60,12 +69,16 @@
             _h('div', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:'.8rem', fontWeight:600 } }, row.email),
             _h('span', { style:{ fontSize:'.62rem', fontWeight:700, color:ROLE_COLORS[row.role]||'var(--t3)' } }, ROLE_LABELS[row.role]||row.role)
           ),
-          _h('div', { style:{ display:'flex', gap:4 } },
+          _h('div', { style:{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' } },
             ROLES.map(function(r) {
               var active = row.role === r;
               return _h('button', { key:r, disabled:isBusy, className:'tag-btn'+(active?' active':''), style:{ fontSize:'.66rem', opacity:isBusy?0.5:1 },
                 onClick:function(){ changeRole(row, r); } }, ROLE_LABELS[r]);
-            })
+            }),
+            imp && row.id !== (auth && auth.session && auth.session.user && auth.session.user.id) && _h('button', {
+              style:{ fontSize:'.66rem', marginLeft:'auto', padding:'4px 8px', borderRadius:'var(--r2)', border:'1px solid var(--orange)', background:'transparent', color:'var(--orange)', cursor:'pointer', fontWeight:700 },
+              onClick:function(){ enterAs(row); }
+            }, '🔑 Wejdź jako')
           )
         );
       }),

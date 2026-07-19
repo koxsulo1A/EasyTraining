@@ -275,8 +275,10 @@
                 _h(React.Fragment, null,
                   _h(ET.SyncManager, null),
                   _h(ET.SharedExercisesLoader, null),
+                  _h(ET.ImpersonationProvider, null,
                   _h(AuthGate, null,
                     _h('div', { className:'app' },
+                      _h(ET.ImpersonationBanner, null),
                       _h(Sidebar, null),
                       _h('main', { className:'main' },
                         _h('div', { className:'page-content' },
@@ -288,6 +290,7 @@
                       _h(MobileNav, null),
                       _h(DailyWellbeingCheck, null)
                     )
+                  )
                   )
                 )
               )
