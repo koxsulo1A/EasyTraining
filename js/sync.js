@@ -7,24 +7,11 @@
   // inaczej wypycha bieżący lokalny stan). Potem każda zmiana store'u
   // pushowana z debounce 1.5s. Brak konfliktów wielourządzeniowych — proste
   // last-write-wins, wystarczające dla jednego użytkownika na kilku sprzętach.
-  var LAST_UID_KEY = 'et_last_synced_uid';
-
-  // ETCore (js/core.bundle.js) trzyma WŁASNY cache w localStorage pod kluczami
-  // "etcore:*" (eventy, 1RM, fatigue/recovery/progress) — całkowicie osobno
-  // od store'u "et_v1", więc reset store'u przy zmianie konta go NIE czyści.
-  // Bez tego dane jednego konta (progresja, PR-y) przeciekałyby do kolejnego
-  // konta zalogowanego na tym samym urządzeniu — ten sam problem, który
-  // LAST_UID_KEY rozwiązuje dla store'u.
-  function clearLocalEngineCache() {
-    try {
-      var toRemove = [];
-      for (var i=0; i<localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf('etcore:') === 0) toRemove.push(k);
-      }
-      toRemove.forEach(function(k){ localStorage.removeItem(k); });
-    } catch(e) {}
-  }
+  //
+  // Izolacja danych między kontami na tym samym urządzeniu (localStorage
+  // 'et_v1' + cache silnika 'etcore:*') jest scentralizowana w
+  // js/account-storage.js (ET.AccountStorage) — patrz komentarz tam po
+  // uzasadnienie. sync.js NIE dotyka localStorage bezpośrednio.
 
   function SyncManager() {
     var auth = ET.useAuth();
@@ -46,19 +33,19 @@
       if (!uid || !ET.supabase) return;
       if (pulledForUser.current === uid) return;
       pulledForUser.current = uid;
-      var lastUid = null;
-      try { lastUid = localStorage.getItem(LAST_UID_KEY); } catch(e) {}
 
       ET.supabase.from('user_data').select('data').eq('user_id', uid).maybeSingle().then(function(res) {
         if (res.error) { console.warn('[sync] pull error:', res.error); return; }
-        if (lastUid !== null && lastUid !== uid) clearLocalEngineCache();
+        // Rozstrzyga i — jeśli trzeba — czyści dane poprzedniego konta na tym
+        // urządzeniu, zanim cokolwiek dalej się wydarzy (ET.AccountStorage).
+        var verdict = ET.AccountStorage ? ET.AccountStorage.resolveAccountLogin(uid) : 'first';
         var hasCloudData = res.data && res.data.data && Object.keys(res.data.data).length;
 
         if (hasCloudData) {
           update(function() { return res.data.data; });
           lastPushedJson.current = JSON.stringify(res.data.data);
           toast('Zsynchronizowano z chmurą ✓', 'success');
-        } else if (lastUid === uid || lastUid === null) {
+        } else if (verdict !== 'switched') {
           // to samo konto co ostatnio (lub pierwsze logowanie z trybu offline) — wypchnij lokalne dane
           ET.supabase.from('user_data').upsert({ user_id:uid, data:store, updated_at:new Date().toISOString() }).then(function(r) {
             if (!r.error) lastPushedJson.current = JSON.stringify(store);
@@ -71,7 +58,6 @@
             if (!r.error) lastPushedJson.current = JSON.stringify(fresh);
           });
         }
-        try { localStorage.setItem(LAST_UID_KEY, uid); } catch(e) {}
       });
     }, [uid]);
 
@@ -96,7 +82,7 @@
       if (prevUid.current && !uid) {
         pulledForUser.current = null;
         lastPushedJson.current = '';
-        clearLocalEngineCache();
+        if (ET.AccountStorage) ET.AccountStorage.clearAccountData();
         if (ET.emptyStoreSnapshot) update(function(){ return ET.emptyStoreSnapshot(); });
       }
       prevUid.current = uid;

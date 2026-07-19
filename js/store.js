@@ -2,7 +2,10 @@
   'use strict';
   window.ET = window.ET || {};
 
-  var STORE_KEY = 'et_v1';
+  // Klucz store'u jest zdefiniowany w js/account-storage.js (jedyna brama do
+  // danych localStorage powiązanych z kontem) — tu tylko go używamy, żeby
+  // nie duplikować literału 'et_v1' w dwóch miejscach.
+  var STORE_KEY = (window.ET && ET.AccountStorage && ET.AccountStorage.STORE_KEY) || 'et_v1';
   var emptyStore = {
     profile: { name:'', age:null, weight:null, height:null, activityLevel:'moderate', gender:'male', sport:'' },
     workouts: [], runs: [], sleepSessions: [], saunaSessions: [],

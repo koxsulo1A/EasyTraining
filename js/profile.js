@@ -89,7 +89,7 @@
 
     function clearAll() {
       if (!confirm('Czy na pewno chcesz usunąć WSZYSTKIE dane? Tej operacji nie można cofnąć!')) return;
-      localStorage.removeItem('et_v1');
+      if (ET.AccountStorage) ET.AccountStorage.clearAccountData(); else localStorage.removeItem('et_v1');
       window.location.reload();
     }
 

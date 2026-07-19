@@ -723,7 +723,7 @@
               _h('button', { style:{ padding:'10px', borderRadius:'var(--r2)', border:'1px solid var(--red)', background:'none', color:'var(--red)', cursor:'pointer', fontSize:'.8rem', fontWeight:700 },
                 onClick:function(){
                   if(!confirm('Zresetować aplikację? Wszystkie dane zostaną utracone!')) return;
-                  localStorage.removeItem('et_v1');
+                  if (ET.AccountStorage) ET.AccountStorage.clearAccountData(); else localStorage.removeItem('et_v1');
                   window.location.reload();
                 }
               }, '🔄 Resetuj aplikację')
