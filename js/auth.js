@@ -14,6 +14,8 @@
 
     function loadProfile(session) {
       ET.supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(function(res) {
+        if (res.error) console.error('[auth] błąd wczytywania profilu (rola pokaże się jako "user"):', res.error);
+        if (!res.error && !res.data) console.warn('[auth] brak wiersza w profiles dla id=' + session.user.id + ' — rola pokaże się jako "user"');
         setState({ status:'authed', session:session, profile: res.data || { role:'user', email:session.user.email } });
       });
     }
