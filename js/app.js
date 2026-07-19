@@ -72,6 +72,8 @@
   function Sidebar() {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
     var su = ET.useStore(); var msSide = (su.store.menuSettings||{}).sidebar;
+    var auth = ET.useAuth ? ET.useAuth() : null;
+    var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
     return _h('aside', { className:'sidebar' },
       _h('div', { className:'sb-logo' },
         _h('div', { className:'sb-logo-icon' }, '⚡'),
@@ -81,7 +83,7 @@
         )
       ),
       ET.NAV_GROUPS.map(function(g, gi) {
-        var items = applyMenuSettings(g.items, msSide);
+        var items = applyMenuSettings(g.items.filter(function(i){ return !i.adminOnly || isAdmin; }), msSide);
         if (!items.length) return null;
         return _h('div', { className:'sb-section', key:gi },
           g.s && _h('div', { className:'sb-section-label' }, g.s),
@@ -102,11 +104,13 @@
     var ms = React.useState(false); var showMore = ms[0], setShowMore = ms[1];
     var su = ET.useStore(); var msMob = (su.store.menuSettings||{}).mobile;
     var mobileTabs = applyMenuSettings(ET.MOBILE_TABS, msMob);
+    var auth = ET.useAuth ? ET.useAuth() : null;
+    var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
 
     // Grupy w sheet "Więcej" (wszystko poza widocznymi tabami)
     var tabIds = mobileTabs.map(function(t){ return t.id; });
     var moreGroups = ET.NAV_GROUPS.map(function(g){
-      return Object.assign({}, g, { items: g.items.filter(function(i){ return tabIds.indexOf(i.id)===-1; }) });
+      return Object.assign({}, g, { items: g.items.filter(function(i){ return tabIds.indexOf(i.id)===-1 && (!i.adminOnly || isAdmin); }) });
     }).filter(function(g){ return g.items.length > 0; });
 
     function goTo(id) { setShowMore(false); navigate(id); }
@@ -179,6 +183,7 @@
     acwr:         function(){ return ET.AcwrModule; },
     assessment:   function(){ return ET.AssessmentModule; },
     profile:      function(){ return ET.ProfileModule; },
+    accounts:     function(){ return ET.AccountsModule; },
     'dev':        function(){ return ET.DevPanel; },
   };
 

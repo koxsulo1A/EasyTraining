@@ -37,11 +37,29 @@ To wymaga ujednolicenia dwóch dziś równoległych systemów: płaskiej listy
 `getEffectivePlans()` (używanej przez "Twoje plany treningowe" i Dashboard)
 i zagnieżdżonych meta-planów (`getMetaPlans()`, używanych w edytorze planów).
 
-## 5. Wszystkie dane użytkownika przypisane do konta — audyt kompletności
-Sync (`sync.js`) już zapisuje cały `store` pod `user_id` w Supabase. Do
-zrobienia: przegląd czy NA PEWNO wszystko co user zapisuje trafia do store'u
-zsynchronizowanego (a nie np. gdzieś do samego `localStorage` poza store'em,
-albo do stanu komponentu który ginie przy odświeżeniu) — pełny audyt pól.
+## 5. Wszystkie dane użytkownika przypisane do konta — audyt kompletności ✅ (częściowo)
+Zrobiony audyt: `sync.js` zapisuje cały `store` (`et_v1`) pod `user_id`
+w Supabase — wszystkie pola z `emptyStore` w `store.js` są objęte. Znaleziony
+i naprawiony realny wyciek: `js/core.bundle.js` (silnik `ETCore` — fatigue,
+recovery, progress, estymacja 1RM, cele) trzyma WŁASNY cache w
+`localStorage` pod kluczami `etcore:*`, całkowicie osobno od `et_v1` —
+sync.js go nie ruszał. Efekt: przy zmianie konta na tym samym urządzeniu
+dane silnika (PR-y, progresja) jednego użytkownika przeciekały do drugiego
+(ten sam problem, który wcześniej naprawiono dla `et_v1` przez `LAST_UID_KEY`,
+ale nigdy nie zastosowano do `etcore:*`). Naprawione: `clearLocalEngineCache()`
+w `sync.js` czyści `etcore:*` przy każdej zmianie konta i przy wylogowaniu.
+
+Pozostała, większa luka (NIE naprawiona — osobna sesja): dane silnika
+(`etcore:*`) same w sobie NIE są synchronizowane do chmury — są odtwarzane
+lokalnie z eventów `WorkoutFinished`/`RunFinished` publikowanych tylko przy
+faktycznym zapisie treningu na danym urządzeniu. Po zalogowaniu na NOWYM
+urządzeniu zsynchronizowane `store.workouts`/`store.runs` się pojawią, ale
+1RM/fatigue/recovery/progresja będą puste, dopóki nowe treningi nie zostaną
+zapisane na tym urządzeniu — historyczne dane nie są "odtwarzane" (replay)
+przez silnik. Wymagałoby to replay'u wszystkich zapisanych treningów przez
+`window.etcore.bus.publish(...)` po pierwszym pociągnięciu danych z chmury,
+z zabezpieczeniem przed podwójnym liczeniem — nietrywialne, do zrobienia
+osobno.
 
 ## 6. Kafelek "Konta" w menu bocznym (tylko dla admina)
 Dziś panel kont (`AdminPanel`) jest schowany w Profil → Ustawienia. Dodać

@@ -265,7 +265,7 @@
         _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
         _h('div', null,
           _h('h1', { style:{ fontSize:'1.2rem', fontWeight:700 } }, props.plan.icon + ' ' + props.plan.name),
-          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 1 z 4 — Ocena gotowości')
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 1 z 5 — Ocena gotowości')
         )
       ),
 
@@ -388,7 +388,7 @@
       }),
 
       _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%', marginTop:10 }, onClick:props.onNext },
-        doneSets===totalSets ? '→ Dalej: Trening' : '→ Pomiń resztę i zacznij trening'
+        doneSets===totalSets ? '→ Dalej: Ćwiczenia korekcyjne' : '→ Pomiń resztę i przejdź dalej'
       )
     );
   }
@@ -943,7 +943,7 @@
         _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
         _h('div', { style:{ flex:1 } },
           _h('div', { style:{ fontWeight:700, fontSize:'1rem' } }, plan.icon + ' ' + plan.name),
-          _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, 'Krok 3 z 4 — Trening właściwy')
+          _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)' } }, 'Krok 4 z 5 — Trening właściwy')
         ),
         _h('div', { style:{ background:'var(--s3)', borderRadius:'var(--r2)', padding:'6px 12px', fontSize:'.88rem', fontWeight:700, color:'var(--a-light)', fontVariantNumeric:'tabular-nums' } }, '⏱ '+elStr),
         _h('button', { className:'btn btn-primary btn-sm', onClick:finish }, 'Zakończ →')
@@ -1101,7 +1101,7 @@
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
         _h('div', null,
           _h('h1', { style:{ fontSize:'1.2rem', fontWeight:700 } }, '🧘 Rozciąganie'),
-          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 4 z 4 — ' + props.plan.name + ' · ' + doneCount + '/' + total)
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 5 z 5 — ' + props.plan.name + ' · ' + doneCount + '/' + total)
         )
       ),
 
@@ -1135,7 +1135,7 @@
           return _h('div', { key:e.id, className:'suppl-item'+(done?' checked':''), onClick:function(){ toggleCorr(e.id); } },
             _h('div', { className:'suppl-check' }, done ? '✓' : ''),
             _h('div', { style:{ flex:1 } },
-              _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name),
+              _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name+' · '+e.sets+'×'+e.reps),
               _h('div', { style:{ fontSize:'.7rem', color:'var(--t2)', marginTop:2 } }, e.mechanism||e.target_anatomy||'')
             )
           );
@@ -1145,6 +1145,48 @@
       _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%' }, onClick:props.onNext },
         doneCount === total ? '🏆 Zakończ i podsumowanie' : '→ Pomiń i przejdź do podsumowania'
       )
+    );
+  }
+
+  // ── STEP 3.5: ĆWICZENIA KOREKCYJNE (po rozgrzewce, przed treningiem) ─────
+  function CorrectiveStep(props) {
+    var su = ET.useStore(); var store = su.store;
+    var ck = React.useState({}); var corrChecked = ck[0], setCorrChecked = ck[1];
+    function toggleCorr(id) {
+      setCorrChecked(function(c){ var n={}; n[id]=!c[id]; return Object.assign({},c,n); });
+    }
+    var metaForCorrective = findMetaForUnit(store, props.plan.id);
+    var wiForCorrective = metaForCorrective ? planWeekInfo(store, metaForCorrective.units) : null;
+    var trainingWeek = wiForCorrective ? wiForCorrective.currentWeek : 1;
+    var block12 = Math.floor((trainingWeek - 1) / 12);
+    var corrective = pickCorrectiveExercises(store, (props.plan.id||'')+'-block'+block12, 4);
+
+    if (!corrective.length) { props.onNext(); return null; }
+
+    return _h('div', { className:'fade-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
+        _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
+        _h('div', null,
+          _h('h1', { style:{ fontSize:'1.2rem', fontWeight:700 } }, '🩹 Ćwiczenia korekcyjne'),
+          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:2 } }, 'Krok 3 z 5 — ' + props.plan.name)
+        )
+      ),
+      _h('div', { className:'card card-accent', style:{ marginBottom:14, fontSize:'.82rem', color:'var(--t2)', lineHeight:1.6 } },
+        ((store.ailments||[]).length ? 'Dobrane pod Twoje dolegliwości' : 'Profilaktyka postawy') + ' · tydzień '+trainingWeek+' (zmiana co 12 tyg.)'
+      ),
+      _h('div', { className:'card', style:{ marginBottom:14 } },
+        corrective.map(function(e) {
+          var done = !!corrChecked[e.id];
+          return _h('div', { key:e.id, className:'suppl-item'+(done?' checked':''), onClick:function(){ toggleCorr(e.id); } },
+            _h('div', { className:'suppl-check' }, done ? '✓' : ''),
+            _h('div', { style:{ flex:1 } },
+              _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name+' · '+e.sets+'×'+e.reps),
+              _h('div', { style:{ fontSize:'.7rem', color:'var(--t2)', marginTop:2 } }, e.mechanism||e.target_anatomy||'')
+            )
+          );
+        })
+      ),
+      _h('button', { className:'btn btn-primary btn-lg', style:{ width:'100%' }, onClick:props.onNext }, '→ Dalej: Trening')
     );
   }
 
@@ -1923,6 +1965,10 @@
     var pf = React.useState(-1); var pickerFor = pf[0], setPickerFor = pf[1];
     var pq = React.useState(''); var pickerQ = pq[0], setPickerQ = pq[1];
     var pt = React.useState(''); var pickerTag = pt[0], setPickerTag = pt[1];
+    var wpo = React.useState(false); var warmupPickerOpen = wpo[0], setWarmupPickerOpen = wpo[1];
+    var wpq = React.useState(''); var warmupPickerQ = wpq[0], setWarmupPickerQ = wpq[1];
+    var cpo = React.useState(false); var cooldownPickerOpen = cpo[0], setCooldownPickerOpen = cpo[1];
+    var cpq = React.useState(''); var cooldownPickerQ = cpq[0], setCooldownPickerQ = cpq[1];
 
     function upE(key, val) { setEditing(function(p){ var o={}; o[key]=val; return Object.assign({},p,o); }); }
 
@@ -1956,6 +2002,14 @@
     function addWarmup() {
       setEditing(function(p){ return Object.assign({},p,{ warmup:(p.warmup||[]).concat([{ n:'', s:1, r:0, note:'' }]) }); });
     }
+    function addWarmupFromDb(dbEx) {
+      setEditing(function(p){ return Object.assign({},p,{ warmup:(p.warmup||[]).concat([{ n:dbEx.name, s:2, r:10, note:'' }]) }); });
+      setWarmupPickerOpen(false); setWarmupPickerQ('');
+    }
+    function addCooldownFromDb(dbEx) {
+      setEditing(function(p){ return Object.assign({},p,{ cooldown:(p.cooldown||[]).concat([{ n:dbEx.name, d:'30-45 s' }]) }); });
+      setCooldownPickerOpen(false); setCooldownPickerQ('');
+    }
     function upWarmup(i, field, val) {
       setEditing(function(p){
         return Object.assign({},p,{ warmup:p.warmup.map(function(item,j){ if(j!==i)return item; var o={}; o[field]=val; return Object.assign({},item,o); }) });
@@ -1963,6 +2017,17 @@
     }
     function rmWarmup(i) {
       setEditing(function(p){ return Object.assign({},p,{ warmup:p.warmup.filter(function(_,j){ return j!==i; }) }); });
+    }
+    function addCooldown() {
+      setEditing(function(p){ return Object.assign({},p,{ cooldown:(p.cooldown||[]).concat([{ n:'', d:'30-45 s' }]) }); });
+    }
+    function upCooldown(i, field, val) {
+      setEditing(function(p){
+        return Object.assign({},p,{ cooldown:p.cooldown.map(function(item,j){ if(j!==i)return item; var o={}; o[field]=val; return Object.assign({},item,o); }) });
+      });
+    }
+    function rmCooldown(i) {
+      setEditing(function(p){ return Object.assign({},p,{ cooldown:p.cooldown.filter(function(_,j){ return j!==i; }) }); });
     }
 
     function addExercise() {
@@ -2036,7 +2101,32 @@
       _h('div', { style:{ marginBottom:14 } },
         _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
           _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, '🔥 Rozgrzewka ('+((editing.warmup||[]).length)+')'),
-          _h('button', { className:'btn btn-secondary btn-sm', onClick:addWarmup }, '+ Dodaj')
+          _h('div', { style:{ display:'flex', gap:6 } },
+            _h('button', { className:'btn btn-sm '+(warmupPickerOpen?'btn-primary':'btn-secondary'), onClick:function(){ setWarmupPickerOpen(!warmupPickerOpen); setWarmupPickerQ(''); } }, '📚 Z bazy'),
+            _h('button', { className:'btn btn-secondary btn-sm', onClick:addWarmup }, '+ Dodaj')
+          )
+        ),
+        warmupPickerOpen && _h('div', { style:{ marginBottom:10, background:'var(--s2)', border:'1px solid var(--b2)', borderRadius:'var(--r2)', padding:8 } },
+          _h('input', { type:'text', placeholder:'🔍 Szukaj rozgrzewki...', value:warmupPickerQ, autoFocus:true, style:{ width:'100%', marginBottom:6 },
+            onChange:function(e){ setWarmupPickerQ(e.target.value); } }),
+          _h('div', { style:{ maxHeight:200, overflowY:'auto' } },
+            (function() {
+              var q = warmupPickerQ.trim().toLowerCase();
+              var list = (ET.EXERCISES_BASIC||[]).filter(function(e) {
+                if ((e.tags||[])[0]!=='rozgrzewka') return false;
+                return !q || e.name.toLowerCase().indexOf(q)!==-1;
+              });
+              if (!list.length) return _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', padding:6 } }, 'Brak wyników');
+              return list.map(function(dbEx) {
+                return _h('div', { key:dbEx.id,
+                  style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 8px', borderBottom:'1px solid var(--b1)', cursor:'pointer', borderRadius:4 },
+                  onClick:function(){ addWarmupFromDb(dbEx); } },
+                  _h('div', { style:{ fontSize:'.78rem', fontWeight:600 } }, dbEx.name),
+                  _h('span', { style:{ fontSize:'.9rem' } }, '🔥')
+                );
+              });
+            })()
+          )
         ),
         (editing.warmup||[]).length===0 && _h('div', { style:{ color:'var(--t3)', fontSize:'.78rem', padding:'6px 0' } }, 'Brak ćwiczeń rozgrzewkowych'),
         (editing.warmup||[]).map(function(item, i) {
@@ -2176,6 +2266,51 @@
                 _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)', display:'block', marginBottom:2 } }, 'Progresja'),
                 _h('input', { type:'text', value:ex.prog||'', placeholder:'+2.5 kg/tydz', onChange:function(e){ upExercise(i,'prog',e.target.value); } })
               )
+            )
+          );
+        })
+      ),
+
+      _h('div', { style:{ marginBottom:14 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
+          _h('div', { style:{ fontWeight:700, fontSize:'.88rem' } }, '🧘 Rozciąganie ('+((editing.cooldown||[]).length)+')'),
+          _h('div', { style:{ display:'flex', gap:6 } },
+            _h('button', { className:'btn btn-sm '+(cooldownPickerOpen?'btn-primary':'btn-secondary'), onClick:function(){ setCooldownPickerOpen(!cooldownPickerOpen); setCooldownPickerQ(''); } }, '📚 Z bazy'),
+            _h('button', { className:'btn btn-secondary btn-sm', onClick:addCooldown }, '+ Dodaj')
+          )
+        ),
+        cooldownPickerOpen && _h('div', { style:{ marginBottom:10, background:'var(--s2)', border:'1px solid var(--b2)', borderRadius:'var(--r2)', padding:8 } },
+          _h('input', { type:'text', placeholder:'🔍 Szukaj rozciągania...', value:cooldownPickerQ, autoFocus:true, style:{ width:'100%', marginBottom:6 },
+            onChange:function(e){ setCooldownPickerQ(e.target.value); } }),
+          _h('div', { style:{ maxHeight:200, overflowY:'auto' } },
+            (function() {
+              var q = cooldownPickerQ.trim().toLowerCase();
+              var list = (ET.EXERCISES_BASIC||[]).filter(function(e) {
+                if ((e.tags||[])[0]!=='rozciaganie') return false;
+                return !q || e.name.toLowerCase().indexOf(q)!==-1;
+              });
+              if (!list.length) return _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', padding:6 } }, 'Brak wyników');
+              return list.map(function(dbEx) {
+                return _h('div', { key:dbEx.id,
+                  style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 8px', borderBottom:'1px solid var(--b1)', cursor:'pointer', borderRadius:4 },
+                  onClick:function(){ addCooldownFromDb(dbEx); } },
+                  _h('div', { style:{ fontSize:'.78rem', fontWeight:600 } }, dbEx.name),
+                  _h('span', { style:{ fontSize:'.9rem' } }, '🤸‍♂️')
+                );
+              });
+            })()
+          )
+        ),
+        (editing.cooldown||[]).length===0 && _h('div', { style:{ color:'var(--t3)', fontSize:'.78rem', padding:'6px 0' } }, 'Brak ćwiczeń rozciągających'),
+        (editing.cooldown||[]).map(function(item, i) {
+          return _h('div', { key:i, className:'card card-sm', style:{ marginBottom:6 } },
+            _h('div', { style:{ display:'flex', gap:6, alignItems:'center', marginBottom:6 } },
+              _h('input', { type:'text', value:item.n, placeholder:'Nazwa ćwiczenia', style:{ flex:1 }, onChange:function(e){ upCooldown(i,'n',e.target.value); } }),
+              _h('button', { className:'btn btn-ghost btn-sm btn-icon', style:{ color:'var(--red)', flexShrink:0 }, onClick:function(){ rmCooldown(i); } }, '✕')
+            ),
+            _h('div', { style:{ flex:1 } },
+              _h('label', { style:{ fontSize:'.6rem', color:'var(--t3)' } }, 'Czas (np. 30-45 s)'),
+              _h('input', { type:'text', value:item.d||'', onChange:function(e){ upCooldown(i,'d',e.target.value); } })
             )
           );
         })
@@ -2736,6 +2871,7 @@
     var ew = React.useState(null); var editW = ew[0], setEditW = ew[1];
     var ma = React.useState(false); var showManualAdd = ma[0], setShowManualAdd = ma[1];
     var se = React.useState(false); var showEditor = se[0], setShowEditor = se[1];
+    var st = React.useState(null); var selTileId = st[0], setSelTileId = st[1];
 
     if (view==='ai-coach') return _h(AICoachView, { onBack:function(){ setView('list'); } });
     if (showEditor) return _h(PlanEditorSheet, { onClose:function(){ setShowEditor(false); } });
@@ -2755,9 +2891,11 @@
     if (view==='readiness' && plan) return _h(ReadinessStep, { plan:plan, readiness:readiness, setReadiness:setReadiness,
       onNext:function(){ setView('warmup'); }, onBack:function(){ setView('wellbeing_pre'); } });
     if (view==='warmup' && plan) return _h(WarmupStep, { plan:plan,
-      onNext:function(){ setView('session'); }, onBack:function(){ setView('readiness'); } });
+      onNext:function(){ setView('corrective'); }, onBack:function(){ setView('readiness'); } });
+    if (view==='corrective' && plan) return _h(CorrectiveStep, { plan:plan,
+      onNext:function(){ setView('session'); }, onBack:function(){ setView('warmup'); } });
     if (view==='session' && plan) return _h(StrengthSession, { plan:plan, readiness:readiness,
-      onFinish:function(r){ setResult(r); setView('cooldown'); }, onBack:function(){ setView('warmup'); } });
+      onFinish:function(r){ setResult(r); setView('cooldown'); }, onBack:function(){ setView('corrective'); } });
     if (view==='cooldown' && plan) return _h(CooldownStep, { plan:plan, onNext:function(){ setView('goals_check'); } });
     if (view==='goals_check' && plan) return _h(GoalCheckStep, { plan:plan, onNext:function(){ setView('wellbeing_post'); } });
     if (view==='wellbeing_post' && plan) return _h(WellbeingStep, {
@@ -2935,22 +3073,55 @@
       showManualAdd && _h(WorkoutEditSheet, { workout:null, update:update, toast:toast, onClose:function(){ setShowManualAdd(false); } }),
       editW && _h(WorkoutEditSheet, { workout:editW, update:update, toast:toast, onClose:function(){ setEditW(null); } }),
 
-      _h('div', { style:{ marginBottom:20 } },
-        _h('div', { className:'section-hdr' }, _h('h2', null, 'Twoje plany treningowe')),
-        _h('div', { className:'grid-2', style:{ gap:8 } },
-          effectivePlans.map(function(p) {
-            return _h('div', { key:p.id, className:'card card-interactive', style:{ cursor:'pointer', borderColor:'transparent', backgroundImage:'linear-gradient(135deg, var(--s2), var(--s3))', position:'relative' },
-              onClick:function(){ selectPlan(p); } },
-              p._isCustom && _h('div', { style:{ position:'absolute', top:6, right:8, fontSize:'.55rem', color:'var(--teal)', fontWeight:700 } }, '⭐ WŁASNY'),
-              (store.workoutPlans||{})[p.id] && !p._isCustom && _h('div', { style:{ position:'absolute', top:6, right:8, fontSize:'.55rem', color:'var(--orange)', fontWeight:700 } }, '✏️ EDYTOWANY'),
-              _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, p.icon),
-              _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, p.name),
-              _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:3 } }, p.day),
-              _h('div', { style:{ fontSize:'.62rem', color:'var(--t2)', marginTop:6, lineHeight:1.4 } }, p.desc)
-            );
-          })
-        )
-      ),
+      (function() {
+        var metaPlansList = getMetaPlans(store);
+        var selMeta = selTileId ? metaPlansList.find(function(m){ return m.id===selTileId; }) : null;
+
+        if (!selMeta) {
+          // ── Poziom 1: kafelek każdego planu (meta-plan) ──
+          return _h('div', { style:{ marginBottom:20 } },
+            _h('div', { className:'section-hdr' }, _h('h2', null, 'Twoje plany treningowe')),
+            _h('div', { className:'grid-2', style:{ gap:8 } },
+              metaPlansList.map(function(mp) {
+                var strCount = (mp.units||[]).filter(function(u){ return u.unitType!=='running'; }).length;
+                var runCount = (mp.units||[]).filter(function(u){ return u.unitType==='running'; }).length;
+                var parts = [];
+                if (strCount) parts.push('💪 '+strCount+' siłow'+(strCount===1?'y':'ych'));
+                if (runCount) parts.push('🏃 '+runCount+' biegow'+(runCount===1?'y':'ych'));
+                return _h('div', { key:mp.id, className:'card card-interactive', style:{ cursor:'pointer', borderColor:'transparent', backgroundImage:'linear-gradient(135deg, var(--s2), var(--s3))', position:'relative' },
+                  onClick:function(){ setSelTileId(mp.id); } },
+                  _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, mp.icon||'📋'),
+                  _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, mp.name),
+                  _h('div', { style:{ fontSize:'.62rem', color:'var(--t2)', marginTop:6, lineHeight:1.4 } }, parts.length ? parts.join(' · ') : 'Pusty plan')
+                );
+              })
+            )
+          );
+        }
+
+        // ── Poziom 2: jednostki wybranego planu (siłowe + biegowe) ──
+        return _h('div', { style:{ marginBottom:20 } },
+          _h('div', { className:'section-hdr', style:{ display:'flex', alignItems:'center', gap:8 } },
+            _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ setSelTileId(null); } }, '←'),
+            _h('h2', null, selMeta.icon+' '+selMeta.name)
+          ),
+          _h('div', { className:'grid-2', style:{ gap:8 } },
+            (selMeta.units||[]).map(function(p) {
+              var isRun = p.unitType==='running';
+              return _h('div', { key:p.id, className:'card card-interactive', style:{ cursor:'pointer', borderColor:'transparent', backgroundImage:'linear-gradient(135deg, var(--s2), var(--s3))', position:'relative' },
+                onClick:function(){ isRun ? nav.navigate('running') : selectPlan(p); } },
+                p._isCustom && _h('div', { style:{ position:'absolute', top:6, right:8, fontSize:'.55rem', color:'var(--teal)', fontWeight:700 } }, '⭐ WŁASNY'),
+                (store.workoutPlans||{})[p.id] && !p._isCustom && _h('div', { style:{ position:'absolute', top:6, right:8, fontSize:'.55rem', color:'var(--orange)', fontWeight:700 } }, '✏️ EDYTOWANY'),
+                _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, p.icon||(isRun?'🏃':'💪')),
+                _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, p.name),
+                _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)', marginTop:3 } }, p.day),
+                _h('div', { style:{ fontSize:'.62rem', color:'var(--t2)', marginTop:6, lineHeight:1.4 } }, p.desc)
+              );
+            }),
+            (selMeta.units||[]).length===0 && _h('div', { style:{ color:'var(--t3)', fontSize:'.78rem', padding:'6px 0' } }, 'Ten plan nie ma jeszcze żadnych jednostek — dodaj je w edytorze planów.')
+          )
+        );
+      })(),
 
       workouts.length === 0
         ? _h(ET.Placeholder, { icon:'🏋️', title:'Brak zapisanych treningów', desc:'Wybierz plan i zacznij swój pierwszy trening.' })

@@ -30,6 +30,7 @@
     { s: 'Narzędzia', items: [
       { id:'library', icon:'📚', label:'Biblioteka ćwiczeń' },
       { id:'backup', icon:'💾', label:'Kopia i eksport' },
+      { id:'accounts', icon:'👥', label:'Konta', adminOnly:true },
     ]},
     { s: null, items: [{ id:'profile', icon:'👤', label:'Profil' }] },
   ];

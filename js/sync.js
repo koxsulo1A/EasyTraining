@@ -9,6 +9,23 @@
   // last-write-wins, wystarczające dla jednego użytkownika na kilku sprzętach.
   var LAST_UID_KEY = 'et_last_synced_uid';
 
+  // ETCore (js/core.bundle.js) trzyma WŁASNY cache w localStorage pod kluczami
+  // "etcore:*" (eventy, 1RM, fatigue/recovery/progress) — całkowicie osobno
+  // od store'u "et_v1", więc reset store'u przy zmianie konta go NIE czyści.
+  // Bez tego dane jednego konta (progresja, PR-y) przeciekałyby do kolejnego
+  // konta zalogowanego na tym samym urządzeniu — ten sam problem, który
+  // LAST_UID_KEY rozwiązuje dla store'u.
+  function clearLocalEngineCache() {
+    try {
+      var toRemove = [];
+      for (var i=0; i<localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('etcore:') === 0) toRemove.push(k);
+      }
+      toRemove.forEach(function(k){ localStorage.removeItem(k); });
+    } catch(e) {}
+  }
+
   function SyncManager() {
     var auth = ET.useAuth();
     var su = ET.useStore(); var store = su.store, update = su.update;
@@ -34,6 +51,7 @@
 
       ET.supabase.from('user_data').select('data').eq('user_id', uid).maybeSingle().then(function(res) {
         if (res.error) { console.warn('[sync] pull error:', res.error); return; }
+        if (lastUid !== null && lastUid !== uid) clearLocalEngineCache();
         var hasCloudData = res.data && res.data.data && Object.keys(res.data.data).length;
 
         if (hasCloudData) {
@@ -78,6 +96,7 @@
       if (prevUid.current && !uid) {
         pulledForUser.current = null;
         lastPushedJson.current = '';
+        clearLocalEngineCache();
         if (ET.emptyStoreSnapshot) update(function(){ return ET.emptyStoreSnapshot(); });
       }
       prevUid.current = uid;

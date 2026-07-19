@@ -14,6 +14,7 @@
     { tag:'przedramiona',     label:'Przedramiona',      icon:'🤙', size:'mala' },
     { tag:'core_brzuch',      label:'Core / Brzuch',     icon:'🧘', size:'mala' },
     { tag:'rozciaganie',      label:'Rozciąganie',       icon:'🤸‍♂️', size:'stretch' },
+    { tag:'rozgrzewka',       label:'Rozgrzewka',        icon:'🔥', size:'stretch' },
   ];
 
   // ── REGIONY CIAŁA (ćwiczenia korekcyjne) ─────────────────────────────────
@@ -185,6 +186,18 @@
     B('st10','Kot-krowa (mobilizacja kręgosłupa)','rozciaganie','Mata',1,'Klęk podparty. Na wdechu wygnij grzbiet w dół, na wydechu zaokrąglij. 8-10 powolnych cykli.','Ruch tylko z lędźwi, brak synchronizacji z oddechem'),
     B('st11','Rozciąganie karku w bok','rozciaganie','Brak',1,'Przechyl głowę do barku, dłonią delikatnie dociśnij. 30 s na stronę.','Wzruszanie przeciwnego barku, dociskanie na siłę'),
     B('st12','Motyl (przywodziciele)','rozciaganie','Mata',1,'Siad, stopy złączone, kolana opadają na boki. Delikatnie dociskaj uda łokciami. 45-60 s.','Zaokrąglone plecy, sprężynowanie'),
+
+    // A11. ROZGRZEWKA (dynamiczna mobilizacja/aktywacja — przed treningiem)
+    B('wa1','Krążenia ramion','rozgrzewka','Brak',1,'Stań swobodnie, wykonuj duże krążenia ramion w przód i w tył. 10 powt. w każdą stronę.','Zbyt małe krążenia, sztywne barki'),
+    B('wa2','Pajacyki (jumping jacks)','rozgrzewka','Brak',1,'Skoki z jednoczesnym rozstawianiem nóg i unoszeniem rąk nad głowę. 20-30 powt.','Sztywne lądowanie, brak zgięcia kolan'),
+    B('wa3','Krążenia bioder','rozgrzewka','Brak',1,'Dłonie na biodrach, wykonuj duże krążenia miednicą. 10 powt. w każdą stronę.','Ruch tylko barkami zamiast biodrami'),
+    B('wa4','Marsz z wysokim unoszeniem kolan','rozgrzewka','Brak',1,'W miejscu unoś kolana do wysokości bioder, dynamicznie. 20 powt. na nogę.','Garbienie się, zbyt wolne tempo'),
+    B('wa5','Wykroki dynamiczne z rotacją','rozgrzewka','Brak',2,'Wykrok w przód, w dolnej pozycji zrotuj tułów w stronę przedniej nogi. 8-10 powt. na stronę.','Kolano wychodzi za linię palców, brak rotacji'),
+    B('wa6','Mostek dynamiczny (glute bridge)','rozgrzewka','Mata',1,'Leżenie tyłem, kolana ugięte. Unoś i opuszczaj biodra rytmicznie. 15 powt.','Przeprost w lędźwiach na górze ruchu'),
+    B('wa7','Rotacje tułowia stojąc','rozgrzewka','Brak',1,'Stopy na szerokość bioder, ręce luźno, skręcaj tułów na boki dynamicznie. 15 powt. na stronę.','Skręcanie w kolanach zamiast w tułowiu'),
+    B('wa8','Krążenia nadgarstków i kostek','rozgrzewka','Brak',1,'Krążenia w obu kierunkach, najpierw nadgarstki, potem kostki. 10 powt. każdy kierunek.','Zbyt szybkie, niedokładne ruchy'),
+    B('wa9','Inchworm (chodzenie rękami)','rozgrzewka','Mata',2,'Skłon, dłonie na podłodze, wyjdź rękami do deski, wróć do stóp. 6-8 powt.','Zaokrąglone plecy, ugięte kolana przy chodzeniu rękami'),
+    B('wa10','Przysiad z wypadem bocznym','rozgrzewka','Brak',1,'Naprzemienny wypad w bok z lekkim przysiadem na drugiej nodze. 10 powt. na stronę.','Kolano zapada się do środka'),
   ];
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -446,6 +459,12 @@
   }
   ET.EXERCISES_BASIC.forEach(classifyUnilateralAndMeasurement);
   ET.EXERCISES_CORRECTIVE.forEach(classifyUnilateralAndMeasurement);
+
+  // Domyślne serie/powtórzenia dla ćwiczeń korekcyjnych (dotąd tylko checklista bez parametrów).
+  ET.EXERCISES_CORRECTIVE.forEach(function(ex) {
+    ex.sets = 2;
+    ex.reps = ex.measurementType === 'seconds' ? '30-45 s' : '10-12';
+  });
 
   // Wszystkie ćwiczenia razem
   ET.EXERCISES = ET.EXERCISES_BASIC.concat(ET.EXERCISES_CORRECTIVE);

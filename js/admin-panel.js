@@ -73,5 +73,21 @@
     );
   }
 
+  // Strona menu bocznego "👥 Konta" (tylko admin) — wrapper wokół AdminPanel z page-hdr.
+  function AccountsModule() {
+    var auth = ET.useAuth ? ET.useAuth() : null;
+    var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
+    return _h('div', { className:'fade-in' },
+      _h('div', { className:'page-hdr' },
+        _h('div', null,
+          _h('h1', null, '👥 Konta'),
+          _h('p', null, 'Zarządzanie kontami i rolami')
+        )
+      ),
+      isAdmin ? _h(AdminPanel, null) : _h(ET.Placeholder, { icon:'🔒', title:'Brak dostępu', desc:'Ta sekcja jest dostępna tylko dla administratorów.' })
+    );
+  }
+
   ET.AdminPanel = AdminPanel;
+  ET.AccountsModule = AccountsModule;
 })();
