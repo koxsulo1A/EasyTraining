@@ -5,6 +5,7 @@
 
   var ROLE_LABELS = { user:'Użytkownik', admin:'Administrator', trainer:'Trener' };
   var ROLE_COLORS = { user:'var(--t3)', admin:'var(--purple)', trainer:'var(--teal)' };
+  var ROLE_BG = { user:'var(--s3)', admin:'var(--purple-d)', trainer:'var(--teal-d)' };
   var ROLES = ['user','admin','trainer'];
 
   // Panel kont (widoczny tylko dla admina) — lista wszystkich kont z Supabase
@@ -61,21 +62,30 @@
       ),
       _h('p', { style:{ fontSize:'.7rem', color:'var(--t3)', marginBottom:10 } },
         profiles.length + ' ' + (profiles.length===1?'konto':'kont') + ' · zmiana roli działa natychmiast'),
-      loading && _h('div', { style:{ fontSize:'.78rem', color:'var(--t3)', padding:'10px 0', textAlign:'center' } }, 'Ładowanie…'),
+      loading && [0,1,2].map(function(i) {
+        return _h('div', { key:'skel'+i, style:{ display:'flex', alignItems:'center', gap:8, padding:'10px 0', borderBottom:'1px solid var(--b1)', opacity:.5 } },
+          _h('div', { style:{ width:28, height:28, borderRadius:'50%', background:'var(--s3)', flexShrink:0 } }),
+          _h('div', { style:{ flex:1 } },
+            _h('div', { style:{ width:'60%', height:10, borderRadius:4, background:'var(--s3)' } }),
+            _h('div', { style:{ width:'30%', height:8, borderRadius:4, background:'var(--s3)', marginTop:6 } })
+          )
+        );
+      }),
       !loading && profiles.map(function(row) {
         var isBusy = busyId === row.id;
+        var isSelf = row.id === (auth && auth.session && auth.session.user && auth.session.user.id);
         return _h('div', { key:row.id, style:{ padding:'8px 0', borderBottom:'1px solid var(--b1)' } },
-          _h('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:6 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:isSelf?0:6 } },
             _h('div', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:'.8rem', fontWeight:600 } }, row.email),
-            _h('span', { style:{ fontSize:'.62rem', fontWeight:700, color:ROLE_COLORS[row.role]||'var(--t3)' } }, ROLE_LABELS[row.role]||row.role)
+            _h('span', { style:{ fontSize:'.6rem', fontWeight:700, color:ROLE_COLORS[row.role]||'var(--t3)', background:ROLE_BG[row.role]||'var(--s3)', padding:'3px 8px', borderRadius:20, whiteSpace:'nowrap' } }, ROLE_LABELS[row.role]||row.role)
           ),
-          _h('div', { style:{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' } },
+          !isSelf && _h('div', { style:{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' } },
             ROLES.map(function(r) {
               var active = row.role === r;
               return _h('button', { key:r, disabled:isBusy, className:'tag-btn'+(active?' active':''), style:{ fontSize:'.66rem', opacity:isBusy?0.5:1 },
                 onClick:function(){ changeRole(row, r); } }, ROLE_LABELS[r]);
             }),
-            imp && row.id !== (auth && auth.session && auth.session.user && auth.session.user.id) && _h('button', {
+            imp && _h('button', {
               style:{ fontSize:'.66rem', marginLeft:'auto', padding:'4px 8px', borderRadius:'var(--r2)', border:'1px solid var(--orange)', background:'transparent', color:'var(--orange)', cursor:'pointer', fontWeight:700 },
               onClick:function(){ enterAs(row); }
             }, '🔑 Wejdź jako')

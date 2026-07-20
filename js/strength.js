@@ -257,10 +257,35 @@
     );
   }
 
+  // ── WIZUALNY STEPPER (5 kroków treningu) ─────────────────────────────────
+  var FLOW_STEPS = ['Gotowość', 'Rozgrzewka', 'Korekcyjne', 'Trening', 'Rozciąganie'];
+  function TrainingStepper(props) {
+    var current = props.current; // 1-5
+    return _h('div', { style:{ display:'flex', alignItems:'center', marginBottom:18 } },
+      FLOW_STEPS.map(function(label, i) {
+        var n = i + 1;
+        var done = n < current, active = n === current;
+        return _h('div', { key:label, style:{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:5, position:'relative' } },
+          i > 0 && _h('div', { style:{ position:'absolute', top:9, right:'50%', width:'100%', height:2, background: n<=current ? 'var(--green)' : 'var(--b2)', zIndex:0 } }),
+          _h('div', { style:{
+            width:20, height:20, borderRadius:'50%', flexShrink:0, position:'relative', zIndex:1,
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:'.6rem', fontWeight:800,
+            background: done ? 'var(--green)' : active ? 'var(--a)' : 'var(--s3)',
+            border: active ? '2px solid var(--a-light)' : '2px solid '+(done?'var(--green)':'var(--b2)'),
+            color: done ? '#04150e' : active ? '#fff' : 'var(--t3)',
+            boxShadow: active ? '0 0 0 4px var(--a-dim)' : 'none'
+          } }, done ? '✓' : n),
+          _h('div', { style:{ fontSize:'.56rem', fontWeight:700, color: active ? 'var(--a-light)' : 'var(--t3)', textAlign:'center' } }, label)
+        );
+      })
+    );
+  }
+
   // ── STEP 2: GOTOWOŚĆ ─────────────────────────────────────────────────────
   function ReadinessStep(props) {
     var rd = props.readiness, setRd = props.setReadiness;
     return _h('div', { className:'fade-in' },
+      _h(TrainingStepper, { current:1 }),
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
         _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
         _h('div', null,
@@ -338,6 +363,7 @@
     var totalSets = exs.reduce(function(t,e){ return t+e.setsData.length; },0);
 
     return _h('div', { className:'fade-in' },
+      _h(TrainingStepper, { current:2 }),
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:12 } },
         _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
         _h('div', { style:{ flex:1 } },
@@ -939,6 +965,7 @@
     var elStr=(elH>0?elH+':':'')+String(elM).padStart(2,'0')+':'+String(elS).padStart(2,'0');
 
     return _h('div', { className:'fade-in' },
+      _h(TrainingStepper, { current:4 }),
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:12, flexWrap:'wrap' } },
         _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
         _h('div', { style:{ flex:1 } },
@@ -1098,6 +1125,7 @@
     var corrective = pickCorrectiveExercises(store, (props.plan.id||'')+'-block'+block12, 4);
 
     return _h('div', { className:'fade-in' },
+      _h(TrainingStepper, { current:5 }),
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
         _h('div', null,
           _h('h1', { style:{ fontSize:'1.2rem', fontWeight:700 } }, '🧘 Rozciąganie'),
@@ -1135,7 +1163,10 @@
           return _h('div', { key:e.id, className:'suppl-item'+(done?' checked':''), onClick:function(){ toggleCorr(e.id); } },
             _h('div', { className:'suppl-check' }, done ? '✓' : ''),
             _h('div', { style:{ flex:1 } },
-              _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name+' · '+e.sets+'×'+e.reps),
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:8 } },
+                _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name),
+                _h('span', { className:'badge badge-orange', style:{ flexShrink:0 } }, e.sets+'×'+e.reps)
+              ),
               _h('div', { style:{ fontSize:'.7rem', color:'var(--t2)', marginTop:2 } }, e.mechanism||e.target_anatomy||'')
             )
           );
@@ -1164,6 +1195,7 @@
     if (!corrective.length) { props.onNext(); return null; }
 
     return _h('div', { className:'fade-in' },
+      _h(TrainingStepper, { current:3 }),
       _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:20 } },
         _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:props.onBack }, '←'),
         _h('div', null,
@@ -1180,7 +1212,10 @@
           return _h('div', { key:e.id, className:'suppl-item'+(done?' checked':''), onClick:function(){ toggleCorr(e.id); } },
             _h('div', { className:'suppl-check' }, done ? '✓' : ''),
             _h('div', { style:{ flex:1 } },
-              _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name+' · '+e.sets+'×'+e.reps),
+              _h('div', { style:{ display:'flex', alignItems:'center', gap:8 } },
+                _h('div', { style:{ fontWeight:600, fontSize:'.88rem' } }, e.name),
+                _h('span', { className:'badge badge-orange', style:{ flexShrink:0 } }, e.sets+'×'+e.reps)
+              ),
               _h('div', { style:{ fontSize:'.7rem', color:'var(--t2)', marginTop:2 } }, e.mechanism||e.target_anatomy||'')
             )
           );

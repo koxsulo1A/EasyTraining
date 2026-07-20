@@ -641,7 +641,10 @@
                     _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', marginTop:2 } }, c.sub),
                     c.badge && _h('div', { className:'badge '+c.bc, style:{ marginTop:6 } }, c.badge)
                   )
-                : _h('div', { style:{ fontSize:'.78rem', color:'var(--t3)', marginTop:6 } }, 'Brak danych')
+                : _h('div', null,
+                    _h('div', { style:{ fontSize:'.78rem', color:'var(--t3)', marginTop:6 } }, 'Brak danych'),
+                    _h('div', { style:{ fontSize:'.64rem', color:'var(--t3)', opacity:.7, marginTop:2 } }, 'Dotknij, by dodać →')
+                  )
             );
           })
         )
