@@ -66,6 +66,9 @@
     B('kp8','Dipy z pochyleniem do przodu','klatka_piersiowa','Poręcze',3,'Pochyl tułów ~45°, opuszczaj do rozciągnięcia klatki.','Pionowa pozycja (→ triceps), zbyt głęboko'),
     B('kp9','Wyciskanie wąskim chwytem na skosie','klatka_piersiowa','Ławka skośna, sztanga',3,'Chwyt na szerokość barków. Sztanga do środkowej części klatki. Akcent na wewnętrzną część.','Za wąski chwyt (→ triceps)'),
     B('kp10','Pompki z nogami na podwyższeniu','klatka_piersiowa','Podwyższenie',2,'Stopy na ławce, dłonie na podłodze. Nacisk na górną część klatki.','Opadanie bioder, brak pełnego zakresu'),
+    B('kp12','Wyciskanie hantli na ławce skośnej','klatka_piersiowa','Ławka skośna, hantle',2,'Kąt 30°. Hantle nad górną częścią klatki, opuszczaj do boków z łokciami ~45°.','Zbyt stromy kąt (→ barki), za duży ciężar'),
+    B('kp13','Wyciskanie sztangi na ławce ze zniżką','klatka_piersiowa','Ławka ze zniżką, sztanga',2,'Głowa niżej bioder. Sztanga opada do dolnej części klatki.','Odbijanie od klatki, zbyt duży ciężar'),
+    B('kp14','Rozpiętki na maszynie (pec-deck)','klatka_piersiowa','Maszyna pec-deck',1,'Siedząc, łokcie na wysokości barków. Ściągnij ramiona przed siebie kontrolowanym ruchem.','Zbyt duży ciężar, szarpanie'),
 
     // A2. PLECY
     B('pl1','Martwy ciąg klasyczny','plecy','Sztanga',3,'Stopy na szer. bioder, sztanga nad śródstopiem. Plecy proste. Wstań prowadząc sztangę blisko piszczeli.','Zaokrąglone plecy, sztanga daleko od ciała'),
@@ -78,6 +81,10 @@
     B('pl8','Face pull','plecy','Wyciąg, lina',1,'Przyciągaj do czoła, odwodząc przedramiona na zewnątrz.','Za duży ciężar, brak rotacji zewnętrznej'),
     B('pl9','Back extension na ławce rzymskiej','plecy','Ławka rzymska',1,'Unieś tułów do linii prostej, napinając prostowniki i pośladki.','Przeprost w lędźwiach'),
     B('pl10','Wiosłowanie podchwytem (Yates row)','plecy','Sztanga',2,'Tułów ~30°, chwyt podchwytem. Przyciągaj do dolnej części brzucha.','Zaokrąglone plecy, odchylanie tułowia'),
+    B('pl12','Podciąganie podchwytem (chin-up)','plecy','Drążek',2,'Chwyt podchwytem na szer. barków. Podciągnij brodę nad drążek, opadaj kontrolowanie.','Bujanie, niepełny zakres'),
+    B('pl13','Wiosłowanie na maszynie Hammer','plecy','Maszyna Hammer',1,'Klatka oparta o podpórkę. Przyciągaj uchwyty do siebie, ściągając łopatki.','Odrywanie klatki od podpórki, szarpanie'),
+    B('pl14','Wzruszanie ramion ze sztangą (shrugs)','plecy','Sztanga',1,'Sztanga wzdłuż ud. Unoś barki prosto w górę, bez zginania łokci.','Rotacja barków w kółko, bujanie tułowiem'),
+    B('pl15','Ściąganie drążka prostymi ramionami (straight-arm pulldown)','plecy','Wyciąg górny, drążek prosty',1,'Ramiona proste. Sprowadzaj drążek w dół łukiem do ud, pracując najszerszym.','Zginanie łokci (→ triceps), bujanie'),
 
     // A3. NOGI
     B('no1','Przysiad ze sztangą (high bar)','nogi','Stojak, sztanga',2,'Sztanga na pułapkach. Zejdź do przysiadu, kolana nad stopami.','Pięty odrywają się, kolana do środka'),
@@ -90,6 +97,10 @@
     B('no8','Wykroki w tył (reverse lunges)','nogi','Hantle (opcja)',1,'Krok w tył, opuść tylne kolano. Biodra i tułów pionowo.','Tułów pochyla się do przodu'),
     B('no9','Przysiad przedni (front squat)','nogi','Stojak, sztanga',3,'Sztanga na przednich barkach, łokcie wysoko.','Łokcie opadają, tułów pochyla się'),
     B('no10','Step-up na skrzynię','nogi','Skrzynia, hantle',1,'Wejdź na skrzynię bez odbijania drugą nogą.','Odbijanie, kolano zapada się'),
+    B('no13','Wyprost nóg na maszynie (leg extension)','nogi','Maszyna',1,'Siedząc, prostuj nogi w kolanach. Chwila napięcia na górze, opuszczaj kontrolowanie.','Odbijanie, zbyt duży ciężar'),
+    B('no14','Uginanie nóg leżąc (leg curl)','nogi','Maszyna',1,'Leżąc przodem, uginaj kolana przyciągając wałek do pośladków.','Odrywanie bioder od ławki, szarpanie'),
+    B('no15','Przysiad Hacka (hack squat)','nogi','Maszyna Hack',2,'Plecy oparte o płytę. Zejdź do przysiadu, pięty mocno w podłodze.','Odrywanie pięt, niepełny zakres'),
+    B('no16','Przywodziciele na maszynie','nogi','Maszyna',1,'Siedząc, poduszki po wewnętrznej stronie ud. Ściągaj kolana do środka kontrolowanie.','Zbyt duży ciężar, szarpanie'),
 
     // A4. BICEPS
     B('bi1','Uginanie ramion ze sztangą stojąc','biceps','Sztanga',1,'Łokcie przy tułowiu. Ugnij ramiona, napinając biceps.','Bujanie, odrywanie łokci'),
@@ -102,6 +113,8 @@
     B('bi8','Uginanie ze sztangą EZ','biceps','Sztanga EZ',1,'Chwyć w zewnętrznych wygięciach. Mniejsze obciążenie nadgarstków.','Bujanie, niepełny zakres'),
     B('bi9','Uginanie z liną na wyciągu górnym','biceps','Wyciąg górny, lina',2,'Ramiona na wys. barków. Przyciągaj do głowy.','Za duży ciężar'),
     B('bi10','Uginanie Zottman','biceps','Hantle',2,'Uginaj z supinacją, opuszczaj nachwytem. Pracuje biceps + przedramię.','Za duży ciężar, brak kontroli rotacji'),
+    B('bi12','Uginanie ramion na maszynie','biceps','Maszyna',1,'Ramiona oparte o podpórkę. Uginaj pełny zakres bez pomocy tułowia.','Odrywanie ramion od podpórki'),
+    B('bi13','Drag curl','biceps','Sztanga/hantle',2,'Sztanga przesuwa się blisko tułowia, łokcie idą w tył. Inny akcent niż klasyczny curl.','Odsuwanie sztangi od ciała, bujanie'),
 
     // A5. TRICEPS
     B('tr1','French press (skull crusher)','triceps','Ławka, sztanga EZ',2,'Leżąc, opuszczaj sztangę do czoła. Wyprostuj.','Łokcie na zewnątrz, opuszczanie na nos'),
@@ -114,6 +127,7 @@
     B('tr8','Wyciskanie wąskim chwytem na płaskiej','triceps','Ławka, sztanga',2,'Chwyt na szer. barków, łokcie blisko ciała.','Za szeroki chwyt (→ klatka)'),
     B('tr9','Dipy na poręczach (pionowo)','triceps','Poręcze',3,'Tułów pionowo, łokcie blisko ciała. Izolacja tricepsa.','Pochylanie do przodu (→ klatka)'),
     B('tr10','Prostowanie z gumą (band pushdown)','triceps','Guma',1,'Guma zaczepiona nad głową. Prostuj przedramiona w dół.','Odrywanie łokci'),
+    B('tr12','Prostowanie ramienia jednorącz na wyciągu','triceps','Wyciąg dolny, uchwyt jednorącz',1,'Łokieć przy tułowiu. Prostuj jedno ramię w dół, druga ręka stabilizuje.','Odrywanie łokcia, rotacja tułowia'),
 
     // A6. BARKI
     B('ba1','OHP sztangą stojąc','barki','Sztanga',2,'Wypchnij nad głowę, głowa przechodzi pod sztangę.','Odchylanie tułowia, za szeroki chwyt'),
@@ -126,6 +140,8 @@
     B('ba8','Behind-the-neck press (tylko zdrowe barki!)','barki','Sztanga',3,'Sztanga za karkiem, wypychaj nad głowę.','Za szeroki chwyt, przeciwwskazane przy impingemencie'),
     B('ba9','Reverse fly na pec-deck','barki','Maszyna pec-deck',1,'Przodem do maszyny, otwieraj ramiona do tyłu.','Za duży ciężar'),
     B('ba10','Combo raise (wznosy przód + bok)','barki','Hantle',2,'Unieś w przód → opuść → unieś w bok. Cały naramienny.','Bujanie'),
+    B('ba12','Wyciskanie hantli siedząc','barki','Ławka, hantle',1,'Plecy oparte, hantle na wysokości barków. Wyciskaj nad głowę bez blokowania łokci.','Przeprost w lędźwiach, odbijanie hantli'),
+    B('ba13','Wyciskanie na maszynie barkowej','barki','Maszyna',1,'Siedząc, plecy dociśnięte. Wypychaj uchwyty do góry kontrolowanym ruchem.','Zbyt szybkie tempo, przeprost łokci'),
 
     // A7. ŁYDKI
     B('ly1','Wspięcia na palcach stojąc (maszyna)','lydki','Maszyna',1,'Opuść pięty poniżej platformy, wspnij się maksymalnie.','Za szybkie tempo, brak pełnego zakresu'),
@@ -162,6 +178,10 @@
     B('co8','Pallof press','core_brzuch','Wyciąg',1,'Stań bokiem do wyciągu. Wypychaj linkę przed siebie, opierając się rotacji.','Rotacja tułowia w stronę wyciągu'),
     B('co9','Hollow body hold','core_brzuch','Brak',2,'Leżenie tyłem, ręce za głową, nogi proste uniesione ~15 cm. Lędźwie dociśnięte.','Odrywanie lędźwi od maty'),
     B('co10','Cable crunch','core_brzuch','Wyciąg górny, lina',2,'Klęcząc, linka przy głowie. Zwijaj tułów w dół. Pełny zakres z obciążeniem.','Ciągnięcie ramionami, brak zgięcia tułowia'),
+    B('co12','Deska boczna (side plank)','core_brzuch','Brak',1,'Podpór na jednym przedramieniu, ciało w linii prostej. Biodro nie opada.','Opadanie biodra, skręcanie tułowia'),
+    B('co13','Wznosy nóg leżąc','core_brzuch','Mata',1,'Leżenie tyłem, dłonie pod pośladkami. Unoś proste nogi do pionu, opuszczaj kontrolowanie.','Odrywanie lędźwi od maty, bujanie'),
+    B('co14','Brzuszki na skośnej ławce','core_brzuch','Ławka skośna',2,'Stopy zablokowane, głowa niżej bioder. Unoś tułów kontrolowanym ruchem.','Szarpanie, ciągnięcie za szyję'),
+    B('co15','V-up','core_brzuch','Brak',2,'Leżenie tyłem, jednoczesne unoszenie prostych nóg i tułowia w literę V.','Bujanie, zginanie kolan'),
 
     // A10b. NOWE ĆWICZENIA (uzupełnienie luk w bazie)
     B('pl11','Wiosłowanie T-bar','plecy','Sztanga T-bar/landmine',2,'Tułów pochylony ~45°, uchwyt równoległy. Przyciągaj do dolnej części klatki, ściągając łopatki.','Zaokrąglone plecy, szarpanie ciężaru'),
@@ -186,6 +206,10 @@
     B('st10','Kot-krowa (mobilizacja kręgosłupa)','rozciaganie','Mata',1,'Klęk podparty. Na wdechu wygnij grzbiet w dół, na wydechu zaokrąglij. 8-10 powolnych cykli.','Ruch tylko z lędźwi, brak synchronizacji z oddechem'),
     B('st11','Rozciąganie karku w bok','rozciaganie','Brak',1,'Przechyl głowę do barku, dłonią delikatnie dociśnij. 30 s na stronę.','Wzruszanie przeciwnego barku, dociskanie na siłę'),
     B('st12','Motyl (przywodziciele)','rozciaganie','Mata',1,'Siad, stopy złączone, kolana opadają na boki. Delikatnie dociskaj uda łokciami. 45-60 s.','Zaokrąglone plecy, sprężynowanie'),
+    B('st13','Skręty tułowia leżąc','rozciaganie','Mata',1,'Leżenie tyłem, kolana zgięte i opuszczone na bok, ramiona w linii barków. 30-45 s na stronę.','Odrywanie barków od maty, szarpanie'),
+    B('st14','Rozciąganie pośladka leżąc (figure-4)','rozciaganie','Mata',1,'Leżenie tyłem, kostka jednej nogi na kolanie drugiej, przyciągnij udo do klatki. 30-45 s na stronę.','Napinanie karku, zbyt mocne szarpanie'),
+    B('st15','Rozciąganie przedramion','rozciaganie','Brak',1,'Ramię proste przed sobą, drugą ręką delikatnie zegnij nadgarstek w dół i w górę. 20-30 s każda pozycja.','Za mocny nacisk, ból w nadgarstku'),
+    B('st16','Rozciąganie mięśnia gruszkowatego siedząc','rozciaganie','Krzesło',1,'Siedząc, kostka jednej nogi na kolanie drugiej, pochyl tułów w przód z prostymi plecami. 30-45 s na stronę.','Zaokrąglanie pleców zamiast zgięcia w biodrze'),
 
     // A11. ROZGRZEWKA (dynamiczna mobilizacja/aktywacja — przed treningiem)
     B('wa1','Krążenia ramion','rozgrzewka','Brak',1,'Stań swobodnie, wykonuj duże krążenia ramion w przód i w tył. 10 powt. w każdą stronę.','Zbyt małe krążenia, sztywne barki'),
@@ -198,6 +222,10 @@
     B('wa8','Krążenia nadgarstków i kostek','rozgrzewka','Brak',1,'Krążenia w obu kierunkach, najpierw nadgarstki, potem kostki. 10 powt. każdy kierunek.','Zbyt szybkie, niedokładne ruchy'),
     B('wa9','Inchworm (chodzenie rękami)','rozgrzewka','Mata',2,'Skłon, dłonie na podłodze, wyjdź rękami do deski, wróć do stóp. 6-8 powt.','Zaokrąglone plecy, ugięte kolana przy chodzeniu rękami'),
     B('wa10','Przysiad z wypadem bocznym','rozgrzewka','Brak',1,'Naprzemienny wypad w bok z lekkim przysiadem na drugiej nodze. 10 powt. na stronę.','Kolano zapada się do środka'),
+    B('wa11','Wymachy nogą w przód i tył','rozgrzewka','Ściana (podparcie)',1,'Trzymając się ściany, wymachuj prostą nogą w przód i w tył. 10-12 powt. na nogę.','Zbyt duży zakres kosztem tułowia, brak kontroli'),
+    B('wa12','Zabieganie piętami do pośladków','rozgrzewka','Brak',1,'Bieg w miejscu z dynamicznym przyciąganiem pięt do pośladków. 20-30 s.','Pochylanie tułowia w przód, zbyt wolne tempo'),
+    B('wa13','Przysiady bez obciążenia','rozgrzewka','Brak',1,'Stopy na szer. barków. Zejdź do pełnego przysiadu, wróć dynamicznie. 12-15 powt.','Pięty odrywają się, kolana do środka'),
+    B('wa14','World\'s Greatest Stretch','rozgrzewka','Mata',2,'Głęboki wykrok, dłoń przy stopie, rotacja tułowia z uniesieniem ramienia. 5-6 powt. na stronę.','Zbyt szybkie tempo, brak pełnej rotacji'),
   ];
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -329,6 +357,7 @@
     C('pm11','Marsz ze zgięciem biodra w staniu','przodopochylenie_miednicy','biodro_miednica','Zginacze/prostowniki biodra, core','Naprzemienne unoszenie kolana z utrzymaniem neutralnej miednicy — uczy kontroli w staniu',1,'Brak'),
     C('dl11','Segmentalne toczenie kręgosłupa','dyskopatia_L','kregoslup','Mobilność segmentalna','Powolne zwijanie/rozwijanie kręgosłupa kręg po kręgu — poprawia kontrolę ruchu bez obciążenia osiowego',2,'Brak'),
     C('kv11','Mostek jednonóż (single-leg glute bridge)','kolana_valgus','kolano','Pośladek wielki, stabilizacja kolana','Unoszenie bioder na jednej nodze — uczy kontroli kolana w osi bez obciążenia osiowego',1,'Brak'),
+    C('pm12','Kolana do klatki','przodopochylenie_miednicy','biodro_miednica','Pośladek wielki, prostowniki lędźwi','Rozciąga napięte prostowniki grzbietu i pośladek jednocześnie, przywracając balans miednicy',1,'Mata'),
   ];
 
   // ── PRECYZYJNE TAGI MIĘŚNIOWE (akton/mięsień) — prompt 1.2.1 ─────────────
