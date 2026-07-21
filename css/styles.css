@@ -16,7 +16,7 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%}
   --r1:6px;--r2:10px;--r3:14px;--r4:18px;--r5:24px;
   --sw:220px;--bnh:64px;
 }
-html,body{height:100%;background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;overflow-x:hidden;overscroll-behavior-x:none}
 #root{height:100%}
 button{font-family:inherit;cursor:pointer;border:none}
 input,textarea,select{font-family:inherit;color:var(--t1);background:transparent}
@@ -32,7 +32,7 @@ a{color:inherit;text-decoration:none}
   padding-left:env(safe-area-inset-left);
   padding-right:env(safe-area-inset-right)}
 .sidebar{width:var(--sw);flex-shrink:0;background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow-y:auto}
-.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.main{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;display:flex;flex-direction:column}
 .page-content{flex:1;padding:28px 24px;max-width:1100px;width:100%;margin:0 auto}
 @media(max-width:768px){
   .sidebar{display:none}
@@ -133,7 +133,8 @@ a{color:inherit;text-decoration:none}
 
 /* ── SHEET ── */
 .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s ease}
-.sheet{background:var(--s2);border-radius:var(--r4) var(--r4) 0 0;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));animation:slideUp .25s ease;position:relative}
+.sheet{background:var(--s2);border-radius:var(--r4) var(--r4) 0 0;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));animation:slideUp .25s ease;position:relative;scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
 .sheet-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;background:var(--s4);color:var(--t2);font-size:.85rem;display:flex;align-items:center;justify-content:center;z-index:2}
 .sheet-close:active{background:var(--s5)}
 .sheet-handle{width:36px;height:4px;background:var(--s4);border-radius:2px;margin:0 auto 16px}

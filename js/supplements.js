@@ -237,11 +237,31 @@
   // ── Knowledge Base Tab ────────────────────────────────────────────────────
   function BasaTab(props) {
     var onAdd = props.onAdd;
+    var onAddMany = props.onAddMany;
     var db = (typeof ET.SUPP_DB !== 'undefined') ? ET.SUPP_DB : [];
 
     var qs = React.useState(''); var query = qs[0], setQuery = qs[1];
     var cs = React.useState(''); var selCat = cs[0], setSelCat = cs[1];
     var ds = React.useState(null); var detailSupp = ds[0], setDetailSupp = ds[1];
+    var ms = React.useState(false); var multiMode = ms[0], setMultiMode = ms[1];
+    var sel = React.useState([]); var selectedIds = sel[0], setSelectedIds = sel[1];
+
+    function toggleMultiMode() {
+      setMultiMode(function(v){ return !v; });
+      setSelectedIds([]);
+    }
+    function toggleSelected(id) {
+      setSelectedIds(function(prev){
+        return prev.indexOf(id)!==-1 ? prev.filter(function(x){ return x!==id; }) : prev.concat([id]);
+      });
+    }
+    function addSelected() {
+      var chosen = db.filter(function(s){ return selectedIds.indexOf(s.id)!==-1; });
+      if (!chosen.length) return;
+      onAddMany(chosen);
+      setSelectedIds([]);
+      setMultiMode(false);
+    }
 
     var allCatsUsed = [];
     db.forEach(function(s){ s.cat.forEach(function(c){ if (allCatsUsed.indexOf(c) === -1) allCatsUsed.push(c); }); });
@@ -252,11 +272,13 @@
       return matchQ && matchC;
     });
 
-    return _h('div', null,
-      _h('div', { style:{ marginBottom:10 } },
+    return _h('div', { style:{ paddingBottom: multiMode && selectedIds.length>0 ? 64 : 0 } },
+      _h('div', { style:{ display:'flex', gap:8, marginBottom:10 } },
         _h('input', { type:'text', placeholder:'🔍 Szukaj suplementu...', value:query, onChange:function(e){ setQuery(e.target.value); },
-          style:{ width:'100%', boxSizing:'border-box', padding:'10px 14px', borderRadius:'var(--r2)', background:'var(--s3)', border:'1px solid var(--b1)', color:'var(--t1)', fontSize:'.82rem', outline:'none' }
-        })
+          style:{ flex:1, boxSizing:'border-box', padding:'10px 14px', borderRadius:'var(--r2)', background:'var(--s3)', border:'1px solid var(--b1)', color:'var(--t1)', fontSize:'.82rem', outline:'none' }
+        }),
+        _h('button', { className:'btn '+(multiMode?'btn-primary':'btn-secondary'), style:{ fontSize:'.72rem', padding:'8px 12px', flexShrink:0, whiteSpace:'nowrap' }, onClick:toggleMultiMode },
+          multiMode ? '✕ Anuluj' : '☑ Zaznacz wiele')
       ),
 
       _h('div', { style:{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:14 } },
@@ -275,10 +297,12 @@
       filtered.map(function(s) {
         var mainCat = s.cat[0];
         var c = catColor(mainCat);
-        return _h('div', { key:s.id, className:'card card-sm', style:{ marginBottom:8, cursor:'pointer', borderLeft:'3px solid '+c },
-          onClick:function(){ setDetailSupp(s); }
+        var checked = selectedIds.indexOf(s.id)!==-1;
+        return _h('div', { key:s.id, className:'card card-sm', style:{ marginBottom:8, cursor:'pointer', borderLeft:'3px solid '+c, background: checked?'var(--a-dim)':undefined },
+          onClick:function(){ multiMode ? toggleSelected(s.id) : setDetailSupp(s); }
         },
           _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
+            multiMode && _h('div', { style:{ width:20, height:20, borderRadius:6, border:'1.5px solid '+(checked?'var(--a)':'var(--b2)'), background:checked?'var(--a)':'transparent', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'.7rem', flexShrink:0 } }, checked?'✓':''),
             _h('div', { style:{ fontSize:'1.4rem', flexShrink:0 } }, s.icon),
             _h('div', { style:{ flex:1, minWidth:0 } },
               _h('div', { style:{ fontWeight:700, fontSize:'.88rem', marginBottom:2 } }, s.name),
@@ -290,7 +314,7 @@
               )
             ),
             _h('div', { style:{ fontSize:'.7rem', color:'var(--green)', fontWeight:700, flexShrink:0 } }, s.optDose),
-            _h('div', { style:{ color:'var(--t3)', fontSize:'.7rem', flexShrink:0 } }, '›')
+            !multiMode && _h('div', { style:{ color:'var(--t3)', fontSize:'.7rem', flexShrink:0 } }, '›')
           )
         );
       }),
@@ -300,6 +324,13 @@
           onAdd(s);
           setDetailSupp(null);
         } })
+      ),
+
+      multiMode && selectedIds.length > 0 && _h('div', {
+        style:{ position:'fixed', left:0, right:0, bottom:'calc(var(--bnh, 0px) + env(safe-area-inset-bottom,0px))', padding:'10px 16px', background:'var(--s2)', borderTop:'1px solid var(--b1)', zIndex:250, display:'flex', justifyContent:'center' }
+      },
+        _h('button', { className:'btn btn-primary', style:{ width:'100%', maxWidth:640 }, onClick:addSelected },
+          '+ Dodaj ('+selectedIds.length+')')
       )
     );
   }
@@ -352,6 +383,19 @@
       var newEntry = { id:Date.now(), name:s.name, dose:s.defaultDose, unit:s.defaultUnit, timing:s.defaultTiming, notes:s.nameEn };
       update(function(st){ return Object.assign({},st,{ supplements:(st.supplements||[]).concat([newEntry]) }); });
       toast(s.name+' dodano do planu ✓', 'success');
+      setTab('plan');
+    }
+
+    // Dodaje wiele suplementów z bazy naraz (zaznaczanie wielokrotne w Bazie wiedzy).
+    // Każdy dostaje unikalne id — Date.now() samo nie wystarczy przy dodawaniu
+    // kilku w tej samej milisekundzie, więc doliczamy indeks.
+    function addManyFromDB(list) {
+      var base = Date.now();
+      var newEntries = list.map(function(s, i) {
+        return { id:base+i, name:s.name, dose:s.defaultDose, unit:s.defaultUnit, timing:s.defaultTiming, notes:s.nameEn };
+      });
+      update(function(st){ return Object.assign({},st,{ supplements:(st.supplements||[]).concat(newEntries) }); });
+      toast(newEntries.length+' suplementów dodano do planu ✓', 'success');
       setTab('plan');
     }
 
@@ -459,7 +503,7 @@
       ),
 
       // ── BAZA WIEDZY ───────────────────────────────────────────────────────
-      tab==='baza' && _h(BasaTab, { onAdd:addFromDB }),
+      tab==='baza' && _h(BasaTab, { onAdd:addFromDB, onAddMany:addManyFromDB }),
 
       // ── PLAN DETAIL SHEET ─────────────────────────────────────────────────
       _h(ET.Sheet, { open:!!planDetail, onClose:function(){ setPlanDetail(null); }, title:planDetail?planDetail.name:'' },
