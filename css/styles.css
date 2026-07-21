@@ -61,9 +61,15 @@ a{color:inherit;text-decoration:none}
   background:rgba(9,9,24,.95);backdrop-filter:blur(20px);
   border-top:1px solid var(--b1);z-index:200;
   padding:0 4px;padding-bottom:env(safe-area-inset-bottom,0px);
-  align-items:stretch}
+  align-items:stretch;overflow-x:hidden}
 @media(max-width:768px){.mobile-nav{display:flex}}
+/* Tryb przewijania — odblokowany po przytrzymaniu paska (patrz MobileNav w app.js).
+   W tym trybie pasek pokazuje WSZYSTKIE sekcje menu (nie tylko skróconą listę)
+   i pozwala je przewinąć przeciągnięciem, zamiast otwierać osobny arkusz "Więcej". */
+.mobile-nav.scroll-mode{overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;justify-content:flex-start}
+.mobile-nav.scroll-mode::-webkit-scrollbar{display:none}
 .mn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--t3);transition:color .15s;padding:8px 0;-webkit-tap-highlight-color:transparent;user-select:none}
+.mobile-nav.scroll-mode .mn-item{flex:0 0 68px;scroll-snap-align:center}
 .mn-item.active{color:var(--a-light)}
 .mn-item-icon{font-size:1.3rem;line-height:1}
 .mn-item-label{font-size:.55rem;font-weight:600}

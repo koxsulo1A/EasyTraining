@@ -99,13 +99,25 @@
   }
 
   // ── MOBILE NAV ───────────────────────────────────
+  // Przytrzymanie paska (LONG_PRESS_MS) odblokowuje "tryb przewijania": pasek
+  // pokazuje WSZYSTKIE sekcje menu zamiast skróconej listy, przeciąganie w
+  // bok przewija do dowolnej z nich — alternatywa dla arkusza "Więcej" dla
+  // kogoś, kto woli jeden gest zamiast otwierania osobnego okna.
+  var LONG_PRESS_MS = 350;
+  var LONG_PRESS_MOVE_TOLERANCE = 10; // px — większy ruch przed czasem = zwykłe przewijanie/tap, nie przytrzymanie
+
   function MobileNav() {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
     var ms = React.useState(false); var showMore = ms[0], setShowMore = ms[1];
+    var sm = React.useState(false); var scrollMode = sm[0], setScrollMode = sm[1];
     var su = ET.useStore(); var msMob = (su.store.menuSettings||{}).mobile;
     var mobileTabs = applyMenuSettings(ET.MOBILE_TABS, msMob);
     var auth = ET.useAuth ? ET.useAuth() : null;
     var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
+    var navRef = React.useRef(null);
+    var pressTimer = React.useRef(null);
+    var pressStart = React.useRef(null);
+    var idleTimer = React.useRef(null);
 
     // Grupy w sheet "Więcej" (wszystko poza widocznymi tabami)
     var tabIds = mobileTabs.map(function(t){ return t.id; });
@@ -113,19 +125,64 @@
       return Object.assign({}, g, { items: g.items.filter(function(i){ return tabIds.indexOf(i.id)===-1 && (!i.adminOnly || isAdmin); }) });
     }).filter(function(g){ return g.items.length > 0; });
 
-    function goTo(id) { setShowMore(false); navigate(id); }
+    // Płaska lista WSZYSTKICH sekcji (do trybu przewijania) — te same filtry co "Więcej".
+    var allItems = ET.NAV_GROUPS.reduce(function(a,g){
+      return a.concat(g.items.filter(function(i){ return !i.adminOnly || isAdmin; }));
+    }, []);
+
+    function goTo(id) { setShowMore(false); setScrollMode(false); navigate(id); }
+
+    function clearIdleTimer() { if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; } }
+    function armIdleExit() {
+      clearIdleTimer();
+      idleTimer.current = setTimeout(function(){ setScrollMode(false); }, 4000);
+    }
+    function enterScrollMode() {
+      setScrollMode(true);
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch(e) {} }
+      armIdleExit();
+      // wyśrodkuj pasek na aktualnie aktywnej sekcji
+      setTimeout(function(){
+        if (!navRef.current) return;
+        var activeEl = navRef.current.querySelector('.mn-item.active');
+        if (activeEl) activeEl.scrollIntoView({ behavior:'auto', inline:'center', block:'nearest' });
+      }, 0);
+    }
+    function onPressStart(e) {
+      var p = e.touches ? e.touches[0] : e;
+      pressStart.current = { x:p.clientX, y:p.clientY };
+      pressTimer.current = setTimeout(enterScrollMode, LONG_PRESS_MS);
+    }
+    function onPressMove(e) {
+      if (!pressTimer.current || !pressStart.current) return;
+      var p = e.touches ? e.touches[0] : e;
+      var dx = Math.abs(p.clientX - pressStart.current.x), dy = Math.abs(p.clientY - pressStart.current.y);
+      if (dx > LONG_PRESS_MOVE_TOLERANCE || dy > LONG_PRESS_MOVE_TOLERANCE) {
+        clearTimeout(pressTimer.current); pressTimer.current = null;
+      }
+      if (scrollMode) armIdleExit();
+    }
+    function onPressEnd() {
+      if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+    }
+    React.useEffect(function(){ return function(){ clearIdleTimer(); if (pressTimer.current) clearTimeout(pressTimer.current); }; }, []);
 
     var isMoreActive = !mobileTabs.some(function(t){ return t.id===current; });
+    var displayItems = scrollMode ? allItems : mobileTabs;
 
     return _h('div', null,
-      _h('nav', { className:'mobile-nav' },
-        mobileTabs.map(function(item) {
-          return _h('div', { key:item.id, className:'mn-item'+(current===item.id?' active':''), onClick:function(){ setShowMore(false); navigate(item.id); } },
+      _h('nav', {
+        className:'mobile-nav'+(scrollMode?' scroll-mode':''), ref:navRef,
+        onTouchStart:onPressStart, onTouchMove:onPressMove, onTouchEnd:onPressEnd, onTouchCancel:onPressEnd,
+        onMouseDown:onPressStart, onMouseMove:onPressMove, onMouseUp:onPressEnd, onMouseLeave:onPressEnd
+      },
+        displayItems.map(function(item) {
+          return _h('div', { key:item.id, className:'mn-item'+(current===item.id?' active':''), onClick:function(){ goTo(item.id); } },
             _h('span', { className:'mn-item-icon' }, item.icon),
             _h('span', { className:'mn-item-label' }, item.label)
           );
         }),
-        _h('div', { className:'mn-item'+(isMoreActive?' active':''), onClick:function(){ setShowMore(function(v){ return !v; }); } },
+        !scrollMode && _h('div', { className:'mn-item'+(isMoreActive?' active':''), onClick:function(){ setShowMore(function(v){ return !v; }); } },
           _h('span', { className:'mn-item-icon' }, '⋯'),
           _h('span', { className:'mn-item-label' }, 'Więcej')
         )
