@@ -127,16 +127,22 @@
       if (db) {
         e.measurementType = e.measurementType || db.measurementType;
         e.isUnilateral = e.isUnilateral != null ? e.isUnilateral : db.isUnilateral;
+        e.bodyweight = e.bodyweight != null ? e.bodyweight : db.bodyweight;
       } else {
         e.measurementType = e.measurementType || (/plank|deska|wall sit|izometr/i.test(e.name) ? 'seconds' : 'reps');
         e.isUnilateral = e.isUnilateral != null ? e.isUnilateral : /jednorącz|jednonóż|jednej nodze|jednej ręki|single-leg|split squat|bułgarski|step-up|pistol|unilateral|wykrok|lunge|suitcase carry|bottoms-up|koncentrowane|kickback|gripper|plate pinch/i.test(e.name);
+        e.bodyweight = e.bodyweight != null ? e.bodyweight : /pompk|podciąganie|chin-up|dip|plank|deska|pike push|w zwisie|hanging|dead hang|burpee|pajacyki|mostek/i.test(e.name);
       }
     });
   });
 
   // ── SKALA RIR (Reps In Reserve) ───────────────────────────────────────────
-  // 0 = seria do upadku, 0.5/1/2/3 = rosnący zapas powtórzeń. Im niższy RIR, tym cięższa seria.
-  var RIR_SCALE = [0, 0.5, 1, 2, 3];
+  // 0 = seria do upadku, 0.5/1/1.5/2/3 = rosnący zapas powtórzeń. Im niższy RIR, tym cięższa seria.
+  var RIR_SCALE = [0, 0.5, 1, 1.5, 2, 3];
+  // Opisy słowne — pomagają nowym użytkownikom, którzy nie znają skali na pamięć.
+  var RIR_LABELS = { 0:'Upadek', 0.5:'Prawie', 1:'Ciężko', 1.5:'Trudno', 2:'Solidnie', 3:'Luźno' };
+  function fmtRir(v) { return (v === 0.5 || v === 1.5) ? String(v).replace('.', ',') : String(v); }
+
   function RirPicker(props) {
     var val = props.value != null ? props.value : 2;
     return _h('div', { style:{ display:'flex', gap:3, flexWrap:'wrap' } },
@@ -145,20 +151,36 @@
         return _h('button', { key:v, type:'button',
           style:{ padding:'4px 6px', borderRadius:'var(--r2)', border:'1px solid '+(active?'var(--a)':'var(--b1)'), background:active?'var(--a-dim)':'var(--s3)', color:active?'var(--a-light)':'var(--t2)', fontSize:'.65rem', fontWeight:700, cursor:'pointer', minWidth:26 },
           onClick:function(){ props.onChange(v); }
-        }, v);
+        }, fmtRir(v));
       })
     );
   }
 
-  // RIR na osi (suwak) — używany w trakcie aktywnego treningu
-  function RirSlider(props) {
+  // RIR w aktywnym treningu — kompaktowy przycisk w komórce serii otwiera
+  // duży, jednoznaczny picker (arkusz). Rozwiązuje trudność trafiania palcem
+  // w mały suwak w gęstej siatce serii (mockup wariant B).
+  function RirButtonPicker(props) {
     var val = props.value != null ? props.value : 2;
-    var idx = RIR_SCALE.indexOf(val);
-    if (idx === -1) idx = 3;
-    return _h('div', { style:{ display:'flex', alignItems:'center', gap:6, minWidth:96 } },
-      _h('input', { type:'range', min:0, max:RIR_SCALE.length-1, step:1, value:idx, style:{ width:64, margin:0 },
-        onChange:function(e){ props.onChange(RIR_SCALE[+e.target.value]); } }),
-      _h('span', { style:{ fontSize:'.75rem', fontWeight:700, color:'var(--a-light)', minWidth:22, fontVariantNumeric:'tabular-nums' } }, RIR_SCALE[idx])
+    var os = React.useState(false); var open = os[0], setOpen = os[1];
+    return _h(React.Fragment, null,
+      _h('button', { type:'button',
+        style:{ width:'100%', minWidth:0, padding:'5px 2px', borderRadius:5, background:'var(--a-dim)', border:'1px solid var(--a)', color:'var(--a-light)', fontSize:'.72rem', fontWeight:800, cursor:'pointer', fontVariantNumeric:'tabular-nums' },
+        onClick:function(){ setOpen(true); } }, fmtRir(val)),
+      _h(ET.Sheet, { open:open, onClose:function(){ setOpen(false); }, title:'RIR — zapas powtórzeń' },
+        _h('p', { style:{ fontSize:'.78rem', color:'var(--t2)', marginBottom:14, lineHeight:1.5 } },
+          'Ile powtórzeń „zostało w zapasie" do upadku mięśniowego na końcu tej serii?'),
+        _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+          RIR_SCALE.map(function(v){
+            var active = val === v;
+            return _h('button', { key:v, type:'button',
+              style:{ flex:'1 1 28%', minWidth:80, padding:'16px 6px', borderRadius:12, border:'1.5px solid '+(active?'var(--a-light)':'var(--b2)'), background:active?'var(--a)':'var(--s3)', color:active?'#fff':'var(--t2)', fontWeight:800, fontSize:'1.15rem', cursor:'pointer', textAlign:'center' },
+              onClick:function(){ props.onChange(v); setOpen(false); } },
+              fmtRir(v),
+              _h('div', { style:{ fontSize:'.55rem', fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:'.04em', color:active?'rgba(255,255,255,.8)':'var(--t3)' } }, RIR_LABELS[v] || '')
+            );
+          })
+        )
+      )
     );
   }
 
@@ -185,6 +207,12 @@
   ];
 
   function calc1RM(w, r) { return (!w||!r) ? 0 : Math.round(w*(1+r/30)); }
+  // Efektywne obciążenie do 1RM/wolumenu: dla ćwiczeń z masą własną liczy się
+  // masa ciała + ewentualne dociążenie (+kg), inaczej sam wpisany ciężar.
+  function effLoad(ex, w, bodyMass) {
+    var add = +w || 0;
+    return (ex && ex.bodyweight) ? (bodyMass||0) + add : add;
+  }
 
   // ── DOBÓR ĆWICZEŃ KOREKCYJNYCH: rotacja + sprawiedliwość między dolegliwościami ──
   // Zamiast zawsze tych samych 4 pozycji: deterministyczna rotacja zależna od
@@ -671,7 +699,7 @@
         var measurementType = e.measurementType || 'reps';
         var isUnilateral = !!e.isUnilateral;
         return Object.assign({}, e, { id:i+1, expanded:true, sets:sets, reps:reps, weight:weight, rir:rir,
-          measurementType:measurementType, isUnilateral:isUnilateral,
+          measurementType:measurementType, isUnilateral:isUnilateral, bodyweight:!!e.bodyweight,
           setsData:buildSetsData(sets, reps, weight, isUnilateral)
         });
       });
@@ -929,11 +957,14 @@
 
     function finish() {
       var vol=0, totalReps=0;
+      var bm = (store.profile && +store.profile.weight) || 0;
       var exData = exs.map(function(ex) {
         var done = ex.setsData.filter(function(s){ return s.done; });
-        done.forEach(function(s){ vol+=(s.weight||0)*(s.reps||0); totalReps+=(s.reps||0); });
-        var best = done.reduce(function(b,s){ return calc1RM(s.weight,s.reps)>calc1RM(b&&b.weight,b&&b.reps)?s:b; }, null);
-        return Object.assign({}, ex, { e1rm:best?calc1RM(best.weight,best.reps):0 });
+        // Wolumen i 1RM liczone z efektywnego obciążenia (masa ciała + dociążenie
+        // dla ćwiczeń z masą własną), spójnie z tym, co widać w trakcie serii.
+        done.forEach(function(s){ vol+=effLoad(ex, s.weight, bm)*(s.reps||0); totalReps+=(s.reps||0); });
+        var best = done.reduce(function(b,s){ return calc1RM(effLoad(ex,s.weight,bm),s.reps)>calc1RM(b?effLoad(ex,b.weight,bm):0,b&&b.reps)?s:b; }, null);
+        return Object.assign({}, ex, { e1rm:best?calc1RM(effLoad(ex,best.weight,bm),best.reps):0 });
       });
       var prs = [];
       exData.forEach(function(ex) {
@@ -963,6 +994,7 @@
     var totalSets = exs.reduce(function(t,e){ return t+e.setsData.length; },0);
     var elH=Math.floor(elapsed/3600000), elM=Math.floor(elapsed/60000)%60, elS=Math.floor(elapsed/1000)%60;
     var elStr=(elH>0?elH+':':'')+String(elM).padStart(2,'0')+':'+String(elS).padStart(2,'0');
+    var bodyMass = (store.profile && +store.profile.weight) || 0;
 
     return _h('div', { className:'fade-in' },
       _h(TrainingStepper, { current:4 }),
@@ -1010,7 +1042,7 @@
                 _h('span', { className:'chip', style:{ fontSize:'.6rem' } }, ex.plan),
                 ex.tempo && ex.tempo !== '0' && _h('span', { className:'chip', style:{ fontSize:'.6rem' } }, 'Tempo '+ex.tempo),
                 ex.rir != null && _h('span', { className:'chip', style:{ fontSize:'.6rem' } }, 'RIR '+ex.rir),
-                _h('span', { className:'chip', style:{ fontSize:'.6rem', color:'var(--a-light)' } }, '1RM ~'+calc1RM(ex.setsData[0]&&ex.setsData[0].weight,ex.setsData[0]&&ex.setsData[0].reps)+' kg')
+                _h('span', { className:'chip', style:{ fontSize:'.6rem', color:'var(--a-light)' } }, '1RM ~'+calc1RM(effLoad(ex, ex.setsData[0]&&ex.setsData[0].weight, bodyMass), ex.setsData[0]&&ex.setsData[0].reps)+' kg')
               )
             ),
             _h('div', { style:{ display:'flex', gap:6, alignItems:'center', flexShrink:0 } },
@@ -1020,41 +1052,56 @@
               _h('span', { style:{ color:'var(--t3)' } }, ex.expanded?'▴':'▾')
             )
           ),
-          ex.expanded && _h('div', { style:{ padding:'0 12px 12px' } },
-            _h('div', { style:{ overflowX:'auto', WebkitOverflowScrolling:'touch' } },
-            _h('table', { className:'sets-table', style:{ minWidth: ex.isUnilateral ? 460 : 400 } },
-              _h('thead', null, _h('tr', null,
-                _h('th',null,'#'),
-                ex.isUnilateral && _h('th',null,'Str.'),
-                _h('th',null, ex.measurementType==='seconds' ? 'Czas' : 'Powt.'),
-                _h('th',null,'kg'), _h('th',{ title:'Reps In Reserve — zapas powtórzeń w serii' },'RIR'), _h('th',null,'1RM'), _h('th',null,'✓'), _h('th',null,'')
-              )),
-              _h('tbody', null,
-                ex.setsData.map(function(s, si) {
-                  var timerKey = ex.id+'-'+s.id;
-                  var isRunning = !!timers[timerKey];
-                  var liveSec = isRunning ? Math.max(0, Math.round((Date.now()-timers[timerKey])/1000)) : 0;
-                  return _h('tr', { key:s.id, style:{ opacity:s.done?.5:1, transition:'opacity .2s' } },
-                    _h('td', { style:{ color:'var(--t3)', fontSize:'.75rem' } }, si+1),
-                    ex.isUnilateral && _h('td', null, _h('span', { className:'chip', style:{ fontSize:'.6rem', color:s.side==='L'?'var(--a-light)':'var(--purple)' } }, s.side==='L'?'L':'P')),
-                    ex.measurementType==='seconds'
-                      ? _h('td', null, _h('button', {
-                          style:{ padding:'6px 8px', borderRadius:'var(--r2)', border:'1px solid '+(isRunning?'var(--yellow)':'var(--b1)'), background:isRunning?'var(--yellow-d)':'var(--s3)', color:isRunning?'var(--yellow)':'var(--t1)', fontSize:'.72rem', fontWeight:700, cursor:'pointer', minWidth:56 },
-                          onClick:function(){ toggleTimer(ex.id, s.id); }
-                        }, isRunning ? ('⏱ '+liveSec+'s') : (s.reps ? s.reps+'s' : '▶ Start')))
-                      : _h('td', null, _h('input', { type:'number', value:s.reps, min:1, onChange:function(e){ upSet(ex.id,s.id,'reps',e.target.value); } })),
-                    _h('td', null, _h('input', { type:'number', value:s.weight, min:0, step:2.5, onChange:function(e){ upSet(ex.id,s.id,'weight',e.target.value); } })),
-                    _h('td', null, _h(RirSlider, { value:s.rpe!=null?s.rpe:2, onChange:function(v){ upSet(ex.id,s.id,'rpe',v); } })),
-                    _h('td', { style:{ color:'var(--a-light)', fontWeight:600 } }, calc1RM(s.weight,s.reps)||'—'),
-                    _h('td', null, _h('div', { className:'set-done-btn'+(s.done?' done':''), title:s.done?'Anuluj serię':'Zalicz serię', onClick:function(){ toggleSet(ex.id,s.id,ex.rest); } }, s.done?'✓':'○')),
-                    _h('td', null, _h('button', { style:{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.85rem', padding:'2px 4px', lineHeight:1 }, onClick:function(){ removeSet(ex.id,s.id); } }, '✕'))
-                  );
-                })
-              )
-            )
-            ),
-            _h('button', { className:'btn btn-ghost btn-sm', style:{ marginTop:8, width:'100%', borderStyle:'dashed' }, onClick:function(){ addSeries(ex.id); } }, '+ Seria')
-          )
+          ex.expanded && (function() {
+            // Siatka serii — liczba kolumn = liczba aktywnych pól. Każda kolumna
+            // dostaje udział fr, więc cały wiersz zawsze mieści się w szerokości
+            // ekranu bez przewijania w bok, niezależnie ile jest pól (skaluje się
+            // automatycznie, gdy w przyszłości dojdą nowe parametry).
+            var cols = ['0.4fr'];                       // #
+            if (ex.isUnilateral) cols.push('0.5fr');    // Str.
+            cols.push('0.95fr');                        // Powt./Czas
+            cols.push('0.95fr');                        // kg / +kg
+            cols.push('0.8fr');                         // RIR
+            cols.push('0.7fr');                         // 1RM
+            cols.push('0.5fr');                         // ✓
+            cols.push('0.4fr');                         // ✕
+            var gridCols = cols.join(' ');
+            var headSt = { fontSize:'.52rem', color:'var(--t3)', textTransform:'uppercase', textAlign:'center', fontWeight:700, letterSpacing:'.01em' };
+            return _h('div', { style:{ padding:'0 12px 12px' } },
+              _h('div', { style:{ display:'grid', gridTemplateColumns:gridCols, gap:4, marginBottom:4, padding:'0 2px' } },
+                _h('div', { style:headSt }, '#'),
+                ex.isUnilateral && _h('div', { style:headSt }, 'Str.'),
+                _h('div', { style:headSt }, ex.measurementType==='seconds' ? 'Czas' : 'Powt.'),
+                _h('div', { style:headSt, title: ex.bodyweight ? 'Dodatkowe obciążenie ponad masę ciała' : undefined }, ex.bodyweight ? '+kg' : 'kg'),
+                _h('div', { style:headSt, title:'Reps In Reserve — zapas powtórzeń w serii' }, 'RIR'),
+                _h('div', { style:headSt }, '1RM'),
+                _h('div', { style:headSt }, '✓'),
+                _h('div', { style:headSt }, '')
+              ),
+              ex.setsData.map(function(s, si) {
+                var timerKey = ex.id+'-'+s.id;
+                var isRunning = !!timers[timerKey];
+                var liveSec = isRunning ? Math.max(0, Math.round((Date.now()-timers[timerKey])/1000)) : 0;
+                var oneRm = calc1RM(effLoad(ex, s.weight, bodyMass), s.reps);
+                return _h('div', { key:s.id, style:{ display:'grid', gridTemplateColumns:gridCols, gap:4, alignItems:'center', padding:'3px 2px', opacity:s.done?.55:1, transition:'opacity .2s' } },
+                  _h('div', { style:{ color:'var(--t3)', fontSize:'.72rem', textAlign:'center' } }, si+1),
+                  ex.isUnilateral && _h('div', { style:{ background:s.side==='L'?'var(--a-dim)':'var(--purple-d)', color:s.side==='L'?'var(--a-light)':'var(--purple)', borderRadius:5, fontSize:'.6rem', fontWeight:800, textAlign:'center', padding:'5px 0' } }, s.side==='L'?'L':'P'),
+                  ex.measurementType==='seconds'
+                    ? _h('button', {
+                        style:{ width:'100%', minWidth:0, padding:'5px 2px', borderRadius:5, border:'1px solid '+(isRunning?'var(--yellow)':'var(--b1)'), background:isRunning?'var(--yellow-d)':'var(--s4)', color:isRunning?'var(--yellow)':'var(--t1)', fontSize:'.7rem', fontWeight:700, cursor:'pointer' },
+                        onClick:function(){ toggleTimer(ex.id, s.id); }
+                      }, isRunning ? ('⏱'+liveSec) : (s.reps ? s.reps+'s' : '▶'))
+                    : _h('input', { className:'sg-input', type:'number', value:s.reps, min:1, onChange:function(e){ upSet(ex.id,s.id,'reps',e.target.value); } }),
+                  _h('input', { className:'sg-input', type:'number', value:s.weight, min:0, step:2.5, onChange:function(e){ upSet(ex.id,s.id,'weight',e.target.value); } }),
+                  _h(RirButtonPicker, { value:s.rpe!=null?s.rpe:2, onChange:function(v){ upSet(ex.id,s.id,'rpe',v); } }),
+                  _h('div', { style:{ color:'var(--a-light)', fontWeight:600, fontSize:'.72rem', textAlign:'center', fontVariantNumeric:'tabular-nums' } }, oneRm||'—'),
+                  _h('div', { style:{ display:'flex', justifyContent:'center' } }, _h('div', { className:'set-done-btn'+(s.done?' done':''), title:s.done?'Anuluj serię':'Zalicz serię', onClick:function(){ toggleSet(ex.id,s.id,ex.rest); } }, s.done?'✓':'○')),
+                  _h('button', { style:{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.8rem', padding:'2px', lineHeight:1 }, onClick:function(){ removeSet(ex.id,s.id); } }, '✕')
+                );
+              }),
+              _h('button', { className:'btn btn-ghost btn-sm', style:{ marginTop:8, width:'100%', borderStyle:'dashed' }, onClick:function(){ addSeries(ex.id); } }, '+ Seria')
+            );
+          })()
         );
       }),
 

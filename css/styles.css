@@ -182,6 +182,11 @@ a{color:inherit;text-decoration:none}
 .sets-table tr:last-child td{border-bottom:none}
 .sets-table input{width:60px;background:var(--s4);border:1px solid var(--b1);border-radius:5px;color:var(--t1);padding:4px 6px;text-align:center;font-size:.82rem;outline:none}
 .sets-table input:focus{border-color:var(--a)}
+/* Pole liczbowe w siatce serii (aktywny trening) — pełna szerokość kolumny grid,
+   min-width:0 pozwala kolumnie się kurczyć zamiast rozpychać wiersz poza ekran. */
+.sg-input{width:100%;min-width:0;background:var(--s4);border:1px solid var(--b1);border-radius:5px;color:var(--t1);padding:6px 2px;text-align:center;font-size:.76rem;outline:none;box-sizing:border-box;-moz-appearance:textfield}
+.sg-input:focus{border-color:var(--a)}
+.sg-input::-webkit-outer-spin-button,.sg-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .set-done-btn{width:28px;height:28px;border-radius:6px;background:var(--s4);border:1px solid var(--b1);color:var(--t3);display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0 auto;transition:all .15s;font-size:.85rem}
 .set-done-btn.done{background:var(--green-d);border-color:var(--green);color:var(--green)}
 .summary-hero{text-align:center;padding:32px 20px 24px}

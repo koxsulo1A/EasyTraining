@@ -479,12 +479,31 @@
   ];
   var SECONDS_KW = ['plank','deska','wall sit','izometr','martwy punkt'];
   var UNILATERAL_OVERRIDE = { ly8:true, it5:true, ns5:true }; // jednostronne bez charakterystycznego słowa w nazwie
+  // Ćwiczenia z masą własną — pole obciążenia pokazuje DOCIĄŻENIE (+kg, domyślnie 0),
+  // a nie ciężar zewnętrzny. 1RM/wolumen liczone z masy ciała użytkownika + dociążenia.
+  var BODYWEIGHT_KW = [
+    'pompk','podciąganie','chin-up','dip','plank','deska','pike push','dead bug',
+    'martwy robak','crunch','spięcia brzucha','w zwisie','hanging','bird dog',
+    'pies myśliwski','mountain climber','hollow body','v-up','dead hang','inchworm',
+    'pajacyki','burpee','przysiady bez obciążenia','zabieganie','wznosy nóg leżąc',
+    'brzuszki','glute bridge','mostek'
+  ];
+  var BODYWEIGHT_OVERRIDE = { ba11:true }; // Pompki Pike — na wypadek gdyby "pike push" nie chwyciło wariantu nazwy
+  // Wyjątki: nazwa zawiera słowo kluczowe BW, ale ćwiczenie ma obciążenie zewnętrzne
+  var BODYWEIGHT_EXCLUDE = { co10:true }; // Cable crunch — wyciąg, nie masa własna
   function classifyUnilateralAndMeasurement(ex) {
     var n = (ex.name||'').toLowerCase();
     ex.isUnilateral = UNILATERAL_KW.some(function(k){ return n.indexOf(k)!==-1; }) || !!UNILATERAL_OVERRIDE[ex.id];
     // Rozciąganie zawsze liczone w sekundach
     var isStretch = (ex.tags||[])[0]==='rozciaganie';
     ex.measurementType = (isStretch || SECONDS_KW.some(function(k){ return n.indexOf(k)!==-1; })) ? 'seconds' : 'reps';
+    // Masa własna: rozgrzewka/rozciąganie zawsze BW; reszta wg słów kluczowych/override
+    var tag0 = (ex.tags||[])[0];
+    ex.bodyweight = !BODYWEIGHT_EXCLUDE[ex.id] && (
+      tag0==='rozgrzewka' || tag0==='rozciaganie'
+      || BODYWEIGHT_KW.some(function(k){ return n.indexOf(k)!==-1; })
+      || !!BODYWEIGHT_OVERRIDE[ex.id]
+    );
   }
   ET.EXERCISES_BASIC.forEach(classifyUnilateralAndMeasurement);
   ET.EXERCISES_CORRECTIVE.forEach(classifyUnilateralAndMeasurement);
