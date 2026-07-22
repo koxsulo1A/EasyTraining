@@ -1021,7 +1021,8 @@
             )
           ),
           ex.expanded && _h('div', { style:{ padding:'0 12px 12px' } },
-            _h('table', { className:'sets-table' },
+            _h('div', { style:{ overflowX:'auto', WebkitOverflowScrolling:'touch' } },
+            _h('table', { className:'sets-table', style:{ minWidth: ex.isUnilateral ? 460 : 400 } },
               _h('thead', null, _h('tr', null,
                 _h('th',null,'#'),
                 ex.isUnilateral && _h('th',null,'Str.'),
@@ -1050,6 +1051,7 @@
                   );
                 })
               )
+            )
             ),
             _h('button', { className:'btn btn-ghost btn-sm', style:{ marginTop:8, width:'100%', borderStyle:'dashed' }, onClick:function(){ addSeries(ex.id); } }, '+ Seria')
           )
