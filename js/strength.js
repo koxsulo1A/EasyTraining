@@ -4,6 +4,14 @@
   var _h = React.createElement;
 
   // ── PLANY TRENINGOWE (z Excela) ──────────────────────────────────────────
+  // ⚠️ UWAGA PRZED USUNIĘCIEM KTÓREGOKOLWIEK Z TYCH PLANÓW:
+  // Użytkownicy, którzy dostosowali wbudowany plan, mają zapisane TYLKO swoje
+  // zmiany jako nakładkę (store.workoutPlans[id]) — baza (nazwa, ćwiczenia)
+  // wciąż pochodzi stąd. Usunięcie planu z tej tablicy sprawi, że nakładka
+  // straci punkt zaczepienia i personalizacja zniknie z ich konta.
+  // Bezpieczna ścieżka: najpierw wypuść wersję z przyciskiem „Odłącz i zapisz
+  // jako mój plan" (edytor jednostki → detachUnit), daj użytkownikom czas na
+  // odłączenie, dopiero potem usuwaj plan stąd.
   var WORKOUT_PLANS = [
     {
       id:'pon_gora_sila', name:'Góra / Siła', icon:'💪', day:'Poniedziałek',
@@ -205,6 +213,18 @@
     { key:'state',       label:'Samopoczucie',      opts:['😞 Słabo','😐 Normalnie','😄 Świetnie'] },
     { key:'fatigue',     label:'Zmęczenie',          opts:['😴 Bardzo zmęczony','😐 Umiarkowane','⚡ Brak zmęczenia'] },
   ];
+
+  // Unikalny identyfikator planu/segmentu/jednostki. UUID zamiast Date.now(),
+  // bo Date.now() powtarza się przy tworzeniu kilku obiektów w tej samej
+  // milisekundzie (np. nowy plan + jego pierwszy segment) — a te id trafiają
+  // do konta i muszą być stabilne między urządzeniami.
+  function uid(prefix) {
+    var u = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          var r = Math.random()*16|0; return (c === 'x' ? r : (r&0x3|0x8)).toString(16);
+        });
+    return prefix ? prefix + '_' + u : u;
+  }
 
   function calc1RM(w, r) { return (!w||!r) ? 0 : Math.round(w*(1+r/30)); }
   // Efektywne obciążenie do 1RM/wolumenu: dla ćwiczeń z masą własną liczy się
@@ -2165,6 +2185,14 @@
         }, props.onDelete ? '🗑' : '↩')
       ),
 
+      props.onDetach && _h('div', { className:'card', style:{ marginBottom:14, borderLeft:'3px solid var(--orange)' } },
+        _h('div', { style:{ fontWeight:700, fontSize:'.82rem', marginBottom:4 } }, '🔗 Plan oparty o wersję wbudowaną'),
+        _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', lineHeight:1.55, marginBottom:10 } },
+          'Ten plan bazuje na wersji zaszytej w aplikacji, a Twoje zmiany są zapisane jako nakładka na nią. Odłącz go, żeby zapisać własną, niezależną kopię — przetrwa wtedy nawet usunięcie oryginału w przyszłych aktualizacjach.'),
+        _h('button', { className:'btn btn-secondary btn-sm', style:{ borderColor:'var(--orange)', color:'var(--orange)' }, onClick:props.onDetach },
+          '🔓 Odłącz i zapisz jako mój plan')
+      ),
+
       _h('div', { className:'card', style:{ marginBottom:14 } },
         _h('div', { style:{ fontWeight:700, marginBottom:12, fontSize:'.85rem', color:'var(--t2)' } }, 'Informacje o planie'),
         _h('div', { className:'field' },
@@ -2540,7 +2568,7 @@
       var segs = segsOf(mp);
       var name = prompt('Nazwa nowego segmentu (np. "Tygodnie 13-24")', 'Segment '+(segs.length+1));
       if (!name) return;
-      var seg = { id:'seg_'+Date.now(), name:name, createdAt:ET.dstr() };
+      var seg = { id:uid('seg'), name:name, createdAt:ET.dstr() };
       mp.segments = segs.concat([seg]);
       saveMetaPlan(mp); setSelMeta(mp); setSelSeg(seg.id);
       toast('Nowy segment utworzony — poprzednie jednostki zostają w historii','success');
@@ -2578,6 +2606,44 @@
       setSelUnit(null);
     }
 
+    // Odłącza jednostkę od wersji wbudowanej w kod aplikacji: bierze AKTUALNIE
+    // widoczną wersję (baza z WORKOUT_PLANS + nakładka store.workoutPlans) i
+    // zapisuje ją jako w pełni samodzielną kopię z własnym UUID. Dzięki temu
+    // plan przestaje zależeć od tego, czy oryginał nadal istnieje w kodzie —
+    // przeżywa też usunięcie wbudowanego planu w przyszłych wersjach aplikacji.
+    function detachUnit(unit) {
+      if (!confirm('Zapisać „'+unit.name+'" jako Twój własny, niezależny plan?\n\nDzięki temu przestanie zależeć od wersji wbudowanej w aplikację i przetrwa jej ewentualne usunięcie w przyszłych aktualizacjach.')) return;
+      var oldId = unit.id;
+      var copy = JSON.parse(JSON.stringify(unit));
+      copy.id = uid('unit');
+      copy._isCustom = true;
+      copy._detachedFrom = oldId;
+      copy.createdAt = new Date().toISOString();
+
+      var mp = JSON.parse(JSON.stringify(selMeta));
+      var idx = mp.units.findIndex(function(u){ return u.id===oldId; });
+      if (idx >= 0) mp.units[idx] = copy; else mp.units.push(copy);
+      // saveMetaPlan sam dopisuje jednostki _isCustom do customWorkoutPlans —
+      // nie powielamy tego tutaj, inaczej kopia trafiłaby do listy dwa razy.
+      saveMetaPlan(mp);
+      setSelMeta(mp);
+
+      update(function(s) {
+        var next = Object.assign({}, s);
+        // oryginał znika z list, a jego nakładka nie jest już potrzebna
+        var hidden = (s.hiddenPlanIds||[]).slice();
+        if (hidden.indexOf(oldId)===-1) hidden.push(oldId);
+        next.hiddenPlanIds = hidden;
+        var ov = Object.assign({}, s.workoutPlans||{});
+        delete ov[oldId];
+        next.workoutPlans = ov;
+        return next;
+      });
+
+      toast('Plan jest teraz Twój — niezależny od wersji wbudowanej ✓','success');
+      setSelUnit(null);
+    }
+
     // Usuwa jednostkę TRWALE (nie tylko z listy meta-planu) — inaczej wbudowane/
     // custom plany nadal pojawiały się w "Twoje plany treningowe" i na Dashboardzie,
     // mimo usunięcia z planu (bug: getEffectivePlans czytał osobną, niezależną listę).
@@ -2600,7 +2666,7 @@
     }
 
     function addNewMeta() {
-      var mp = { id:'plan_'+Date.now(), name:'Nowy plan', icon:'📋', units:[], goal:null, segments:[{ id:'seg_'+Date.now(), name:'Segment 1', createdAt:ET.dstr() }] };
+      var mp = { id:uid('plan'), name:'Nowy plan', icon:'📋', units:[], goal:null, segments:[{ id:uid('seg'), name:'Segment 1', createdAt:ET.dstr() }] };
       var updated = metaPlans.concat([mp]);
       saveMetaPlans(update, updated);
       setSelMeta(mp);
@@ -2629,12 +2695,12 @@
     }
 
     function addStrengthUnit() {
-      var unit = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, segmentId:currentSegId(), createdAt:new Date().toISOString(), name:'Nowy trening', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
+      var unit = { id:uid('unit'), unitType:'strength', _isCustom:true, segmentId:currentSegId(), createdAt:new Date().toISOString(), name:'Nowy trening', icon:'🏋️', day:'', desc:'', color:'var(--a)', badge:'badge-blue', warmup:[], exercises:[], cooldown:[] };
       setSelUnit(unit);
     }
 
     function addRunUnit() {
-      var unit = { id:'rununit_'+Date.now(), unitType:'running', segmentId:currentSegId(), createdAt:new Date().toISOString(), name:'Bieg', day:'', runType:'easy', distance:5, duration:30, pace:'6:00', notes:'' };
+      var unit = { id:uid('rununit'), unitType:'running', segmentId:currentSegId(), createdAt:new Date().toISOString(), name:'Bieg', day:'', runType:'easy', distance:5, duration:30, pace:'6:00', notes:'' };
       setSelUnit(unit);
     }
 
@@ -2658,7 +2724,7 @@
             cooldown.push({ n:name, d:cols[7]||'' });
           }
         });
-        var imported = { id:'unit_'+Date.now(), unitType:'strength', _isCustom:true, segmentId:currentSegId(), createdAt:new Date().toISOString(), name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
+        var imported = { id:uid('unit'), unitType:'strength', _isCustom:true, segmentId:currentSegId(), createdAt:new Date().toISOString(), name:planName, icon:'📋', day:'Import', desc:exercises.length+' ćwiczeń', color:'var(--teal)', badge:'badge-teal', warmup:warmup, exercises:exercises, cooldown:cooldown };
         setSelUnit(imported);
         toast('Wczytano plik — sprawdź i zapisz','success');
       };
@@ -2688,6 +2754,8 @@
         onBack: function(){ setSelUnit(null); },
         onSave: saveUnit,
         onReset: null,
+        // "Odłącz" pokazujemy tylko dla jednostek nadal opartych o wersję z kodu
+        onDetach: (!selUnit._isCustom && selUnit.unitType!=='running') ? function(){ detachUnit(selUnit); } : null,
         onDelete: selMeta && selMeta.units.find(function(u){ return u.id===selUnit.id; }) ? function(){ deleteUnit(selUnit.id); } : null
       });
     }

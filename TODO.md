@@ -3,6 +3,22 @@
 Lista rzeczy do zrobienia w kolejnych sesjach. Nie zaimplementowane —
 tylko zapisane zakresy, żeby nic się nie zgubiło.
 
+## ⚠️ Planowane usunięcie wbudowanych planów z kodu
+Docelowo 4 wbudowane plany (`WORKOUT_PLANS` w `js/strength.js`: Góra/Siła,
+Dół+Core, Góra/Hipertrofia, FullBody) mają zniknąć z kodu aplikacji.
+
+**Zanim to zrobisz:** użytkownik, który dostosował wbudowany plan, ma zapisane
+tylko swoje zmiany jako nakładkę (`store.workoutPlans[id]`) — baza planu wciąż
+pochodzi z kodu. Usunięcie planu z tablicy sprawi, że nakładka straci punkt
+zaczepienia i personalizacja zniknie z konta.
+
+Bezpieczna kolejność:
+1. ✅ ZROBIONE — przycisk „🔓 Odłącz i zapisz jako mój plan" w edytorze
+   jednostki (`detachUnit`): zapisuje aktualnie widoczną wersję jako
+   samodzielną kopię z własnym UUID, chowa oryginał, kasuje nakładkę.
+2. Dać użytkownikom czas na odłączenie swoich planów (kilka wersji aplikacji).
+3. Dopiero wtedy usunąć plany z `WORKOUT_PLANS`.
+
 ## 1. Baza ćwiczeń rozgrzewkowych (jak baza ćwiczeń siłowych)
 Dziś rozgrzewka to sztywna tablica `{n, s, r, note}` wpisana ręcznie w każdym
 planie (`WORKOUT_PLANS[].warmup`), bez własnej bazy/kategorii jak
