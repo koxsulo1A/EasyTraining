@@ -234,6 +234,25 @@
     return (ex && ex.bodyweight) ? (bodyMass||0) + add : add;
   }
 
+  // Objętość zagregowana per tydzień (poniedziałek–niedziela), do wykresu
+  // "Objętość tygodniowa" na liście Trening siłowy. Ostatnie 8 tygodni z danymi.
+  function weeklyVolumeData(workouts) {
+    function mondayKey(dateStr) {
+      var d = new Date(dateStr+'T12:00:00');
+      var dow = (d.getDay()+6)%7; // 0=poniedziałek
+      d.setDate(d.getDate()-dow);
+      return d.toISOString().slice(0,10);
+    }
+    var buckets = {};
+    (workouts||[]).forEach(function(w){
+      if (!w.date) return;
+      var k = mondayKey(w.date);
+      buckets[k] = (buckets[k]||0) + (w.volume||0);
+    });
+    var weeks = Object.keys(buckets).sort().slice(-8);
+    return weeks.map(function(k){ return { label:ET.fmtDateShort(k), value:Math.round(buckets[k]) }; });
+  }
+
   // ── DOBÓR ĆWICZEŃ KOREKCYJNYCH: rotacja + sprawiedliwość między dolegliwościami ──
   // Zamiast zawsze tych samych 4 pozycji: deterministyczna rotacja zależna od
   // dnia i planu (zmienia się między sesjami, ale stabilna w obrębie dnia),
@@ -3139,6 +3158,16 @@
               _h('div', { style:{ width:64, fontSize:'.66rem', color:'var(--t3)', textAlign:'right', flexShrink:0 } }, row.v.toLocaleString('pl-PL')+' kg')
             );
           })
+        );
+      })(),
+
+      // ── OBJĘTOŚĆ TYGODNIOWA: wykres słupkowy z historii treningów ─────────
+      (function() {
+        var data = weeklyVolumeData(workouts);
+        if (data.length < 2) return null; // BarChart i tak pokaże "Brak danych", ale mniej niż 2 tyg. nic nie wnosi
+        return _h('div', { className:'chart-wrap', style:{ marginBottom:16 } },
+          _h('div', { className:'chart-title' }, 'Objętość tygodniowa'),
+          _h(ET.BarChart, { data:data, color:'var(--a)', unit:'kg' })
         );
       })(),
 
