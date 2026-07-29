@@ -58,8 +58,12 @@ ext_target.build_configurations.each do |config|
   bs['CODE_SIGN_IDENTITY']              = ''
   bs['CODE_SIGNING_REQUIRED']           = 'NO'
   bs['CODE_SIGNING_ALLOWED']            = 'NO'
-  bs['CURRENT_PROJECT_VERSION']         = '1'
-  bs['MARKETING_VERSION']               = '1.0'
+  # Wersje muszą być IDENTYCZNE z aplikacją-kontenerem — iOS odrzuca rozszerzenie
+  # przy rozjeździe, a przy sideloadzie objawia się to cichą awarią instalacji
+  # albo brakiem Live Activity. Dlatego bierzemy je z tych samych zmiennych
+  # środowiskowych, którymi CI ustawia wersję głównego targetu (patrz ios.yml).
+  bs['CURRENT_PROJECT_VERSION']         = ENV.fetch('ET_BUILD_NUMBER', '1')
+  bs['MARKETING_VERSION']               = ENV.fetch('ET_MARKETING_VERSION', '1.0')
   bs['GENERATE_INFOPLIST_FILE']         = 'NO'
 end
 

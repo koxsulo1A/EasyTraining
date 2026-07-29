@@ -16,10 +16,12 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
+	<!-- Z build settings (patrz scripts/ios-add-widgets.rb) — muszą się zgadzać
+	     z aplikacją-kontenerem, inaczej iOS odrzuca rozszerzenie przy instalacji. -->
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

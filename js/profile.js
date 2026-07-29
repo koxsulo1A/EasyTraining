@@ -287,8 +287,12 @@
         _h('button', { className:'btn btn-danger', style:{ width:'100%' }, onClick:clearAll }, '🗑 Usuń wszystkie dane')
       ),
 
+      // Stempel kompilacji — pozwala od razu sprawdzić na telefonie, czy po
+      // instalacji .ipa faktycznie działa nowe wydanie (wstrzykiwany przez
+      // scripts/build-web.mjs; przy pracy z repo bez buildu pokazuje "dev").
       _h('div', { onClick:handleVersionTap, style:{ textAlign:'center', padding:'20px 0 8px', color:'var(--t3)', fontSize:'.62rem', userSelect:'none', cursor:'default', letterSpacing:'.04em' } },
         'EasyTraining v1.0.0',
+        _h('div', { style:{ marginTop:3, fontFamily:'monospace', fontSize:'.58rem', opacity:.75 } }, 'build ' + (window.ET_BUILD || 'dev')),
         tapCount > 0 && _h('span', { style:{ color:'var(--a)', marginLeft:6, fontWeight:700 } }, '['+tapCount+'/10]')
       )
     );

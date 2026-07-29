@@ -36,6 +36,11 @@ jobs:
         run: npx cap sync ios
 
       - name: Add Live Activities widget extension
+        env:
+          # Ta sama para wartości co niżej w xcodebuild — rozszerzenie MUSI mieć
+          # wersję identyczną z aplikacją, inaczej iOS odrzuca je przy instalacji.
+          ET_BUILD_NUMBER: ${{ github.run_number }}
+          ET_MARKETING_VERSION: 1.0.${{ github.run_number }}
         run: |
           set -e
           gem install xcodeproj --no-document
@@ -46,6 +51,10 @@ jobs:
       - name: Build unsigned archive
         run: |
           set -eo pipefail
+          # Unikalna wersja per build. Bez tego każdy .ipa wyglądał dla iOS/AltStore
+          # identycznie (stale 1.0/1), przez co instalacja potrafiła nie podmienić
+          # już zainstalowanej aplikacji — telefon zostawał na starym wydaniu.
+          # Przekazane jako build settings, więc obejmuje aplikację i widget naraz.
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
@@ -53,10 +62,32 @@ jobs:
             -sdk iphoneos \
             -archivePath "$PWD/build/App.xcarchive" \
             archive \
+            MARKETING_VERSION="1.0.${{ github.run_number }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
+
+      - name: Verify app and widget versions match
+        run: |
+          set -e
+          # Rozjazd wersji między aplikacją a rozszerzeniem to cicha awaria instalacji
+          # na urządzeniu — łapiemy to w CI, zanim trafi na telefon.
+          APP_PLIST="build/App.xcarchive/Products/Applications/App.app/Info.plist"
+          EXT_PLIST="build/App.xcarchive/Products/Applications/App.app/PlugIns/EasyTrainingWidgets.appex/Info.plist"
+          get() { /usr/libexec/PlistBuddy -c "Print :$2" "$1" 2>/dev/null || echo "BRAK"; }
+          APP_V=$(get "$APP_PLIST" CFBundleVersion); APP_S=$(get "$APP_PLIST" CFBundleShortVersionString)
+          echo "Aplikacja: $APP_S ($APP_V)"
+          if [ -f "$EXT_PLIST" ]; then
+            EXT_V=$(get "$EXT_PLIST" CFBundleVersion); EXT_S=$(get "$EXT_PLIST" CFBundleShortVersionString)
+            echo "Widget:    $EXT_S ($EXT_V)"
+            [ "$APP_V" = "$EXT_V" ] && [ "$APP_S" = "$EXT_S" ] || { echo "BŁĄD: wersje aplikacji i widgetu się różnią"; exit 1; }
+          else
+            echo "UWAGA: nie znaleziono rozszerzenia widgetu w archiwum"
+          fi
+          [ "$APP_V" = "${{ github.run_number }}" ] || { echo "BŁĄD: numer buildu nie został nadpisany"; exit 1; }
+          echo "OK — wersje zgodne i unikalne dla tego buildu"
 
       - name: Package .ipa (unsigned)
         run: |

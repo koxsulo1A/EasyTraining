@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- Ten plik trzyma wszystkie adresy ?v=<build> pozostałych zasobów, więc jego
+     własne zbuforowanie unieważnia cały cache-busting: WebView wczytałby stary
+     index.html, a z nim stare odwołania do JS/CSS. Dlatego jego samego nigdy
+     nie cache'ujemy — pozostałe pliki i tak mają unikalne adresy per build. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>EasyTraining</title>
 <link rel="stylesheet" href="css/styles.css?v=7">
 <style>
