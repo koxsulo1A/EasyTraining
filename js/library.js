@@ -244,6 +244,17 @@
       if (items.length) sections.push({ label:g.label, items:items });
     });
 
+    // Biblioteka rysowała wszystkie pasujące ćwiczenia naraz (190 pozycji w
+    // bazie i rośnie). Okno progresywne liczymy na spłaszczonej liście, a
+    // sekcje filtrujemy do tego, co się w nim mieści — inaczej limit na
+    // sekcję dawałby różną liczbę pozycji zależnie od podziału na grupy.
+    var flatItems = sections.reduce(function(a,s){ return a.concat(s.items); }, []);
+    var libPage = ET.useProgressive(flatItems, 40);
+    var visible = new Set(libPage.items);
+    sections = sections
+      .map(function(s){ return { label:s.label, items:s.items.filter(function(ex){ return visible.has(ex); }) }; })
+      .filter(function(s){ return s.items.length; });
+
     return _h('div', { className:'fade-in' },
       _h('div', { className:'page-hdr' },
         _h('div', null,
@@ -287,7 +298,10 @@
               ),
               sec.items.map(function(ex){ return ExerciseCard(ex, function(){ setSelected(ex); }); })
             );
+
           }),
+
+      _h(ET.ShowMore, { state:libPage }),
 
       _h(ExerciseDetail, { open:!!selected, exercise:selected, onClose:function(){ setSelected(null); } }),
       isAdmin && _h(AddExerciseSheet, { open:isAdding, onClose:function(){ setIsAdding(false); } }),
