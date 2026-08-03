@@ -330,7 +330,7 @@
     measurements: function(){ return ET.MeasurementsModule; },
     diet:         function(){ return ET.DietModule; },
     supplements:  function(){ return ET.SupplementsModule; },
-    wellbeing:    function(){ return ET.WellbeingModule; },
+    wellbeing:    function(){ return (IS_WEB && ET.ReadinessModule) || ET.WellbeingModule; },
     pain:         function(){ return ET.PainModule; },
     calendar:     function(){ return ET.CalendarModule; },
     competitions: function(){ return ET.CompetitionsModule; },
