@@ -260,3 +260,181 @@ a{color:inherit;text-decoration:none}
 .fade-in{animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AURORA GLASS — redesign frontu mobilnego (handoff „EasyTraining Mobile").
+   Warstwa dokładana na wierzch istniejących klas; nie zmienia widoku desktop.
+   Wartości 1:1 z README handoffu (tokeny --a, --s*, --t*, --r* już zgodne).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* — keyframes redesignu — */
+@keyframes scrIn   {from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+@keyframes sheetUp {from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes pop     {0%{transform:scale(1)}45%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes drift   {0%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,14px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
+@keyframes pulseRing{0%{opacity:.55;transform:scale(1)}70%,100%{opacity:0;transform:scale(1.5)}}
+@keyframes shimmer {0%{background-position:-240px 0}100%{background-position:240px 0}}
+.scr-in{animation:scrIn .38s cubic-bezier(.2,.8,.2,1)}
+
+/* — poświata „aurora" (tło ekranów mobilnych) — */
+.aurora{position:fixed;z-index:0;pointer-events:none;border-radius:50%;display:none}
+@media(max-width:768px){
+  .aurora{display:block}
+  /* treść ponad poświatą */
+  .main>.page-content{position:relative;z-index:1}
+}
+.aurora-1{top:-130px;left:-90px;width:340px;height:340px;
+  background:radial-gradient(circle,rgba(59,130,246,.5),transparent 68%);
+  filter:blur(50px);animation:drift 15s ease-in-out infinite}
+.aurora-2{top:-40px;right:-120px;width:300px;height:300px;
+  background:radial-gradient(circle,rgba(139,92,246,.42),transparent 68%);
+  filter:blur(54px);animation:drift 19s ease-in-out infinite reverse}
+
+/* — karta szklana — */
+.glass{background:linear-gradient(158deg,rgba(255,255,255,.10),rgba(255,255,255,.025));
+  border:1px solid rgba(255,255,255,.10);border-radius:var(--r5);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:0 18px 44px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.09)}
+
+/* — karta CTA z gradientową ramką + shimmer (trening, abonament) — */
+.cta-card{position:relative;border-radius:var(--r5);padding:1px;
+  background:linear-gradient(135deg,#60A5FA,#3B82F6 45%,#8B5CF6)}
+.cta-card-inner{border-radius:calc(var(--r5) - 1px);padding:16px;overflow:hidden;position:relative;
+  background:linear-gradient(158deg,#161628,#0e0e1c)}
+.cta-card-inner::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.06) 50%,transparent 70%);
+  background-size:480px 100%;animation:shimmer 4.5s linear infinite}
+
+/* — przycisk akcentowy (gradient + glow) — */
+.btn-accent{background:linear-gradient(150deg,#60A5FA,#3B82F6 55%,#8B5CF6);color:#fff;
+  border-radius:var(--r4);font-weight:700;
+  box-shadow:0 12px 28px -6px rgba(59,130,246,.75),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-accent:active{transform:scale(.985)}
+
+/* — segmenty RIR (edytor serii) — */
+.rir-seg{flex:1;height:46px;border-radius:var(--r3);border:1px solid var(--b1);background:var(--s3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;
+  transition:background .2s cubic-bezier(.2,.8,.2,1),border-color .2s cubic-bezier(.2,.8,.2,1)}
+.rir-seg-n{font-size:14px;font-weight:800;line-height:1}
+.rir-seg-l{font-size:8px;font-weight:800;letter-spacing:.08em}
+
+/* ══════════════ SZKLANY PASEK NAWIGACJI (gnav) ══════════════ */
+.gnav{display:none}
+@media(max-width:768px){
+  .gnav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:200;
+    height:calc(var(--bnh) + env(safe-area-inset-bottom,0px));
+    padding:0 6px;padding-bottom:env(safe-area-inset-bottom,0px);
+    background:rgba(20,20,37,.72);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+    border-top:1px solid var(--b2);
+    box-shadow:0 -6px 30px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.07);
+    align-items:stretch}
+}
+.gnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:var(--t3);transition:color .25s;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+.gnav-item:active{transform:scale(.94)}
+.gnav-item.active{color:var(--a-light)}
+.gnav-item svg{width:21px;height:21px}
+.gnav-label{font-size:9.5px;font-weight:700}
+.gnav-center-slot{flex:1;display:flex;align-items:flex-start;justify-content:center}
+.gnav-center{width:50px;height:50px;border-radius:19px;margin-top:-24px;flex-shrink:0;
+  background:linear-gradient(150deg,#60A5FA,#3B82F6 45%,#8B5CF6);color:#fff;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 12px 28px -6px rgba(59,130,246,.75),inset 0 1px 0 rgba(255,255,255,.3)}
+.gnav-center:active{transform:scale(.92)}
+.gnav-center svg{width:24px;height:24px}
+
+/* ══════════════ SZUFLADA MODUŁÓW (drawer) ══════════════ */
+.drawer-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.drawer-tile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 4px;
+  border-radius:16px;background:var(--s1);border:1px solid var(--b1);cursor:pointer;transition:all .15s}
+.drawer-tile:active{transform:scale(.95)}
+.drawer-ic{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center}
+.drawer-ic svg{width:22px;height:22px}
+.drawer-label{font-size:11px;font-weight:600;color:var(--t2);text-align:center;line-height:1.15}
+
+/* — wygaszanie animacji — */
+@media(prefers-reduced-motion:reduce){
+  .aurora,.cta-card-inner::before{animation:none}
+  .scr-in{animation-duration:0ms}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   POWŁOKA WEB — design „EasyTraining Aplikacja" (przeglądarka, desktop).
+   Renderowana tylko gdy platforma == web (patrz IS_WEB w js/app.js); apka
+   natywna iOS używa powłoki mobilnej „Aurora Glass" powyżej. Klasy mają
+   przedrostek `w`, żeby obie powłoki nigdy nie walczyły o te same reguły.
+   ══════════════════════════════════════════════════════════════════════════ */
+.wapp{display:flex;align-items:flex-start;min-height:100vh;background:var(--bg)}
+
+/* — sidebar 236px — */
+.wside{position:sticky;top:0;flex:0 0 236px;height:100vh;display:flex;flex-direction:column;
+  background:var(--s1);border-right:1px solid var(--b1);z-index:30}
+.wside-logo{display:flex;align-items:center;gap:11px;padding:22px 18px 16px}
+.wside-mark{width:34px;height:34px;border-radius:12px;flex:none;
+  background:linear-gradient(150deg,#60A5FA,#3B82F6 45%,#8B5CF6);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 24px -8px rgba(59,130,246,.8),inset 0 1px 0 rgba(255,255,255,.3)}
+.wside-txt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.wside-name{font-size:14px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.wside-sub{font-size:9px;font-weight:600;line-height:1;letter-spacing:.12em;color:var(--t3)}
+
+.wnav{display:flex;flex-direction:column;gap:2px;padding:4px 12px 16px;overflow-y:auto;flex:1}
+.wnav-item{position:relative;display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;
+  cursor:pointer;user-select:none;font-size:12.5px;font-weight:600;line-height:1;letter-spacing:-.01em;
+  color:var(--t2);transition:background .18s,color .18s;-webkit-tap-highlight-color:transparent}
+.wnav-item:hover{background:rgba(255,255,255,.05);color:var(--t1)}
+.wnav-item.active{background:rgba(59,130,246,.14);color:var(--a-light)}
+.wnav-item.active::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);
+  width:3px;height:16px;border-radius:0 2px 2px 0;background:var(--a)}
+.wnav-item svg{flex:none;width:17px;height:17px}
+.wnav-label{flex:1;min-width:0}
+
+.wside-foot{padding:12px 16px 18px;border-top:1px solid var(--b1);display:flex;flex-direction:column;gap:8px}
+.wside-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.wside-row-label{font-size:10.5px;font-weight:600;line-height:1;color:var(--t3)}
+.wside-row-val{font-size:11.5px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.wside-btn{display:flex;align-items:center;justify-content:center;gap:7px;height:34px;border-radius:11px;
+  border:1px solid var(--b2);background:rgba(255,255,255,.04);color:var(--t2);
+  font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.wside-btn:hover{background:rgba(255,255,255,.08);color:var(--t1)}
+.wside-btn svg{width:14px;height:14px;flex:none}
+
+/* — obszar główny + pasek górny — */
+.wmain{flex:1;min-width:0;position:relative}
+.wtop{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:0 34px;height:60px;background:rgba(20,20,37,.72);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-bottom:1px solid var(--b1)}
+.wtop-title{font-size:14px;font-weight:700;line-height:1;letter-spacing:-.015em}
+.wtop-date{font-size:11.5px;font-weight:600;line-height:1;color:var(--t3)}
+.wcontent{position:relative;z-index:1;max-width:1040px;margin:0 auto;padding:32px 34px 80px}
+
+/* — poświata „aurora" (wariant web: większe, inne pozycje niż mobile) — */
+.waurora{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.waurora-1{position:absolute;top:-200px;left:100px;width:520px;height:520px;border-radius:50%;
+  background:radial-gradient(circle,rgba(59,130,246,.34),transparent 68%);
+  filter:blur(60px);animation:drift 15s ease-in-out infinite}
+.waurora-2{position:absolute;top:-140px;right:-180px;width:460px;height:460px;border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.3),transparent 68%);
+  filter:blur(64px);animation:drift 19s ease-in-out infinite reverse}
+
+/* — karty treści w powłoce web — */
+.wcard{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.wplan{transition:transform .25s cubic-bezier(.2,.8,.2,1),border-color .25s}
+.wplan:hover{transform:translateY(-3px);border-color:var(--b2)}
+.wplay,.wcta{transition:filter .2s,background .2s}
+.wplay:hover{filter:brightness(1.15)}
+.wplay:active,.wcta:active{transform:scale(.985)}
+.wcta:hover{background:rgba(96,165,250,.22)!important}
+
+/* — web na wąskim ekranie: sidebar zwija się do szyny z ikonami — */
+@media(max-width:900px){
+  .wside{flex-basis:64px}
+  .wside-logo{justify-content:center;padding:18px 0 14px}
+  .wside-txt,.wnav-label,.wside-row,.wside-btn span{display:none}
+  .wnav-item{justify-content:center;padding:10px 0}
+  .wnav-item.active::before{left:-12px}
+  .wside-foot{padding:12px 10px 18px;align-items:center}
+  .wtop{padding:0 16px}
+  .wcontent{padding:24px 16px 64px}
+}
+@media(prefers-reduced-motion:reduce){.waurora-1,.waurora-2{animation:none}}

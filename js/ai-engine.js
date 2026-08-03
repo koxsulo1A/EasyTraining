@@ -53,7 +53,9 @@
       // Pain
       var pains = filterDays(store.painEntries||[], 'date', 7);
       if (pains.length > 0) {
-        var maxP = Math.max.apply(null, pains.map(function(p){return p.intensity||0;}));
+        // PainEntry używa `level` (1-10), nie `intensity` — to pole nigdy nie
+        // istniało w store.painEntries, więc ból nigdy nie obniżał gotowości.
+        var maxP = Math.max.apply(null, pains.map(function(p){return p.level||0;}));
         var ps = maxP>=8?-22:maxP>=6?-14:maxP>=4?-7:-3;
         score+=ps; factors.push({label:'Ból maks. '+maxP+'/10', value:ps, color:'var(--red)'});
       }
@@ -257,7 +259,10 @@
         });
       });
 
-      var painZones = filterDays(store.painEntries||[], 'date', 21).map(function(p){return (p.zone||'').toLowerCase();});
+      // PainEntry zapisuje strefy w `bodyParts` (tablica id, np. 'bark_l'), nie
+      // w `zone` — to pole nigdy nie istniało, więc heurystyka niżej nigdy się
+      // nie odpalała (js/pain.js zapisuje bodyParts/bodyPart, nie zone).
+      var painZones = filterDays(store.painEntries||[], 'date', 21).reduce(function(a,p){ return a.concat(p.bodyParts||[]); }, []).map(function(z){return (z||'').toLowerCase();});
       var hasShoulderPain = painZones.some(function(z){return z.includes('bark')||z.includes('ramie');});
       var hasKneePain     = painZones.some(function(z){return z.includes('kolan');});
       var hasLowerBack    = painZones.some(function(z){return z.includes('plecy_d')||z.includes('plecy dolne');});

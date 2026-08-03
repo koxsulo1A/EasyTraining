@@ -2,6 +2,49 @@
   'use strict';
   var _h = React.createElement;
 
+  // ── IKONY (rodzina SVG redesignu: viewBox 24, stroke currentColor) ──
+  // Bez emoji — liniowe ikony sterowane kolorem tekstu rodzica.
+  var ICONS = {
+    home:'M3 10.7 12 4l9 6.7V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+    dumbbell:'M4 9v6 M7 6.5v11 M17 6.5v11 M20 9v6 M7 12h10',
+    plus:'M12 5v14 M5 12h14',
+    pill:'M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7z M8.5 6.5l9 9',
+    chart:'M4 20V4 M4 20h16 M8 20v-6 M13 20v-9 M18 20v-4',
+    running:'M4 12h4l2-6 4 12 2-6h4',
+    flame:'M12 3c1.2 3 4 4.2 4 8a4 4 0 0 1-8 0c0-2 1-3.2 2.2-4.2C10.7 8 12 8.4 12 3z',
+    ruler:'M4 14 14 4l6 6L10 20z M8.5 9.5l1.8 1.8 M11.5 6.5l1.8 1.8 M5.5 12.5l1.8 1.8',
+    moon:'M20.5 13A8 8 0 1 1 11 3.5 6.2 6.2 0 0 0 20.5 13z',
+    trophy:'M8 4h8v4a4 4 0 0 1-8 0z M8 5H5v2a3 3 0 0 0 3 3 M16 5h3v2a3 3 0 0 1-3 3 M12 12v4 M9 20h6 M10 20v-2h4v2',
+    calendar:'M5 5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z M5 9h14 M9 3v3 M15 3v3',
+    chat:'M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4z',
+    user:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M5 20a7 7 0 0 1 14 0',
+  };
+  function Icon(name, size) {
+    return _h('svg', { width:size||24, height:size||24, viewBox:'0 0 24 24', fill:'none',
+      stroke:'currentColor', strokeWidth:1.7, strokeLinecap:'round', strokeLinejoin:'round', 'aria-hidden':true },
+      _h('path', { d: ICONS[name] || '' }));
+  }
+  ET.Icon = Icon;
+
+  // ── PLATFORMA: iOS (telefon) vs WEB (przeglądarka) ──────────────────
+  // Ta sama baza kodu obsługuje dwa wyglądy:
+  //   • iOS natywny  → powłoka mobilna „Aurora Glass" (szklany pasek .gnav),
+  //   • przeglądarka → powłoka web wg designu „EasyTraining Aplikacja"
+  //     (sidebar 236 px + pasek górny), niezależnie od szerokości okna.
+  // Brak Capacitora = zwykła przeglądarka, więc web jest wartością domyślną.
+  function detectWeb() {
+    try {
+      var cap = window.Capacitor;
+      if (cap) {
+        if (typeof cap.getPlatform === 'function') return cap.getPlatform() === 'web';
+        if (typeof cap.isNativePlatform === 'function') return !cap.isNativePlatform();
+      }
+    } catch (e) {}
+    return true;
+  }
+  var IS_WEB = detectWeb();
+  ET.IS_WEB = IS_WEB;
+
   // ── MODULE VALIDATION ────────────────────────────
   var REQUIRED = [
     'StoreCtx','StoreProvider','useStore',
@@ -98,113 +141,46 @@
     );
   }
 
-  // ── MOBILE NAV ───────────────────────────────────
-  // Przytrzymanie paska (LONG_PRESS_MS) odblokowuje "tryb przewijania": pasek
-  // pokazuje WSZYSTKIE sekcje menu zamiast skróconej listy, przeciąganie w
-  // bok przewija do dowolnej z nich — alternatywa dla arkusza "Więcej" dla
-  // kogoś, kto woli jeden gest zamiast otwierania osobnego okna.
-  var LONG_PRESS_MS = 350;
-  var LONG_PRESS_MOVE_TOLERANCE = 10; // px — większy ruch przed czasem = zwykłe przewijanie/tap, nie przytrzymanie
+  // ── MOBILE NAV (redesign „Aurora Glass") ─────────
+  // Szklany pasek: Dziś · Trening · [＋] · Suple · Postępy. Centralny przycisk
+  // otwiera szufladę modułów (arkusz z siatką 4 kolumn). Zastępuje poprzedni
+  // pasek ze skróconą listą + trybem przewijania po przytrzymaniu.
+  var GNAV_TABS = [
+    { id:'dashboard',   icon:'home',     label:'Dziś' },
+    { id:'strength',    icon:'dumbbell', label:'Trening' },
+    { center:true },
+    { id:'supplements', icon:'pill',     label:'Suple' },
+    { id:'statistics',  icon:'chart',    label:'Postępy' },
+  ];
+  // Szuflada modułów (kolejność i kolory wg handoffu).
+  var GNAV_DRAWER = [
+    { id:'strength',     icon:'dumbbell', label:'Siła',     color:'var(--a)' },
+    { id:'running',      icon:'running',  label:'Bieganie', color:'var(--green)' },
+    { id:'sauna',        icon:'flame',    label:'Sauna',    color:'var(--orange)' },
+    { id:'supplements',  icon:'pill',     label:'Suple',    color:'var(--purple)' },
+    { id:'measurements', icon:'ruler',    label:'Pomiary',  color:'var(--teal)' },
+    { id:'sleep',        icon:'moon',     label:'Sen',      color:'var(--yellow)' },
+    { id:'competitions', icon:'trophy',   label:'Zawody',   color:'var(--pink)' },
+    { id:'calendar',     icon:'calendar', label:'Plan',     color:'var(--a-light)' },
+    { id:'coach',        icon:'chat',     label:'Trener',   color:'var(--purple)' },
+    { id:'profile',      icon:'user',     label:'Profil',   color:'var(--t2)' },
+  ];
 
-  function MobileNav() {
+  function ModuleDrawer(props) {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
-    var ms = React.useState(false); var showMore = ms[0], setShowMore = ms[1];
-    var sm = React.useState(false); var scrollMode = sm[0], setScrollMode = sm[1];
-    var su = ET.useStore(); var msMob = (su.store.menuSettings||{}).mobile;
-    var mobileTabs = applyMenuSettings(ET.MOBILE_TABS, msMob);
-    var auth = ET.useAuth ? ET.useAuth() : null;
-    var isAdmin = !!(auth && auth.profile && auth.profile.role === 'admin');
-    var navRef = React.useRef(null);
-    var pressTimer = React.useRef(null);
-    var pressStart = React.useRef(null);
-    var idleTimer = React.useRef(null);
-
-    // Grupy w sheet "Więcej" (wszystko poza widocznymi tabami)
-    var tabIds = mobileTabs.map(function(t){ return t.id; });
-    var moreGroups = ET.NAV_GROUPS.map(function(g){
-      return Object.assign({}, g, { items: g.items.filter(function(i){ return tabIds.indexOf(i.id)===-1 && (!i.adminOnly || isAdmin); }) });
-    }).filter(function(g){ return g.items.length > 0; });
-
-    // Płaska lista WSZYSTKICH sekcji (do trybu przewijania) — te same filtry co "Więcej".
-    var allItems = ET.NAV_GROUPS.reduce(function(a,g){
-      return a.concat(g.items.filter(function(i){ return !i.adminOnly || isAdmin; }));
-    }, []);
-
-    function goTo(id) { setShowMore(false); setScrollMode(false); navigate(id); }
-
-    function clearIdleTimer() { if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; } }
-    function armIdleExit() {
-      clearIdleTimer();
-      idleTimer.current = setTimeout(function(){ setScrollMode(false); }, 4000);
-    }
-    function enterScrollMode() {
-      setScrollMode(true);
-      if (navigator.vibrate) { try { navigator.vibrate(15); } catch(e) {} }
-      armIdleExit();
-      // wyśrodkuj pasek na aktualnie aktywnej sekcji
-      setTimeout(function(){
-        if (!navRef.current) return;
-        var activeEl = navRef.current.querySelector('.mn-item.active');
-        if (activeEl) activeEl.scrollIntoView({ behavior:'auto', inline:'center', block:'nearest' });
-      }, 0);
-    }
-    function onPressStart(e) {
-      var p = e.touches ? e.touches[0] : e;
-      pressStart.current = { x:p.clientX, y:p.clientY };
-      pressTimer.current = setTimeout(enterScrollMode, LONG_PRESS_MS);
-    }
-    function onPressMove(e) {
-      if (!pressTimer.current || !pressStart.current) return;
-      var p = e.touches ? e.touches[0] : e;
-      var dx = Math.abs(p.clientX - pressStart.current.x), dy = Math.abs(p.clientY - pressStart.current.y);
-      if (dx > LONG_PRESS_MOVE_TOLERANCE || dy > LONG_PRESS_MOVE_TOLERANCE) {
-        clearTimeout(pressTimer.current); pressTimer.current = null;
-      }
-      if (scrollMode) armIdleExit();
-    }
-    function onPressEnd() {
-      if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
-    }
-    React.useEffect(function(){ return function(){ clearIdleTimer(); if (pressTimer.current) clearTimeout(pressTimer.current); }; }, []);
-
-    var isMoreActive = !mobileTabs.some(function(t){ return t.id===current; });
-    var displayItems = scrollMode ? allItems : mobileTabs;
-
-    return _h('div', null,
-      _h('nav', {
-        className:'mobile-nav'+(scrollMode?' scroll-mode':''), ref:navRef,
-        onTouchStart:onPressStart, onTouchMove:onPressMove, onTouchEnd:onPressEnd, onTouchCancel:onPressEnd,
-        onMouseDown:onPressStart, onMouseMove:onPressMove, onMouseUp:onPressEnd, onMouseLeave:onPressEnd
-      },
-        displayItems.map(function(item) {
-          return _h('div', { key:item.id, className:'mn-item'+(current===item.id?' active':''), onClick:function(){ goTo(item.id); } },
-            _h('span', { className:'mn-item-icon' }, item.icon),
-            _h('span', { className:'mn-item-label' }, item.label)
-          );
-        }),
-        !scrollMode && _h('div', { className:'mn-item'+(isMoreActive?' active':''), onClick:function(){ setShowMore(function(v){ return !v; }); } },
-          _h('span', { className:'mn-item-icon' }, '⋯'),
-          _h('span', { className:'mn-item-label' }, 'Więcej')
-        )
-      ),
-      showMore && _h('div', { style:{ position:'fixed', inset:0, zIndex:190, background:'rgba(0,0,0,.5)' }, onClick:function(){ setShowMore(false); } },
-        _h('div', { style:{ position:'absolute', bottom:'calc(var(--bnh) + env(safe-area-inset-bottom,0px))', left:0, right:0, background:'var(--s1)', borderRadius:'16px 16px 0 0', maxHeight:'70vh', overflowY:'auto', padding:'8px 0 12px' },
-          onClick:function(e){ e.stopPropagation(); } },
-          _h('div', { style:{ width:36, height:4, borderRadius:2, background:'var(--b2)', margin:'8px auto 12px' } }),
-          moreGroups.map(function(g, gi) {
-            return _h('div', { key:gi },
-              g.s && _h('div', { style:{ fontSize:'.6rem', fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.1em', padding:'8px 20px 4px' } }, g.s),
-              _h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, padding:'0 12px 4px' } },
-                g.items.map(function(item) {
-                  var active = current===item.id;
-                  return _h('div', { key:item.id,
-                    style:{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, background: active?'var(--a-dim)':'var(--s2)', cursor:'pointer', color: active?'var(--a-light)':'var(--t2)' },
-                    onClick:function(){ goTo(item.id); } },
-                    _h('span', { style:{ fontSize:'1.1rem', width:22, textAlign:'center' } }, item.icon),
-                    _h('span', { style:{ fontSize:'.78rem', fontWeight:600 } }, item.label)
-                  );
-                })
-              )
+    if (!props.open) return null;
+    function go(id) { props.onClose(); navigate(id); }
+    return _h('div', { className:'sheet-overlay', onClick:props.onClose },
+      _h('div', { className:'sheet', style:{ maxWidth:520 }, onClick:function(e){ e.stopPropagation(); } },
+        _h('div', { className:'sheet-handle' }),
+        _h('h2', { style:{ marginBottom:18 } }, 'Moduły'),
+        _h('div', { className:'drawer-grid' },
+          GNAV_DRAWER.map(function(m) {
+            var active = current === m.id;
+            return _h('div', { key:m.id, className:'drawer-tile', onClick:function(){ go(m.id); },
+              style: active ? { borderColor:m.color, background:'var(--s2)' } : null },
+              _h('div', { className:'drawer-ic', style:{ color:m.color, background:'color-mix(in srgb,'+m.color+' 14%, transparent)', border:'1px solid color-mix(in srgb,'+m.color+' 32%, transparent)' } }, Icon(m.icon, 22)),
+              _h('div', { className:'drawer-label' }, m.label)
             );
           })
         )
@@ -212,8 +188,140 @@
     );
   }
 
+  function MobileNav() {
+    var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
+    var ds = React.useState(false); var drawer = ds[0], setDrawer = ds[1];
+    return _h('div', null,
+      _h('nav', { className:'gnav' },
+        GNAV_TABS.map(function(t, i) {
+          if (t.center) {
+            return _h('div', { key:'center', className:'gnav-center-slot' },
+              _h('button', { className:'gnav-center', 'aria-label':'Moduły',
+                onClick:function(){ setDrawer(true); } }, Icon('plus', 24))
+            );
+          }
+          return _h('div', { key:t.id, className:'gnav-item'+(current===t.id?' active':''),
+            onClick:function(){ navigate(t.id); } },
+            Icon(t.icon, 21),
+            _h('span', { className:'gnav-label' }, t.label)
+          );
+        })
+      ),
+      _h(ModuleDrawer, { open:drawer, onClose:function(){ setDrawer(false); } })
+    );
+  }
+
+  // ── NAWIGACJA WEB (design „EasyTraining Aplikacja") ─────────────────
+  // Ikony 1:1 z designu (viewBox 24, stroke 1.7). `id` = trasa w ROUTE_MAP.
+  var WEB_NAV = [
+    { id:'dashboard',    name:'Dziś',        path:'M4 10.5L12 4l8 6.5V20h-5v-6H9v6H4z' },
+    { id:'wellbeing',    name:'Gotowość',    path:'M3.5 12.5h3.2l2-4.5 3 9 2.4-6 1.7 3.2h4.7' },
+    { id:'acwr',         name:'Trener AI',   path:'M4 19.5L9 13l3.5 3L20 6.5M20 6.5h-4.5M20 6.5V11' },
+    { id:'pain',         name:'Ból i fizjo', path:'M12 20.5c-4.5-2.4-7.5-5.6-7.5-9.8V6.2l7.5-3 7.5 3v4.5c0 4.2-3 7.4-7.5 9.8zM12 9v6M9 12h6' },
+    { id:'plan',         name:'Plan',        path:'M5 5.5h14v14H5zM5 9.5h14M9 3v3M15 3v3M9 13.5h6' },
+    { id:'calendar',     name:'Kalendarz',   path:'M4.5 6h15v13.5h-15zM4.5 10h15M8.5 3.5v3M15.5 3.5v3M8 13.5h2M14 13.5h2M8 16.5h2M14 16.5h2' },
+    { id:'strength',     name:'Trening',     path:'M6.5 8v8M3.8 10v4M17.5 8v8M20.2 10v4M6.5 12h11' },
+    { id:'supplements',  name:'Suplementy',  path:'M9.6 14.4l4.8-4.8M6.7 6.7a4.6 4.6 0 0 1 6.6 0l4 4a4.6 4.6 0 0 1-6.6 6.6l-4-4a4.6 4.6 0 0 1 0-6.6z' },
+    { id:'measurements', name:'Pomiary',     path:'M3 8.5h18v7H3zM7 8.5v3M11 8.5v4.5M15 8.5v3M19 8.5v4.5' },
+    { id:'statistics',   name:'Statystyki',  path:'M4 19.5V4.5M4 19.5h16M8 16V11M12 16V7.5M16 16v-6' },
+    { id:'history',      name:'Historia',    path:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3.5 2' },
+  ];
+  // Tytuły w pasku górnym — pełniejsze niż etykiety w menu (jak w designie).
+  var WEB_TITLES = {
+    dashboard:'Dziś', wellbeing:'Samopoczucie i gotowość', acwr:'Trener AI i ACWR',
+    pain:'Dolegliwości i ból', plan:'Plan treningowy', calendar:'Kalendarz',
+    strength:'Trening', supplements:'Suplementy', measurements:'Pomiary',
+    statistics:'Statystyki', history:'Historia', profile:'Profil',
+  };
+  var LOGO_PATH = 'M6.5 8v8M3.8 10v4M17.5 8v8M20.2 10v4M6.5 12h11';
+
+  function PathIcon(d, size, sw) {
+    return _h('svg', { width:size||17, height:size||17, viewBox:'0 0 24 24', fill:'none',
+      stroke:'currentColor', strokeWidth:sw||1.7, strokeLinecap:'round', strokeLinejoin:'round', 'aria-hidden':true },
+      _h('path', { d:d }));
+  }
+
+  function WebSidebar() {
+    var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
+    var su = ET.useStore(); var store = su.store;
+    var sessions = (store.workouts || []).length;
+    return _h('aside', { className:'wside' },
+      _h('div', { className:'wside-logo' },
+        _h('div', { className:'wside-mark' },
+          _h('svg', { width:19, height:19, viewBox:'0 0 24 24', fill:'none', stroke:'#080810',
+            strokeWidth:2, strokeLinecap:'round', strokeLinejoin:'round', 'aria-hidden':true },
+            _h('path', { d:LOGO_PATH }))
+        ),
+        _h('div', { className:'wside-txt' },
+          _h('div', { className:'wside-name' }, 'EasyTraining'),
+          _h('div', { className:'wside-sub' }, 'DANE LOKALNE')
+        )
+      ),
+      _h('nav', { className:'wnav' },
+        WEB_NAV.map(function(it) {
+          return _h('div', { key:it.id, title:it.name,
+            className:'wnav-item'+(current===it.id?' active':''),
+            onClick:function(){ navigate(it.id); } },
+            PathIcon(it.path, 17),
+            _h('span', { className:'wnav-label' }, it.name)
+          );
+        })
+      ),
+      _h('div', { className:'wside-foot' },
+        _h('div', { className:'wside-row' },
+          _h('span', { className:'wside-row-label' }, 'Zapisane sesje'),
+          _h('span', { className:'wside-row-val' }, String(sessions))
+        ),
+        // Design nie ma osobnej pozycji „Profil" w menu, a bez niej nie da się
+        // dojść do ustawień — dlatego wejście do profilu jest w stopce.
+        _h('button', { className:'wside-btn', title:'Profil i ustawienia',
+          onClick:function(){ navigate('profile'); } },
+          PathIcon('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M5 20a7 7 0 0 1 14 0', 14),
+          _h('span', null, 'Profil')
+        )
+      )
+    );
+  }
+
+  function WebTopbar() {
+    var nav = ET.useNav();
+    var title = WEB_TITLES[nav.current] || 'EasyTraining';
+    var today = new Date().toLocaleDateString('pl-PL', { weekday:'long', day:'numeric', month:'long' });
+    return _h('header', { className:'wtop' },
+      _h('div', { style:{ display:'flex', alignItems:'center', gap:10, minWidth:0 } },
+        _h('span', { className:'wtop-title' }, title),
+        _h('span', { className:'wtop-date' }, today)
+      )
+    );
+  }
+
+  // Ekran trenera — w budowie (redesign). Tymczasowy placeholder, dopóki nie
+  // powstanie właściwy CoachModule; wpięty w trasę 'coach' (szuflada modułów).
+  function CoachPlaceholder() {
+    return _h('div', { className:'module-placeholder scr-in' },
+      _h('div', { style:{ color:'var(--purple)', marginBottom:4 } }, Icon('chat', 56)),
+      _h('h2', null, 'Trener'),
+      _h('p', null, 'Ekran trenera jest w przygotowaniu w ramach redesignu — wkrótce znajdziesz tu wiadomości i propozycje korekt.')
+    );
+  }
+
+  // Ekran „Plan" z designu web (meta-plan → segmenty → jednostki → tydzień).
+  // Spec: docs/segment-01-plan.md w projekcie designu; do zbudowania jako
+  // ET.PlanModule (js/plan.js). Do tego czasu placeholder, żeby pozycja w
+  // menu web nie prowadziła po cichu na dashboard.
+  function PlanPlaceholder() {
+    return _h('div', { className:'module-placeholder scr-in' },
+      _h('div', { style:{ color:'var(--a-light)', marginBottom:4 } },
+        PathIcon('M5 5.5h14v14H5zM5 9.5h14M9 3v3M15 3v3M9 13.5h6', 56, 1.5)),
+      _h('h2', null, 'Plan treningowy'),
+      _h('p', null, 'Ekran planu jest w przygotowaniu w ramach redesignu — złoży meta-plan, segmenty, jednostki i tydzień w jednym miejscu.')
+    );
+  }
+
   // ── ROUTER ───────────────────────────────────────
   var ROUTE_MAP = {
+    coach:        function(){ return ET.CoachModule || CoachPlaceholder; },
+    plan:         function(){ return ET.PlanModule || PlanPlaceholder; },
     dashboard:    function(){ return ET.Dashboard; },
     strength:     function(){ return ET.StrengthModule; },
     running:      function(){ return ET.RunningModule; },
@@ -222,9 +330,9 @@
     measurements: function(){ return ET.MeasurementsModule; },
     diet:         function(){ return ET.DietModule; },
     supplements:  function(){ return ET.SupplementsModule; },
-    wellbeing:    function(){ return ET.WellbeingModule; },
-    pain:         function(){ return ET.PainModule; },
-    calendar:     function(){ return ET.CalendarModule; },
+    wellbeing:    function(){ return (IS_WEB && ET.ReadinessModule) || ET.WellbeingModule; },
+    pain:         function(){ return (IS_WEB && ET.WebPainModule) || ET.PainModule; },
+    calendar:     function(){ return (IS_WEB && ET.WebCalendarModule) || ET.CalendarModule; },
     competitions: function(){ return ET.CompetitionsModule; },
     goals:        function(){ return ET.GoalsModule; },
     statistics:   function(){ return ET.StatisticsModule; },
@@ -237,7 +345,7 @@
     physio:       function(){ return ET.PainModule; },
     backup:       function(){ return ET.BackupModule; },
     planner:      function(){ return ET.PlannerModule; },
-    acwr:         function(){ return ET.AcwrModule; },
+    acwr:         function(){ return (IS_WEB && ET.WebAcwrModule) || ET.AcwrModule; },
     assessment:   function(){ return ET.AssessmentModule; },
     profile:      function(){ return ET.ProfileModule; },
     accounts:     function(){ return ET.AccountsModule; },
@@ -299,6 +407,43 @@
     );
   }
 
+  // ── POWŁOKI ──────────────────────────────────────
+  // Natywna (iOS): mobilny „Aurora Glass" — szklany pasek + szuflada modułów.
+  function NativeShell() {
+    return _h('div', { className:'app' },
+      _h(ET.ImpersonationBanner, null),
+      _h(Sidebar, null),
+      _h('main', { className:'main' },
+        _h('div', { className:'aurora aurora-1' }),
+        _h('div', { className:'aurora aurora-2' }),
+        _h('div', { className:'page-content' },
+          _h(ErrorBoundary, null, _h(Router, null))
+        )
+      ),
+      _h(MobileNav, null),
+      _h(DailyWellbeingCheck, null)
+    );
+  }
+
+  // Web (przeglądarka): sidebar 236 px + pasek górny wg designu „Aplikacja".
+  function WebShell() {
+    return _h('div', { className:'wapp' },
+      _h(WebSidebar, null),
+      _h('main', { className:'wmain' },
+        _h('div', { className:'waurora' },
+          _h('div', { className:'waurora-1' }),
+          _h('div', { className:'waurora-2' })
+        ),
+        _h(ET.ImpersonationBanner, null),
+        _h(WebTopbar, null),
+        _h('div', { className:'wcontent' },
+          _h(ErrorBoundary, null, _h(Router, null))
+        )
+      ),
+      _h(DailyWellbeingCheck, null)
+    );
+  }
+
   // ── BRAMKA LOGOWANIA ──────────────────────────────
   // SyncManager i SharedExercisesLoader renderowane POZA bramką (zawsze
   // zamontowane) — SyncManager musi widzieć przejście authed→needsAuth
@@ -334,19 +479,7 @@
                   _h(ET.SharedExercisesLoader, null),
                   _h(ET.ImpersonationProvider, null,
                   _h(AuthGate, null,
-                    _h('div', { className:'app' },
-                      _h(ET.ImpersonationBanner, null),
-                      _h(Sidebar, null),
-                      _h('main', { className:'main' },
-                        _h('div', { className:'page-content' },
-                          _h(ErrorBoundary, null,
-                            _h(Router, null)
-                          )
-                        )
-                      ),
-                      _h(MobileNav, null),
-                      _h(DailyWellbeingCheck, null)
-                    )
+                    _h(IS_WEB ? WebShell : NativeShell, null)
                   )
                   )
                 )

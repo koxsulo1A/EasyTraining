@@ -443,4 +443,276 @@
   }
 
   ET.CalendarModule = CalendarModule;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // WEB — ekran „Kalendarz" wg designu „EasyTraining Aplikacja".
+  // Spec: docs/segment-04-kalendarz.md. Tylko do czytania — planowanie ma
+  // jedno miejsce (ekran Plan, js/plan.js). Reużywa lokalny isCompleted()
+  // z tego samego closure; nie kopiuje starego MonthCalendar/WeekPlanner
+  // (WeekPlanner zostaje częścią mobilnego CalendarModule — na webie jego
+  // rolę pełni tydzień „strip" w module Plan).
+  // ══════════════════════════════════════════════════════════════════════
+
+  var EV_COLORS = { workout:'var(--a-light)', run:'var(--green)', sauna:'var(--orange)', intervals:'var(--a-light)',
+    sleep:'var(--purple)', measurement:'var(--teal)', pain:'var(--red)', competition:'var(--yellow)' };
+  var EV_ICONS = { workout:'💪', run:'🏃', sauna:'🔥', intervals:'⏱', sleep:'😴', measurement:'📏', pain:'🩹', competition:'🏆' };
+  var CAL_LEGEND = [
+    { name:'Trening', color:'var(--a-light)' }, { name:'Sen', color:'var(--purple)' },
+    { name:'Pomiary', color:'var(--teal)' }, { name:'Ból', color:'var(--red)' },
+    { name:'Bieg', color:'var(--green)' }, { name:'Sauna', color:'var(--orange)' }, { name:'Zawody', color:'var(--yellow)' },
+  ];
+  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+
+  function webMonthEvents(store, ds) {
+    var ev = [];
+    (store.workouts||[]).forEach(function(w){ if(w.date===ds) ev.push({ type:'workout', color:EV_COLORS.workout, icon:EV_ICONS.workout, name:w.name||'Trening', meta:(w.volume||0).toFixed(0)+' kg objętości' }); });
+    (store.runs||[]).forEach(function(r){ if(r.date===ds) ev.push({ type:'run', color:EV_COLORS.run, icon:EV_ICONS.run, name:'Bieg '+(r.distance||0)+' km', meta:(r.pace||'')+'/km' }); });
+    (store.saunaSessions||[]).forEach(function(s){ if(s.date===ds) ev.push({ type:'sauna', color:EV_COLORS.sauna, icon:EV_ICONS.sauna, name:'Sauna '+(s.duration||0)+' min', meta:(s.temp||'')+'°C' }); });
+    (store.intervals||[]).forEach(function(s){ if(s.date===ds) ev.push({ type:'intervals', color:EV_COLORS.intervals, icon:EV_ICONS.intervals, name:'Interwały', meta:'' }); });
+    (store.sleepSessions||[]).forEach(function(s){ if(s.date===ds) ev.push({ type:'sleep', color:EV_COLORS.sleep, icon:EV_ICONS.sleep, name:(s.duration||0)+'h snu', meta:'Jakość '+(s.quality||'—')+'/10' }); });
+    (store.measurements||[]).forEach(function(x){ if(x.date===ds) ev.push({ type:'measurement', color:EV_COLORS.measurement, icon:EV_ICONS.measurement, name:'Pomiary', meta:x.weight?x.weight+' kg':'' }); });
+    (store.painEntries||[]).forEach(function(p){ if(p.date===ds) ev.push({ type:'pain', color:EV_COLORS.pain, icon:EV_ICONS.pain, name:p.bodyPart||'Ból', meta:p.level+'/10' }); });
+    (store.competitions||[]).forEach(function(c){ if(c.date===ds) ev.push({ type:'competition', color:EV_COLORS.competition, icon:EV_ICONS.competition, name:c.name||'Start', meta:'' }); });
+    return ev;
+  }
+  function webEvRoute(type) {
+    return { workout:'strength', run:'running', sleep:'sleep', sauna:'sauna', measurement:'measurements', competition:'competitions', pain:'pain', intervals:'intervals' }[type] || 'dashboard';
+  }
+  function webDayPlans(store, ds) { return (store.weekPlans||[]).filter(function(p){ return p.date===ds; }); }
+  function webDayStatus(store, ds, dayPlans, dayEvents, today) {
+    var nonRest = dayPlans.filter(function(p){ return p.type!=='rest'; });
+    var hasRest = dayPlans.some(function(p){ return p.type==='rest'; });
+    if (nonRest.length) {
+      var anyDone = nonRest.some(function(p){ return isCompleted(store, p, ds); });
+      if (anyDone) return { text:'✓ ZROB.', color:'var(--green)' };
+      if (ds < today) return { text:'✗ POMIN.', color:'var(--red)' };
+      return { text:'○ PLAN', color:'var(--t3)' };
+    }
+    if (hasRest) return { text:'WOLNE', color:'var(--t3)', dim:true };
+    if (dayEvents.length) return { text:'+ EXTRA', color:'var(--teal)' };
+    return null;
+  }
+
+  function WebCalendarModule() {
+    var su = ET.useStore(); var store = su.store;
+    var nav = ET.useNav(); var navigate = nav.navigate;
+    var today = ET.dstr();
+
+    var cs = React.useState(new Date()); var cal = cs[0], setCal = cs[1];
+    var vw = React.useState('grid'); var view = vw[0], setView = vw[1]; // 'grid' | 'heat'
+    var y = cal.getFullYear(), m = cal.getMonth();
+    var dim = new Date(y, m+1, 0).getDate();
+    var fdow = (new Date(y, m, 1).getDay()+6) % 7;
+    var monthPrefix = y+'-'+String(m+1).padStart(2,'0')+'-';
+
+    var ds0 = monthPrefix+'01', dsToday = today.indexOf(monthPrefix)===0 ? today : null;
+    var sd = React.useState(dsToday || ds0); var selDate = sd[0], setSelDate = sd[1];
+    function changeMonth(delta) {
+      var nc = new Date(y, m+delta, 1); setCal(nc);
+      var np = nc.getFullYear()+'-'+String(nc.getMonth()+1).padStart(2,'0')+'-';
+      var nt = today.indexOf(np)===0 ? today : np+'01';
+      setSelDate(nt);
+    }
+
+    var days = []; for (var i=0;i<fdow;i++) days.push(null); for (var d=1;d<=dim;d++) days.push(d);
+
+    // ── STATYSTYKI MIESIĄCA ──
+    var stats = React.useMemo(function() {
+      var planned = (store.weekPlans||[]).filter(function(p){ return p.date.indexOf(monthPrefix)===0 && p.type!=='rest'; });
+      var pastPlanned = planned.filter(function(p){ return p.date <= today; });
+      var doneOfPast = pastPlanned.filter(function(p){ return isCompleted(store, p, p.date); });
+      var compliance = pastPlanned.length ? Math.round(doneOfPast.length/pastPlanned.length*100) : null;
+
+      var sessionTypes = [
+        (store.workouts||[]).map(function(w){ return { date:w.date, type:'strength' }; }),
+        (store.runs||[]).map(function(r){ return { date:r.date, type:'running' }; }),
+        (store.saunaSessions||[]).map(function(s){ return { date:s.date, type:'sauna' }; }),
+        (store.intervals||[]).map(function(s){ return { date:s.date, type:'intervals' }; }),
+      ].reduce(function(a,b){ return a.concat(b); }, []).filter(function(s){ return s.date && s.date.indexOf(monthPrefix)===0; });
+      var ofPlan = sessionTypes.filter(function(s){ return planned.some(function(p){ return p.date===s.date && p.type===s.type; }); }).length;
+      var outOfPlan = sessionTypes.length - ofPlan;
+
+      var volume = (store.workouts||[]).filter(function(w){ return w.date && w.date.indexOf(monthPrefix)===0; }).reduce(function(a,w){ return a+(+w.volume||0); }, 0);
+
+      return { planned:planned.length, sessions:sessionTypes.length, ofPlan:ofPlan, outOfPlan:outOfPlan, compliance:compliance, pastPlannedCount:pastPlanned.length, volume:volume };
+    }, [store.weekPlans, store.workouts, store.runs, store.saunaSessions, store.intervals, monthPrefix]);
+
+    var complianceColor = stats.compliance==null ? 'var(--t3)' : stats.compliance>=80 ? 'var(--green)' : stats.compliance>=50 ? 'var(--yellow)' : 'var(--red)';
+
+    // ── SIATKA ──
+    var cells = React.useMemo(function() {
+      return days.map(function(dnum) {
+        if (!dnum) return null;
+        var ds = monthPrefix+String(dnum).padStart(2,'0');
+        var dayPlans = webDayPlans(store, ds);
+        var dayEvents = webMonthEvents(store, ds);
+        var status = webDayStatus(store, ds, dayPlans, dayEvents, today);
+        return { ds:ds, num:dnum, plans:dayPlans, events:dayEvents, status:status, isToday:ds===today, isPast:ds<today };
+      });
+    }, [store.weekPlans, store.workouts, store.runs, store.saunaSessions, store.intervals, store.sleepSessions, store.measurements, store.painEntries, store.competitions, monthPrefix]);
+
+    var maxVol = cells.reduce(function(m,c){ if(!c) return m; var v=(store.workouts||[]).filter(function(w){return w.date===c.ds;}).reduce(function(a,w){return a+(+w.volume||0);},0); return Math.max(m,v); }, 0);
+
+    var selCell = cells.find(function(c){ return c && c.ds===selDate; });
+    var selPlans = selCell ? selCell.plans.filter(function(p){ return p.type!=='rest'; }) : [];
+    var selEvents = selCell ? selCell.events : [];
+
+    return _h('div', { className:'scr-in', style:{ display:'flex', flexDirection:'column', gap:18 } },
+
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, flexWrap:'wrap' } },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
+          _h('div', { onClick:function(){ changeMonth(-1); }, style:{ width:32, height:32, borderRadius:11, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.10)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--t2)' } },
+            _h('svg', { width:15, height:15, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.4, strokeLinecap:'round', strokeLinejoin:'round' }, _h('path', { d:'M15 5l-7 7 7 7' }))),
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:4, minWidth:170 } },
+            _h('span', { style:{ fontSize:17, fontWeight:800, letterSpacing:'-.028em', textTransform:'capitalize' } }, cal.toLocaleDateString('pl-PL',{ month:'long', year:'numeric' })),
+            _h('span', { style:{ fontSize:10, fontWeight:600, color:'var(--t3)' } }, stats.planned+' zaplanowanych · '+stats.sessions+' sesji')
+          ),
+          _h('div', { onClick:function(){ changeMonth(1); }, style:{ width:32, height:32, borderRadius:11, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.10)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--t2)' } },
+            _h('svg', { width:15, height:15, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.4, strokeLinecap:'round', strokeLinejoin:'round' }, _h('path', { d:'M9 5l7 7-7 7' })))
+        ),
+        _h('div', { style:{ display:'flex', gap:4, padding:4, borderRadius:13, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)' } },
+          [{ id:'grid', name:'Siatka miesiąca' }, { id:'heat', name:'Mapa objętości' }].map(function(t) {
+            var on = view === t.id;
+            return _h('div', { key:t.id, onClick:function(){ setView(t.id); },
+              style:{ padding:'8px 13px', borderRadius:10, cursor:'pointer', fontSize:11.5, fontWeight:700, color: on ? 'var(--a-light)' : 'var(--t3)', background: on ? 'rgba(59,130,246,.16)' : 'transparent' } }, t.name);
+          })
+        )
+      ),
+
+      _h('div', { style:{ display:'flex', gap:9, flexWrap:'wrap' } },
+        [
+          { label:'ZAPLANOWANE', val:stats.planned, sub:'w tym miesiącu', color:'var(--a-light)' },
+          { label:'WYKONANE', val:stats.sessions, sub:stats.ofPlan+' z planu · '+stats.outOfPlan+' poza planem', color:'var(--t1)' },
+          { label:'ZGODNOŚĆ', val: stats.compliance==null ? '—' : stats.compliance+'%', sub: stats.pastPlannedCount ? 'z '+stats.pastPlannedCount+' minionych planów' : 'brak minionych planów', color:complianceColor },
+          { label:'OBJĘTOŚĆ', val: stats.volume>=1000 ? (stats.volume/1000).toFixed(1).replace('.',',')+' t' : Math.round(stats.volume)+' kg', sub:'suma treningów siłowych', color:'var(--purple)' },
+        ].map(function(s) {
+          return _h('div', { key:s.label, style:{ flex:'1 1 150px', display:'flex', flexDirection:'column', gap:7, padding:'15px 17px', borderRadius:18, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)' } },
+            _h('span', { style:SECTION_LABEL }, s.label),
+            _h('span', { style:{ fontSize:24, fontWeight:800, letterSpacing:'-.04em', fontVariantNumeric:'tabular-nums', color:s.color } }, s.val),
+            _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--t3)' } }, s.sub)
+          );
+        })
+      ),
+
+      _h('div', { style:{ display:'flex', gap:16, alignItems:'flex-start', flexWrap:'wrap' } },
+
+        _h('div', { className:'glass', style:{ flex:'1 1 480px', minWidth:400, display:'flex', flexDirection:'column', gap:12, padding:20, borderRadius:22 } },
+          _h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(7,minmax(0,1fr))', gap:6 } },
+            DAY_LABELS.map(function(w,i){ return _h('span', { key:i, style:{ textAlign:'center', fontSize:8.5, fontWeight:800, letterSpacing:'.12em', color:'var(--t3)' } }, w); })
+          ),
+
+          view === 'grid'
+            ? _h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(7,minmax(0,1fr))', gap:6 } },
+                cells.map(function(c, i) {
+                  if (!c) return _h('div', { key:'e'+i });
+                  var sel = c.ds === selDate;
+                  return _h('div', { key:c.ds, onClick:function(){ setSelDate(c.ds); },
+                    style:{ display:'flex', flexDirection:'column', gap:5, minHeight:78, padding:'7px 6px', borderRadius:13, cursor:'pointer',
+                      background: sel ? 'rgba(59,130,246,.12)' : c.isToday ? 'rgba(255,255,255,.045)' : 'transparent',
+                      border:'1px solid ' + (sel ? 'rgba(96,165,250,.4)' : c.isToday ? 'rgba(96,165,250,.28)' : 'rgba(255,255,255,.06)'),
+                      opacity: c.isPast && !c.plans.length && !c.events.length ? .5 : 1 } },
+                    _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 } },
+                      _h('span', { style:{ fontSize:12.5, fontWeight:800, fontVariantNumeric:'tabular-nums', color: c.isToday ? 'var(--a-light)' : 'var(--t1)' } }, c.num),
+                      _h('span', { style:{ fontSize:10 } }, c.plans.filter(function(p){ return p.type!=='rest'; }).slice(0,2).map(function(p){ return p.icon; }).join(''))
+                    ),
+                    _h('div', { style:{ display:'flex', gap:3, flexWrap:'wrap' } },
+                      c.events.slice(0,3).map(function(e,ei){ return _h('span', { key:ei, style:{ width:6, height:6, borderRadius:'50%', background:e.color } }); })
+                    ),
+                    c.status && _h('span', { style:{ marginTop:'auto', fontSize:7.5, fontWeight:800, letterSpacing:'.06em', color:c.status.color, opacity: c.status.dim?0.6:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, c.status.text)
+                  );
+                })
+              )
+            : _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+                _h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(7,minmax(0,1fr))', gap:6 } },
+                  cells.map(function(c, i) {
+                    if (!c) return _h('div', { key:'e'+i });
+                    var vol = (store.workouts||[]).filter(function(w){ return w.date===c.ds; }).reduce(function(a,w){ return a+(+w.volume||0); }, 0);
+                    var hasOtherEvent = c.events.some(function(e){ return e.type!=='workout'; });
+                    var heatBg, heatNum;
+                    if (vol > 0) {
+                      var ratio = maxVol > 0 ? vol/maxVol : 0;
+                      var alpha = 0.18 + Math.min(1, ratio) * 0.65;
+                      heatBg = 'rgba(16,185,129,'+alpha.toFixed(2)+')'; heatNum = alpha > 0.5 ? '#080810' : 'var(--t1)';
+                    } else {
+                      var nonRestPlan = c.plans.some(function(p){ return p.type!=='rest'; });
+                      if (nonRestPlan && c.isPast) { heatBg = 'rgba(239,68,68,.14)'; heatNum = 'var(--t2)'; }
+                      else if (nonRestPlan) { heatBg = 'rgba(59,130,246,.14)'; heatNum = 'var(--t2)'; }
+                      else { heatBg = 'rgba(255,255,255,.02)'; heatNum = 'var(--t3)'; }
+                    }
+                    return _h('div', { key:c.ds, onClick:function(){ setSelDate(c.ds); },
+                      className:'wplan', style:{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center', height:52, borderRadius:12, cursor:'pointer',
+                        background:heatBg, border:'1px solid ' + (c.ds===selDate ? 'rgba(96,165,250,.5)' : 'transparent') } },
+                      _h('span', { style:{ fontSize:13, fontWeight:800, fontVariantNumeric:'tabular-nums', color:heatNum } }, c.num),
+                      hasOtherEvent && _h('span', { style:{ position:'absolute', top:5, right:6, width:5, height:5, borderRadius:'50%', background:'var(--a-light)' } })
+                    );
+                  })
+                ),
+                _h('div', { style:{ display:'flex', alignItems:'center', gap:10, paddingTop:6 } },
+                  _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--t3)' } }, 'MNIEJ'),
+                  _h('div', { style:{ display:'flex', gap:4 } },
+                    [0.18,0.35,0.5,0.65,0.83].map(function(a,i){ return _h('span', { key:i, style:{ width:22, height:12, borderRadius:4, background:'rgba(16,185,129,'+a+')', border:'1px solid rgba(255,255,255,.08)' } }); })
+                  ),
+                  _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--t3)' } }, 'WIĘCEJ OBJĘTOŚCI')
+                )
+              ),
+
+          _h('div', { style:{ display:'flex', gap:14, flexWrap:'wrap', paddingTop:12, borderTop:'1px solid rgba(255,255,255,.07)' } },
+            CAL_LEGEND.map(function(l) {
+              return _h('div', { key:l.name, style:{ display:'flex', alignItems:'center', gap:6 } },
+                _h('span', { style:{ width:8, height:8, borderRadius:'50%', background:l.color } }),
+                _h('span', { style:{ fontSize:10, fontWeight:600, color:'var(--t2)' } }, l.name)
+              );
+            })
+          )
+        ),
+
+        _h('div', { className:'wcard', style:{ flex:'1 1 280px', minWidth:270, display:'flex', flexDirection:'column', gap:12, padding:20, borderRadius:22 } },
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:5 } },
+            _h('span', { style:SECTION_LABEL }, 'SZCZEGÓŁY DNIA'),
+            _h('span', { style:{ fontSize:14, fontWeight:700, letterSpacing:'-.02em' } }, selDate ? new Date(selDate+'T12:00').toLocaleDateString('pl-PL',{ weekday:'long', day:'numeric', month:'long' }) : '—')
+          ),
+
+          selPlans.length > 0 && _h('div', { style:{ display:'flex', flexDirection:'column', gap:7 } },
+            _h('span', { style:SECTION_LABEL }, 'PLAN'),
+            selPlans.map(function(p) {
+              var done = isCompleted(store, p, selDate);
+              var st = done ? { t:'✓ ZROB.', c:'var(--green)' } : selDate<today ? { t:'✗ POMIN.', c:'var(--red)' } : { t:'○ PLAN', c:'var(--t3)' };
+              return _h('div', { key:p.id, style:{ display:'flex', alignItems:'center', gap:9, padding:'11px 12px', borderRadius:14, background:'color-mix(in srgb,'+p.color+' 14%, transparent)', border:'1px solid color-mix(in srgb,'+p.color+' 32%, transparent)' } },
+                _h('span', { style:{ fontSize:14 } }, p.icon),
+                _h('div', { style:{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:4 } },
+                  _h('span', { style:{ fontSize:12, fontWeight:700, color:p.color } }, p.planName),
+                  p.note && _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--t3)' } }, p.note)
+                ),
+                _h('span', { style:{ fontSize:9, fontWeight:800, letterSpacing:'.06em', color:st.c } }, st.t)
+              );
+            })
+          ),
+
+          selEvents.length > 0 && _h('div', { style:{ display:'flex', flexDirection:'column', gap:7 } },
+            _h('span', { style:SECTION_LABEL }, 'WYKONANIE'),
+            selEvents.map(function(e, i) {
+              return _h('div', { key:i, onClick:function(){ navigate(webEvRoute(e.type)); },
+                style:{ display:'flex', alignItems:'center', gap:9, padding:'11px 12px', borderRadius:14, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)', cursor:'pointer' } },
+                _h('span', { style:{ flex:'none', width:8, height:8, borderRadius:'50%', background:e.color } }),
+                _h('div', { style:{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:4 } },
+                  _h('span', { style:{ fontSize:12, fontWeight:700, lineHeight:1.2 } }, e.name),
+                  _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--t3)' } }, e.meta)
+                )
+              );
+            })
+          ),
+
+          selPlans.length===0 && selEvents.length===0 && _h('div', { style:{ padding:'26px 16px', borderRadius:16, border:'1px dashed rgba(255,255,255,.12)', background:'rgba(255,255,255,.02)', textAlign:'center', fontSize:11.5, color:'var(--t3)' } },
+            selDate < today ? 'Nic nie zaplanowano ani nie wykonano tego dnia.' : 'Nic tu jeszcze nie ma — zaplanuj trening albo wróć po fakcie.'),
+
+          _h('div', { onClick:function(){ navigate('plan'); }, style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, height:42, borderRadius:14, cursor:'pointer', background:'rgba(96,165,250,.14)', border:'1px solid rgba(96,165,250,.30)', color:'var(--a-light)', fontSize:12, fontWeight:700 } },
+            'Zaplanuj w Planie',
+            _h('svg', { width:14, height:14, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.3, strokeLinecap:'round', strokeLinejoin:'round' }, _h('path', { d:'M4 12h14M12 6l6 6-6 6' }))
+          )
+        )
+      )
+    );
+  }
+
+  ET.WebCalendarModule = WebCalendarModule;
 })();

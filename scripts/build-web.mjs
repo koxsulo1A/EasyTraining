@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
 const OUT = 'www';
-const ITEMS = ['index.html', 'css', 'js', 'supplements.json'];
+const ITEMS = ['index.html', 'css', 'js', 'supplements.json', 'landing'];
 
 // ── BUILD ID ──────────────────────────────────────────────────────────────
 // Jednoznaczny identyfikator tej kompilacji. Służy do dwóch rzeczy:

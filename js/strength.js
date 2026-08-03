@@ -3342,4 +3342,5 @@
   ET.WORKOUT_PLANS = WORKOUT_PLANS;
   ET.getEffectivePlans = getEffectivePlans;
   ET.getMetaPlans = getMetaPlans;
+  ET.saveMetaPlans = saveMetaPlans;
 })();

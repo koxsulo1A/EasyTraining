@@ -266,4 +266,233 @@
   }
 
   ET.AcwrModule = AcwrModule;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // WEB — ekran „Trener AI" wg designu „EasyTraining Aplikacja".
+  // Spec: docs/segment-05-trener-ai-acwr.md. Sama matematyka (ET.acwrData/
+  // acwrZone/acwrRecommendation) i HistoryChart są nietknięte — ten blok
+  // to wyłącznie nowa prezentacja desktopowa + lista wniosków trenera.
+  // ══════════════════════════════════════════════════════════════════════
+
+  var GAUGE_SEGS = [
+    { w:40, c:'var(--a-light)' }, { w:25, c:'var(--green)' },
+    { w:10, c:'var(--orange)' }, { w:25, c:'var(--red)' },
+  ];
+  var GAUGE_TICKS = [
+    { at:0,   name:'0' }, { at:0.8, name:'0,8' }, { at:1.3, name:'1,3' },
+    { at:1.5, name:'1,5' }, { at:2.0, name:'2,0+' },
+  ];
+  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+
+  // Regeneracja dnia — ta sama formuła co ekran Gotowość (js/readiness.js),
+  // lokalna kopia zamiast współdzielonego eksportu: obie strony domenowo
+  // należą do różnych modułów, a duplikat 6 linii jest tańszy niż nowa
+  // zależność cross-file dla jednego wniosku.
+  function todayRecoveryPct(store) {
+    var today = ET.dstr();
+    var ci = (store.wellbeingEntries||[]).find(function(e){ return e.date===today && !e.tag; });
+    var sl = (store.sleepSessions||[]).find(function(e){ return e.date===today; });
+    var comps = [];
+    if (sl) { comps.push(Math.min(1, sl.duration/8)); comps.push(sl.quality/10); }
+    if (ci) { comps.push(ci.energy/10); comps.push((10-ci.stress)/10); comps.push(ci.motivation/10); comps.push(ci.mood/10); }
+    if (!comps.length) return null;
+    return Math.round(comps.reduce(function(a,b){ return a+b; },0)/comps.length*100);
+  }
+
+  // Wnioski trenera z realnych danych (spec §4) — kolejność: ryzyko, trend,
+  // kontekst. Zwraca w kształcie oczekiwanym przez ET.InsightList.
+  function buildAcwrInsights(store, d) {
+    var out = [];
+    var todayMs = new Date(ET.dstr()).getTime();
+    function daysAgo(dateStr) { return Math.floor((todayMs - new Date(dateStr).getTime()) / DAY); }
+
+    if (d.zone.id === 'warn' || d.zone.id === 'high' || d.zone.id === 'crit') {
+      out.push({ type:'warning', icon:d.zone.icon, title:'Strefa ryzyka: '+d.zone.label, body:ET.acwrRecommendation(d.acwr) });
+    } else if (d.zone.id === 'low') {
+      out.push({ type:'info', icon:'⏸️', title:'Obciążenie poniżej normy', body:'ACWR '+fmt(d.acwr)+' — dobry moment, żeby wrócić do progresji i stopniowo zwiększać wolumen.' });
+    }
+
+    if (d.chronic > 0) {
+      var deltaPct = Math.round((d.acute - d.chronic) / d.chronic * 100);
+      if (deltaPct >= 8) out.push({ type:'positive', icon:'📈', title:'Objętość rośnie', body:'Ostatnie 7 dni są o '+deltaPct+'% powyżej średniej tygodniowej z ostatnich 4 tygodni.' });
+      else if (deltaPct <= -8) out.push({ type:'warning', icon:'📉', title:'Objętość spada', body:'Ostatnie 7 dni są o '+Math.abs(deltaPct)+'% poniżej średniej tygodniowej — sprawdź, czy to zamierzona regeneracja.' });
+    }
+
+    var sessions28 = (store.workouts||[]).filter(function(w){ return w.date && daysAgo(w.date) <= 27; });
+    var perWeek = sessions28.length / 4;
+    var perWeekTxt = perWeek.toFixed(1).replace('.', ',');
+    if (perWeek >= 3) out.push({ type:'positive', icon:'🗓️', title:'Dobra częstotliwość', body:perWeekTxt+' sesji/tydzień średnio z ostatnich 4 tygodni.' });
+    else if (perWeek >= 2) out.push({ type:'info', icon:'🗓️', title:'Umiarkowana częstotliwość', body:perWeekTxt+' sesji/tydzień — więcej regularności przyspieszy postęp.' });
+    else if (sessions28.length) out.push({ type:'warning', icon:'🗓️', title:'Niska częstotliwość', body:perWeekTxt+' sesji/tydzień z ostatnich 4 tygodni — trudno o postęp przy tak rzadkich sesjach.' });
+
+    // Stagnacja: ten sam najlepszy ciężar w 3 kolejnych sesjach ćwiczenia.
+    var byExercise = {};
+    (store.workouts||[]).forEach(function(w) {
+      (w.exercises||[]).forEach(function(ex) {
+        var best = (ex.setsData||[]).filter(function(s){ return s.done; }).reduce(function(m,s){ return Math.max(m, s.weight||0); }, 0);
+        if (!best) return;
+        (byExercise[ex.name] = byExercise[ex.name]||[]).push({ date:w.date, best:best });
+      });
+    });
+    Object.keys(byExercise).some(function(name) {
+      var hist = byExercise[name].slice(0, 3);
+      if (hist.length === 3 && hist[0].best === hist[1].best && hist[1].best === hist[2].best) {
+        out.push({ type:'warning', icon:'📊', title:'Stagnacja: '+name, body:'Ten sam najlepszy ciężar ('+String(hist[0].best).replace('.', ',')+' kg) w 3 ostatnich sesjach — czas zmienić schemat powtórzeń albo dodać wariant ćwiczenia.' });
+        return true;
+      }
+      return false;
+    });
+
+    var pain7 = (store.painEntries||[]).filter(function(p){ return p.date && p.type!=='doms' && daysAgo(p.date)<=6; });
+    if (pain7.length) out.push({ type:'warning', icon:'🩹', title:'Zgłoszony ból w tym tygodniu', body:pain7.length+' '+(pain7.length===1?'wpis':'wpisy')+' bólu (nie DOMS) z ostatnich 7 dni — sprawdź ekran Ból i fizjo przed zwiększaniem obciążenia.' });
+
+    var rec = todayRecoveryPct(store);
+    if (rec != null) {
+      if (rec < 50) out.push({ type:'warning', icon:'🔋', title:'Niska regeneracja', body:'Gotowość dnia '+rec+'% — rozważ lżejszą sesję.' });
+      else if (rec < 70) out.push({ type:'info', icon:'🔋', title:'Umiarkowana regeneracja', body:'Gotowość dnia '+rec+'% — trzymaj się planu.' });
+    }
+
+    return out.slice(0, 6);
+  }
+
+  function WebGaugeHero(props) {
+    var d = props.d;
+    var pos = Math.max(0, Math.min(1, d.acwr/2)) * 100;
+    var threshLeft = Math.max(0, Math.min(1, d.threshold/2)) * 100;
+    return _h('div', { className:'glass', style:{ display:'flex', gap:20, flexWrap:'wrap', padding:22, borderRadius:22 } },
+      _h('div', { style:{ flex:'1 1 300px', minWidth:280, display:'flex', flexDirection:'column', gap:16 } },
+        _h('div', { style:{ display:'flex', alignItems:'flex-end', gap:12, flexWrap:'wrap' } },
+          _h('span', { style:{ fontSize:54, fontWeight:800, lineHeight:.9, letterSpacing:'-.05em', fontVariantNumeric:'tabular-nums', color:d.zone.color } }, fmt(d.acwr)),
+          _h('span', { style:{ paddingBottom:6, fontSize:26, fontWeight:800, color: d.trend==='up'?'var(--red)':d.trend==='down'?'var(--green)':'var(--t3)' } }, trendArrow(d.trend)),
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:7, paddingBottom:8 } },
+            _h('span', { style:{ fontSize:15 } }, d.zone.icon),
+            _h('span', { style:{ fontSize:13, fontWeight:700, color:d.zone.color } }, d.zone.label)
+          )
+        ),
+        _h('div', { style:{ display:'flex', flexDirection:'column', gap:5 } },
+          _h('div', { style:{ position:'relative', display:'flex', height:18, borderRadius:9, overflow:'hidden' } },
+            GAUGE_SEGS.map(function(s,i){ return _h('div', { key:i, style:{ width:s.w+'%', background:s.c, opacity:.85 } }); }),
+            _h('div', { style:{ position:'absolute', top:0, bottom:0, width:2, background:'rgba(255,255,255,.55)', left:threshLeft+'%' } })
+          ),
+          _h('div', { style:{ position:'relative', height:12 } },
+            _h('div', { style:{ position:'absolute', top:0, left:'calc('+pos+'% - 6px)', width:0, height:0, borderLeft:'6px solid transparent', borderRight:'6px solid transparent', borderTop:'9px solid var(--t1)' } })
+          ),
+          _h('div', { style:{ position:'relative', height:11 } },
+            GAUGE_TICKS.map(function(t,i){ return _h('span', { key:i, style:{ position:'absolute', top:0, left:(t.at/2*100)+'%', transform: i===0?'none':i===GAUGE_TICKS.length-1?'translateX(-100%)':'translateX(-50%)', fontSize:9.5, fontWeight:600, color:'var(--t3)', whiteSpace:'nowrap' } }, t.name); })
+          )
+        )
+      ),
+      _h('div', { style:{ flex:'1 1 240px', minWidth:220, display:'flex', flexDirection:'column', gap:8 } },
+        [
+          { label:'OSTRE (7 DNI)', val:Math.round(d.acute).toLocaleString('pl-PL'), color:'var(--a-light)' },
+          { label:'PRZEWLEKŁE (ŚR. TYG.)', val:Math.round(d.chronic).toLocaleString('pl-PL'), color:'var(--purple)' },
+          { label:'PRÓG ALERTU', val:fmt(d.threshold), color:'var(--orange)' },
+        ].map(function(s) {
+          return _h('div', { key:s.label, style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, padding:'12px 14px', borderRadius:14, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)' } },
+            _h('span', { style:{ fontSize:8.5, fontWeight:800, letterSpacing:'.12em', color:'var(--t3)' } }, s.label),
+            _h('span', { style:{ fontSize:15, fontWeight:800, fontVariantNumeric:'tabular-nums', color:s.color } }, s.val)
+          );
+        })
+      )
+    );
+  }
+
+  function WebChartHero(props) {
+    var d = props.d;
+    return _h('div', { className:'glass', style:{ display:'flex', flexDirection:'column', gap:15, padding:22, borderRadius:22 } },
+      _h('div', { style:{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:16, flexWrap:'wrap' } },
+        _h('div', { style:{ display:'flex', alignItems:'flex-end', gap:11 } },
+          _h('span', { style:{ fontSize:44, fontWeight:800, lineHeight:.9, letterSpacing:'-.04em', fontVariantNumeric:'tabular-nums', color:d.zone.color } }, fmt(d.acwr)),
+          _h('span', { style:{ paddingBottom:5, fontSize:13, fontWeight:700, color:d.zone.color } }, d.zone.label)
+        ),
+        _h('span', { style:SECTION_LABEL }, '12 TYGODNI')
+      ),
+      _h('div', { style:{ maxWidth:640 } }, _h(HistoryChart, { weekly:d.weekly }))
+    );
+  }
+
+  function WebAcwrModule() {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var settings = store.acwrSettings || { method:'external', threshold:1.3, notifications:false };
+    var d = ET.acwrData(store, settings);
+    var vs = React.useState('gauge'); var view = vs[0], setView = vs[1];
+
+    function setSetting(k, v) {
+      update(function(s){ var cur = s.acwrSettings || {}; var o={}; o[k]=v; return Object.assign({}, s, { acwrSettings: Object.assign({}, cur, o) }); });
+    }
+
+    return _h('div', { className:'scr-in', style:{ display:'flex', flexDirection:'column', gap:18 } },
+
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, flexWrap:'wrap' } },
+        _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+          [{ id:'external', name:'Obciążenie zewnętrzne', sub:'objętość (kg)' }, { id:'internal', name:'Wewnętrzne', sub:'RPE × czas' }].map(function(m) {
+            var on = settings.method === m.id;
+            return _h('div', { key:m.id, onClick:function(){ setSetting('method', m.id); },
+              style:{ display:'flex', flexDirection:'column', gap:5, padding:'10px 15px', borderRadius:14, cursor:'pointer',
+                background: on ? 'rgba(59,130,246,.14)' : 'rgba(255,255,255,.04)', border:'1px solid ' + (on ? 'rgba(96,165,250,.36)' : 'rgba(255,255,255,.08)') } },
+              _h('span', { style:{ fontSize:12, fontWeight:700, letterSpacing:'-.01em', color: on ? 'var(--a-light)' : 'var(--t1)' } }, m.name),
+              _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--t3)' } }, m.sub)
+            );
+          })
+        ),
+        d.hasData && d.ready && _h('div', { style:{ display:'flex', gap:4, padding:4, borderRadius:13, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)' } },
+          [{ id:'gauge', name:'Skala ryzyka' }, { id:'chart', name:'Trend 12 tyg.' }].map(function(t) {
+            var on = view === t.id;
+            return _h('div', { key:t.id, onClick:function(){ setView(t.id); },
+              style:{ padding:'8px 13px', borderRadius:10, cursor:'pointer', fontSize:11.5, fontWeight:700, color: on ? 'var(--a-light)' : 'var(--t3)', background: on ? 'rgba(59,130,246,.16)' : 'transparent', transition:'background .2s,color .2s' } }, t.name);
+          })
+        )
+      ),
+
+      !d.hasData
+        ? _h('div', { className:'wcard', style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:9, padding:'44px 20px', borderRadius:22, border:'1px dashed rgba(255,255,255,.12)' } },
+            _h('span', { style:{ fontSize:28 } }, '📈'),
+            _h('div', { style:{ fontSize:14, fontWeight:700 } }, 'Brak treningów'),
+            _h('div', { style:{ fontSize:12, color:'var(--t3)', textAlign:'center', maxWidth:340 } }, 'Zapisz pierwszy trening siłowy — ACWR liczy się z objętości sesji.')
+          )
+        : !d.ready
+          ? _h('div', { className:'wcard', style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:11, padding:'38px 20px', borderRadius:22 } },
+              _h('span', { style:{ fontSize:30 } }, '⏳'),
+              _h('div', { style:{ fontSize:14.5, fontWeight:700 } }, 'Zbieranie danych'),
+              _h('div', { style:{ fontSize:11.5, fontWeight:600, color:'var(--t2)' } }, Math.min(d.daysLogged,28)+'/28 dni logowania'),
+              _h('div', { style:{ width:'100%', maxWidth:320, height:6, borderRadius:3, background:'rgba(255,255,255,.08)', overflow:'hidden' } },
+                _h('div', { style:{ height:'100%', borderRadius:3, background:'linear-gradient(90deg,var(--a),var(--purple))', width:Math.min(100, d.daysLogged/28*100)+'%' } })),
+              _h('div', { style:{ fontSize:11.5, color:'var(--t3)', textAlign:'center', maxWidth:380 } }, 'ACWR wymaga minimum 28 dni logowania — dopiero wtedy średnia przewlekła ma sens statystyczny.')
+            )
+          : _h('div', { style:{ display:'flex', flexDirection:'column', gap:18 } },
+              view === 'gauge' ? _h(WebGaugeHero, { d:d }) : _h(WebChartHero, { d:d }),
+
+              _h('div', { className:'wcard', style:{ display:'flex', flexDirection:'column', gap:8, padding:20, borderRadius:20, borderLeft:'3px solid '+d.zone.color } },
+                _h('span', { style:SECTION_LABEL }, '🧠 REKOMENDACJA PRZED SESJĄ'),
+                _h('div', { style:{ fontSize:13, color:'var(--t1)', lineHeight:1.55 } }, ET.acwrRecommendation(d.acwr)),
+                d.acwr>=1.0 && d.acwr<=1.3 && _h('div', { style:{ fontSize:11, color:'var(--t3)' } }, '📏 Zasada 10%: kolejny tydzień zwiększaj obciążenie maks. o 10% względem średniej z 4 tyg.')
+              ),
+
+              _h('div', { className:'wcard', style:{ display:'flex', flexDirection:'column', gap:10, padding:20, borderRadius:20 } },
+                _h('span', { style:SECTION_LABEL }, 'WNIOSKI TRENERA'),
+                ET.InsightList(buildAcwrInsights(store, d))
+              )
+            ),
+
+      _h('div', { className:'wcard', style:{ display:'flex', flexDirection:'column', gap:14, padding:20, borderRadius:20 } },
+        _h('span', { style:SECTION_LABEL }, '⚙️ USTAWIENIA ACWR'),
+        _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+          _h('div', { style:{ display:'flex', justifyContent:'space-between' } },
+            _h('span', { style:{ fontSize:12, color:'var(--t2)' } }, 'Próg alertu'),
+            _h('span', { style:{ color:'var(--orange)', fontWeight:700, fontSize:12 } }, fmt(settings.threshold||1.3))
+          ),
+          _h('input', { type:'range', min:1.2, max:1.8, step:0.05, value:settings.threshold||1.3, onChange:function(e){ setSetting('threshold', +e.target.value); }, style:{ width:'100%' } })
+        ),
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center' } },
+          _h('span', { style:{ fontSize:12.5 } }, '🔔 Powiadomienia push'),
+          _h('div', { onClick:function(){ setSetting('notifications', !settings.notifications); },
+            style:{ padding:'6px 12px', borderRadius:100, cursor:'pointer', fontSize:11, fontWeight:700,
+              background: settings.notifications ? 'rgba(59,130,246,.16)' : 'rgba(255,255,255,.05)', border:'1px solid ' + (settings.notifications ? 'rgba(96,165,250,.34)' : 'rgba(255,255,255,.10)'), color: settings.notifications ? 'var(--a-light)' : 'var(--t2)' } },
+            settings.notifications ? 'Włączone' : 'Wyłączone')
+        )
+      )
+    );
+  }
+
+  ET.WebAcwrModule = WebAcwrModule;
 })();
