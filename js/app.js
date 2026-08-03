@@ -345,7 +345,7 @@
     physio:       function(){ return ET.PainModule; },
     backup:       function(){ return ET.BackupModule; },
     planner:      function(){ return ET.PlannerModule; },
-    acwr:         function(){ return ET.AcwrModule; },
+    acwr:         function(){ return (IS_WEB && ET.WebAcwrModule) || ET.AcwrModule; },
     assessment:   function(){ return ET.AssessmentModule; },
     profile:      function(){ return ET.ProfileModule; },
     accounts:     function(){ return ET.AccountsModule; },
