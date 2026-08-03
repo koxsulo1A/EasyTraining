@@ -282,7 +282,7 @@
     { at:0,   name:'0' }, { at:0.8, name:'0,8' }, { at:1.3, name:'1,3' },
     { at:1.5, name:'1,5' }, { at:2.0, name:'2,0+' },
   ];
-  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+  var SECTION_LABEL = ET.SECTION_LABEL;
 
   // Regeneracja dnia — ta sama formuła co ekran Gotowość (js/readiness.js),
   // lokalna kopia zamiast współdzielonego eksportu: obie strony domenowo

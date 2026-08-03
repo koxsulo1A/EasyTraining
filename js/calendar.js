@@ -26,10 +26,6 @@
     return d;
   }
 
-  function toStr(d) {
-    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  }
-
   function isCompleted(store, plan, date) {
     if (!plan) return false;
     if (plan.type === 'rest') return date <= ET.dstr();
@@ -54,7 +50,7 @@
     for (var i = 0; i < 7; i++) {
       var d = new Date(ws.getTime());
       d.setDate(ws.getDate() + i);
-      weekDays.push(toStr(d));
+      weekDays.push(ET.dstr(d));
     }
 
     var plans = store.weekPlans || [];
@@ -461,7 +457,7 @@
     { name:'Pomiary', color:'var(--teal)' }, { name:'Ból', color:'var(--red)' },
     { name:'Bieg', color:'var(--green)' }, { name:'Sauna', color:'var(--orange)' }, { name:'Zawody', color:'var(--yellow)' },
   ];
-  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+  var SECTION_LABEL = ET.SECTION_LABEL;
 
   function webMonthEvents(store, ds) {
     var ev = [];

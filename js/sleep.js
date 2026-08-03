@@ -58,6 +58,7 @@
     var sa = React.useState(!!params.openAdd); var showAdd = sa[0], setShowAdd = sa[1];
 
     var sessions = store.sleepSessions||[];
+    var page = ET.useProgressive(sessions);
     var avgDur = sessions.length ? (sessions.reduce(function(t,s){ return t+(s.duration||0); },0)/sessions.length).toFixed(1) : '—';
     var avgQual = sessions.length ? (sessions.reduce(function(t,s){ return t+(s.quality||0); },0)/sessions.length).toFixed(1) : '—';
 
@@ -78,7 +79,7 @@
 
       sessions.length===0
         ? _h(ET.Placeholder, { icon:'😴', title:'Brak wpisów snu', desc:'Śledź godziny snu, jakość i gotowość do treningu.' })
-        : sessions.map(function(s) {
+        : page.items.map(function(s) {
             var rc2 = s.readiness>=70?'var(--green)':s.readiness>=40?'var(--yellow)':'var(--red)';
             return _h('div', { key:s.id, className:'card', style:{ marginBottom:8 } },
               _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:8 } },
@@ -94,6 +95,8 @@
               )
             );
           }),
+
+      _h(ET.ShowMore, { state:page }),
 
       _h(SleepAddSheet, { open:showAdd, onClose:function(){ setShowAdd(false); } })
     );

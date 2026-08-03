@@ -439,8 +439,11 @@
         _h('div', { className:'wcontent' },
           _h(ErrorBoundary, null, _h(Router, null))
         )
-      ),
-      _h(DailyWellbeingCheck, null)
+      )
+      // Bez DailyWellbeingCheck: na webie check-in ma własny ekran („Gotowość")
+      // i CTA na „Dziś". Modal blokował UI 800 ms po KAŻDYM załadowaniu strony,
+      // dublując funkcję, która jest o jedno kliknięcie dalej. Na iOS zostaje —
+      // tam nie ma osobnego ekranu gotowości i poranny monit ma sens.
     );
   }
 

@@ -117,6 +117,7 @@
     var sa = React.useState(!!params.openAdd); var showAdd = sa[0], setShowAdd = sa[1];
 
     var sessions = store.saunaSessions || [];
+    var page = ET.useProgressive(sessions);
     var totalMin = sessions.reduce(function(t,s){ return t+(s.duration||0); },0);
     var avgTemp = sessions.length ? Math.round(sessions.reduce(function(t,s){ return t+(s.temp||0); },0)/sessions.length) : 0;
 
@@ -137,7 +138,7 @@
 
       sessions.length===0
         ? _h(ET.Placeholder, { icon:'🔥', title:'Brak sesji sauny', desc:'Rejestruj sesje sauny z oceną gotowości i samopoczuciem.' })
-        : sessions.map(function(s) {
+        : page.items.map(function(s) {
             var typeInfo = SAUNA_TYPES.find(function(t){ return t.id===s.type; }) || SAUNA_TYPES[0];
             var rdColor = !s.readiness ? 'var(--t3)' : s.readiness.willingness===3?'var(--green)':s.readiness.willingness===1?'var(--red)':'var(--yellow)';
             return _h('div', { key:s.id, className:'card', style:{ marginBottom:8 } },
@@ -156,6 +157,8 @@
               )
             );
           }),
+
+      _h(ET.ShowMore, { state:page }),
 
       _h(SaunaAddSheet, { open:showAdd, onClose:function(){ setShowAdd(false); } })
     );

@@ -134,7 +134,7 @@
 
       for (var d = days; d >= 0; d--) {
         var date = new Date(today.getTime() - d * 86400000);
-        var dateStr = date.toISOString().slice(0,10);
+        var dateStr = ET.dstr(date);
         var dow = (date.getDay() + 6) % 7; // 0=Mon…6=Sun
         var isTrainDay = profile.trainDays.indexOf(date.getDay()) !== -1;
         var isRunDay   = profile.runDays.indexOf(date.getDay()) !== -1;
