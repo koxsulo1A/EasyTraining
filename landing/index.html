@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EasyTraining — cały trening w jednym miejscu</title>
+<meta name="description" content="Offline-first aplikacja treningowa: plan, sesja siłowa z zapisem RIR, regeneracja i pomiary. Działa bez internetu, dane zostają na Twoim urządzeniu.">
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   EasyTraining — strona produktowa (landing).
+   Samodzielny statyczny HTML/CSS/JS — bez zależności od React/store
+   aplikacji (js/, css/styles.css w korzeniu repo). Design: projekt
+   „EasyTraining Aplikacja/Strona" na claude.ai/design, plik
+   `EasyTraining Strona.dc.html`. Wartości px/kolory/copy 1:1 z makietą.
+   ══════════════════════════════════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080810;--s1:#0F0F1C;--s2:#141425;--t1:#F1F1F8;--t2:#A0A0C0;--t3:#60607A;--t4:#3a3a55;
+  --a:#3B82F6;--a-light:#60A5FA;--purple:#8B5CF6;--green:#10B981;--orange:#F97316;
+  --teal:#14B8A6;--yellow:#F59E0B;--pink:#EC4899;--red:#EF4444;
+  --b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.10);
+}
+html,body{background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;min-height:100%}
+a{color:var(--a-light);text-decoration:none}
+a:hover{color:#93BBFC}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#20203A;border-radius:3px}
+@keyframes scrIn{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,14px) scale(1.12)}100%{transform:translate(0,0) scale(1)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+.lp-app{display:flex;align-items:flex-start;min-height:100vh}
+
+/* — sidebar — */
+.lp-side{position:sticky;top:0;flex:0 0 252px;height:100vh;display:flex;flex-direction:column;background:var(--s1);border-right:1px solid var(--b1);z-index:30;overflow-y:auto}
+.lp-logo{display:flex;align-items:center;gap:11px;padding:24px 20px 18px}
+.lp-logo-mark{width:36px;height:36px;border-radius:12px;flex:none;background:linear-gradient(150deg,#60A5FA,#3B82F6 45%,#8B5CF6);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px -8px rgba(59,130,246,.8),inset 0 1px 0 rgba(255,255,255,.3)}
+.lp-logo-txt{display:flex;flex-direction:column;gap:3px}
+.lp-logo-name{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.lp-logo-sub{font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--t3)}
+.lp-nav{display:flex;flex-direction:column;gap:2px;padding:4px 14px 16px;flex:1}
+.lp-nav-label{font-size:9px;font-weight:800;letter-spacing:.14em;color:var(--t4);padding:14px 10px 6px}
+.lp-nav-item{position:relative;display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;cursor:pointer;font-size:12.5px;font-weight:600;letter-spacing:-.01em;color:var(--t2);transition:background .18s,color .18s;background:none;border:none;width:100%;text-align:left}
+.lp-nav-item:hover{background:rgba(255,255,255,.05);color:var(--t1)}
+.lp-nav-item.active{background:rgba(59,130,246,.14);color:var(--a-light)}
+.lp-nav-item.active::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:16px;border-radius:0 2px 2px 0;background:var(--a)}
+.lp-nav-item svg{flex:none;width:17px;height:17px}
+.lp-side-foot{padding:14px 20px 20px;border-top:1px solid var(--b1)}
+.lp-gh{display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:11px;border:1px solid var(--b2);background:rgba(255,255,255,.04);color:var(--t2);font-size:11.5px;font-weight:700;transition:all .15s}
+.lp-gh:hover{background:rgba(255,255,255,.08);color:var(--t1)}
+.lp-gh svg{width:15px;height:15px}
+
+/* — main — */
+.lp-main{flex:1;min-width:0;position:relative}
+.lp-aurora{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.lp-aurora-1{position:absolute;top:-200px;left:100px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.30),transparent 68%);filter:blur(60px);animation:drift 15s ease-in-out infinite}
+.lp-aurora-2{position:absolute;top:-140px;right:-180px;width:460px;height:460px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.26),transparent 68%);filter:blur(64px);animation:drift 19s ease-in-out infinite reverse}
+.lp-content{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:56px 40px 100px}
+.lp-page{display:none;flex-direction:column;gap:52px;animation:scrIn .38s cubic-bezier(.2,.8,.2,1)}
+.lp-page.active{display:flex}
+
+/* — shared bits — */
+.lp-kicker{font-size:9.5px;font-weight:800;letter-spacing:.14em;color:var(--t3)}
+.lp-h1{margin:0;font-size:44px;font-weight:800;line-height:1.05;letter-spacing:-.04em}
+.lp-lead{margin:0;max-width:620px;font-size:14.5px;line-height:1.55;color:var(--t2)}
+.lp-glass{padding:20px;border-radius:22px;background:linear-gradient(158deg,rgba(255,255,255,.075),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.10);box-shadow:0 18px 44px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.09)}
+.lp-card{padding:20px;border-radius:20px;background:linear-gradient(158deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);transition:transform .25s cubic-bezier(.2,.8,.2,1),border-color .25s}
+.lp-card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.16)}
+.lp-btn{display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 24px;border-radius:17px;font-size:14px;font-weight:800;letter-spacing:-.01em;cursor:pointer;border:none}
+.lp-btn-primary{background:linear-gradient(150deg,#60A5FA,#3B82F6 45%,#8B5CF6);color:#080810;box-shadow:0 14px 32px -8px rgba(59,130,246,.8),inset 0 1px 0 rgba(255,255,255,.3)}
+.lp-btn-ghost{border:1px solid var(--b2);background:rgba(255,255,255,.04);color:var(--t1);font-weight:700}
+.lp-btn-ghost:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
+
+/* — Start — */
+.lp-hero{display:flex;gap:56px;align-items:center;flex-wrap:wrap}
+.lp-hero-col{flex:1 1 420px;min-width:340px;display:flex;flex-direction:column;gap:22px}
+.lp-badge{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;padding:6px 12px 6px 9px;border-radius:100px;background:rgba(59,130,246,.14);border:1px solid rgba(96,165,250,.28)}
+.lp-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--a-light);box-shadow:0 0 10px rgba(96,165,250,.9)}
+.lp-badge-txt{font-size:9.5px;font-weight:800;letter-spacing:.14em;color:var(--a-light)}
+.lp-hero-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
+.lp-stats{display:flex;gap:34px;margin-top:16px;padding-top:22px;border-top:1px solid var(--b1)}
+.lp-stat-val{font-size:32px;font-weight:800;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.lp-stat-label{font-size:10.5px;font-weight:600;letter-spacing:.1em;color:var(--t3)}
+.lp-mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.lp-mod{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--b1)}
+.lp-mod-ic{flex:none;width:32px;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center}
+.lp-mod-name{font-size:12.5px;font-weight:700;letter-spacing:-.01em}
+.lp-mod-meta{font-size:9.5px;font-weight:600;color:var(--t3)}
+
+/* — Funkcje — */
+.lp-fgroup{display:flex;flex-direction:column;gap:18px}
+.lp-fgroup-hdr{display:flex;align-items:center;gap:12px}
+.lp-fgroup-line{flex:1;height:1px;background:var(--b1)}
+.lp-fgroup-count{font-size:11px;font-weight:600;color:var(--t3)}
+.lp-fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.lp-ficon{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:11px}
+.lp-fname{font-size:14.5px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.lp-fdesc{font-size:12.5px;line-height:1.5;color:var(--t2)}
+.lp-fsrc{margin-top:8px;font-size:10.5px;font-family:ui-monospace,Menlo,monospace;color:var(--t4)}
+
+/* — Ekrany — */
+.lp-screens{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+.lp-phone{flex:none;width:280px;padding:11px;border-radius:46px;background:linear-gradient(160deg,#2a2a48,#141425 55%,#0e0e1a);box-shadow:0 44px 80px -30px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.12)}
+.lp-phone-screen{position:relative;height:556px;border-radius:36px;background:var(--bg);overflow:hidden;padding:20px 16px;display:flex;flex-direction:column;gap:12px}
+.lp-tabs{display:flex;gap:8px;padding:5px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--b2);align-self:flex-start;margin-bottom:8px}
+.lp-tab{padding:9px 16px;border-radius:12px;cursor:pointer;font-size:12.5px;font-weight:700;letter-spacing:-.01em;color:var(--t3);background:none;border:none;transition:background .2s,color .2s}
+.lp-tab.active{color:var(--a-light);background:rgba(59,130,246,.16)}
+.lp-screen-notes{flex:1;min-width:280px;display:flex;flex-direction:column;gap:12px}
+.lp-note{display:none;flex-direction:column;gap:12px}
+.lp-note.active{display:flex}
+.lp-note-item{display:flex;gap:12px;padding:16px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--b1)}
+.lp-note-num{flex:none;width:26px;height:26px;border-radius:9px;background:rgba(96,165,250,.16);color:var(--a-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.lp-note-name{font-size:13px;font-weight:700;margin-bottom:4px}
+.lp-note-desc{font-size:12px;line-height:1.5;color:var(--t2)}
+.lp-mini-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--b1);font-size:11px}
+.lp-mini-set{display:flex;align-items:center;gap:8px}
+.lp-check{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:none}
+
+/* — Instalacja — */
+.lp-steps{display:flex;flex-direction:column;gap:10px;max-width:640px}
+.lp-step{display:flex;gap:16px;padding:18px 20px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid var(--b1)}
+.lp-step-n{flex:none;width:32px;height:32px;border-radius:11px;background:rgba(96,165,250,.16);color:var(--a-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+.lp-step-name{font-size:13.5px;font-weight:700;margin-bottom:5px}
+.lp-step-desc{font-size:12px;line-height:1.5;color:var(--t2);margin-bottom:8px}
+.lp-step-code{display:inline-block;padding:5px 10px;border-radius:8px;background:rgba(0,0,0,.3);font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--t2)}
+.lp-note-warn{display:flex;gap:10px;padding:14px 16px;border-radius:14px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.28);font-size:12px;line-height:1.5;color:var(--t2);max-width:640px}
+
+/* — O projekcie — */
+.lp-stack{display:flex;flex-direction:column;gap:8px;max-width:720px}
+.lp-stack-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--b1)}
+.lp-stack-name{flex:0 0 160px;font-size:12.5px;font-weight:700}
+.lp-stack-desc{flex:1;font-size:12px;line-height:1.5;color:var(--t2)}
+.lp-stack-src{flex:none;font-size:10.5px;font-family:ui-monospace,Menlo,monospace;color:var(--t4)}
+
+/* — FAQ — */
+.lp-faq{display:flex;flex-direction:column;gap:8px;max-width:720px}
+.lp-faq-item{border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--b1);overflow:hidden}
+.lp-faq-q{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;cursor:pointer;font-size:13px;font-weight:700;list-style:none}
+.lp-faq-q::-webkit-details-marker{display:none}
+.lp-faq-chevron{flex:none;width:18px;height:18px;color:var(--t3);transition:transform .2s}
+details[open] .lp-faq-chevron{transform:rotate(180deg)}
+.lp-faq-a{padding:0 18px 16px;font-size:12.5px;line-height:1.55;color:var(--t2)}
+
+/* — footer CTA — */
+.lp-footer-cta{display:flex;flex-direction:column;align-items:center;gap:14px;padding:44px 20px;border-radius:24px;text-align:center;background:linear-gradient(158deg,rgba(59,130,246,.12),rgba(139,92,246,.06));border:1px solid rgba(96,165,250,.24)}
+
+@media(max-width:900px){
+  .lp-side{position:fixed;flex-basis:64px;z-index:40}
+  .lp-logo{justify-content:center;padding:18px 0 14px}
+  .lp-logo-txt,.lp-nav-label,.lp-nav-item span,.lp-side-foot span{display:none}
+  .lp-nav-item{justify-content:center}
+  .lp-side-foot{display:flex;justify-content:center;padding:14px 8px}
+  .lp-gh{width:40px;padding:0;justify-content:center}
+  .lp-main{margin-left:64px}
+  .lp-content{padding:32px 20px 72px}
+  .lp-h1{font-size:32px}
+}
+</style>
+</head>
+<body>
+
+<div class="lp-app">
+
+  <aside class="lp-side">
+    <div class="lp-logo">
+      <div class="lp-logo-mark">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#080810" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 8v8M3.8 10v4M17.5 8v8M20.2 10v4M6.5 12h11"></path></svg>
+      </div>
+      <div class="lp-logo-txt">
+        <div class="lp-logo-name">EasyTraining</div>
+        <div class="lp-logo-sub">STRONA PRODUKTU</div>
+      </div>
+    </div>
+    <nav class="lp-nav" id="lpNav">
+      <div class="lp-nav-label">PRODUKT</div>
+      <button class="lp-nav-item active" data-page="start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span>Start</span></button>
+      <button class="lp-nav-item" data-page="features"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z"></path></svg><span>Funkcje</span></button>
+      <button class="lp-nav-item" data-page="screens"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8a1.6 1.6 0 0 1 1.6 1.6v14.8A1.6 1.6 0 0 1 16 21H8a1.6 1.6 0 0 1-1.6-1.6V4.6A1.6 1.6 0 0 1 8 3zM10.5 18.4h3"></path></svg><span>Ekrany</span></button>
+      <div class="lp-nav-label">ZACZNIJ</div>
+      <button class="lp-nav-item" data-page="install"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 11l4.5 4.5L16.5 11M4.5 19.5h15"></path></svg><span>Instalacja na iPhone</span></button>
+      <div class="lp-nav-label">PROJEKT</div>
+      <button class="lp-nav-item" data-page="project"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5-8 4.5-8-4.5zM4 12l8 4.5 8-4.5M4 16.5L12 21l8-4.5"></path></svg><span>O projekcie</span></button>
+      <button class="lp-nav-item" data-page="faq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6M12 16.6h0"></path></svg><span>FAQ</span></button>
+    </nav>
+    <div class="lp-side-foot">
+      <a class="lp-gh" href="https://github.com/koxsulo1A/EasyTraining" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.61-3.37-1.21-3.37-1.21-.45-1.18-1.11-1.49-1.11-1.49-.9-.63.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.74 0 0 .84-.28 2.75 1.05a9.29 9.29 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.43.2 2.48.1 2.74.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"></path></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </aside>
+
+  <main class="lp-main">
+    <div class="lp-aurora"><div class="lp-aurora-1"></div><div class="lp-aurora-2"></div></div>
+    <div class="lp-content">
+
+      <!-- ══ START ══ -->
+      <section class="lp-page active" id="page-start">
+        <div class="lp-hero">
+          <div class="lp-hero-col">
+            <div class="lp-badge"><span class="lp-badge-dot"></span><span class="lp-badge-txt">OFFLINE-FIRST · iOS + WEB</span></div>
+            <h1 class="lp-h1">Cały trening<br>w jednym miejscu.</h1>
+            <p style="margin:0;max-width:470px;font-size:15px;line-height:1.55;color:var(--t2)">Plan, sesja siłowa z zapisem RIR, regeneracja i pomiary. Aplikacja działa bez internetu — dane zostają na Twoim urządzeniu.</p>
+            <div class="lp-hero-cta">
+              <a class="lp-btn lp-btn-primary" href="https://koxsulo1a.github.io/EasyTraining/" target="_blank" rel="noopener">
+                Otwórz aplikację
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h14M12 6l6 6-6 6"></path></svg>
+              </a>
+              <button class="lp-btn lp-btn-ghost" data-goto="install">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8a1.6 1.6 0 0 1 1.6 1.6v14.8A1.6 1.6 0 0 1 16 21H8a1.6 1.6 0 0 1-1.6-1.6V4.6A1.6 1.6 0 0 1 8 3zM10.5 18.4h3"></path></svg>
+                Zainstaluj na iPhone
+              </button>
+            </div>
+            <div class="lp-stats">
+              <div><div class="lp-stat-val" id="stat1">0</div><div class="lp-stat-label">ĆWICZEŃ W BAZIE</div></div>
+              <div><div class="lp-stat-val" id="stat2">0</div><div class="lp-stat-label">MODUŁÓW</div></div>
+              <div><div class="lp-stat-val" id="stat3">0%</div><div class="lp-stat-label">OFFLINE</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="lp-kicker">MODUŁY</div>
+          <div class="lp-mods" id="lpMods"></div>
+        </div>
+
+        <div class="lp-footer-cta">
+          <h2 style="margin:0;font-size:26px;font-weight:800;letter-spacing:-.03em">Zacznij dziś — bez konta, bez internetu</h2>
+          <p style="margin:0;max-width:440px;font-size:13px;color:var(--t2);line-height:1.5">Otwórz wersję web od razu w przeglądarce, albo zainstaluj natywną aplikację na iPhone.</p>
+          <div class="lp-hero-cta" style="margin-top:6px">
+            <a class="lp-btn lp-btn-primary" href="https://koxsulo1a.github.io/EasyTraining/" target="_blank" rel="noopener">Otwórz aplikację</a>
+            <button class="lp-btn lp-btn-ghost" data-goto="install">Zainstaluj na iPhone</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ FUNKCJE ══ -->
+      <section class="lp-page" id="page-features">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:620px">
+          <span class="lp-kicker">FUNKCJE</span>
+          <h1 class="lp-h1" style="font-size:44px">Wszystko, co aplikacja liczy za Ciebie</h1>
+          <p class="lp-lead">Każdy moduł to osobny ekran w aplikacji. Poniżej pełna lista — pogrupowana tak, jak wygląda menu.</p>
+        </div>
+        <div id="lpFeatures" style="display:flex;flex-direction:column;gap:52px"></div>
+      </section>
+
+      <!-- ══ EKRANY ══ -->
+      <section class="lp-page" id="page-screens">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:620px">
+          <span class="lp-kicker">EKRANY</span>
+          <h1 class="lp-h1" style="font-size:44px">Tak wygląda trening</h1>
+          <p class="lp-lead">Wszystkie cele dotykowe w trybie treningu mają co najmniej 44 px, a zapis serii 52 px — kontekst to siłownia, jedna ręka, pośpiech.</p>
+        </div>
+
+        <div class="lp-tabs" id="lpScreenTabs">
+          <button class="lp-tab active" data-screen="session">Trening</button>
+          <button class="lp-tab" data-screen="supp">Suplementy</button>
+          <button class="lp-tab" data-screen="summary">Podsumowanie</button>
+        </div>
+
+        <div class="lp-screens">
+          <div class="lp-phone">
+            <div class="lp-phone-screen">
+              <div id="screen-session" class="lp-screen-inner" style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--t3)">PUSH A · SERIA 3/18</div>
+                <div id="lpSets" style="display:flex;flex-direction:column;gap:6px"></div>
+              </div>
+              <div id="screen-supp" class="lp-screen-inner" style="display:none;flex-direction:column;gap:10px">
+                <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--t3)">SUPLEMENTY · SERIA 23 DNI</div>
+                <div id="lpSupp" style="display:flex;flex-direction:column;gap:10px"></div>
+              </div>
+              <div id="screen-summary" class="lp-screen-inner" style="display:none;flex-direction:column;gap:10px">
+                <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--t3);text-align:center">TRENING UKOŃCZONY</div>
+                <div id="lpSummary" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="lp-screen-notes" id="lpScreenNotes"></div>
+        </div>
+      </section>
+
+      <!-- ══ INSTALACJA ══ -->
+      <section class="lp-page" id="page-install">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:620px">
+          <span class="lp-kicker">INSTALACJA NA IPHONE</span>
+          <h1 class="lp-h1" style="font-size:44px">Cztery kroki, bez konta deweloperskiego</h1>
+          <p class="lp-lead">Paczka .ipa jest niepodpisana — podpisuje ją Twoim darmowym Apple ID narzędzie do sideloadu, już na Twoim komputerze.</p>
+        </div>
+        <div class="lp-steps" id="lpSteps"></div>
+        <div class="lp-note-warn">⚠️ Darmowe Apple ID podpisuje aplikację na 7 dni — po tym czasie trzeba ją odświeżyć. AltStore robi to automatycznie w tle, gdy AltServer działa na komputerze w tej samej sieci.</div>
+      </section>
+
+      <!-- ══ O PROJEKCIE ══ -->
+      <section class="lp-page" id="page-project">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:620px">
+          <span class="lp-kicker">O PROJEKCIE</span>
+          <h1 class="lp-h1" style="font-size:44px">Zbudowane, żeby działać bez internetu</h1>
+          <p class="lp-lead">Dane zostają na urządzeniu w localStorage. Konto i synchronizacja są opcjonalne — aplikacja jest w pełni funkcjonalna bez nich.</p>
+        </div>
+        <div class="lp-stack" id="lpStack"></div>
+        <a class="lp-btn lp-btn-ghost" href="https://github.com/koxsulo1A/EasyTraining" target="_blank" rel="noopener" style="align-self:flex-start">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.61-3.37-1.21-3.37-1.21-.45-1.18-1.11-1.49-1.11-1.49-.9-.63.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.74 0 0 .84-.28 2.75 1.05a9.29 9.29 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.43.2 2.48.1 2.74.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"></path></svg>
+          Zobacz kod źródłowy
+        </a>
+      </section>
+
+      <!-- ══ FAQ ══ -->
+      <section class="lp-page" id="page-faq">
+        <div style="display:flex;flex-direction:column;gap:14px;max-width:620px">
+          <span class="lp-kicker">FAQ</span>
+          <h1 class="lp-h1" style="font-size:44px">Najczęstsze pytania</h1>
+        </div>
+        <div class="lp-faq" id="lpFaq"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  function h(tag, attrs, children) {
+    var el = document.createElement(tag);
+    Object.keys(attrs||{}).forEach(function(k) {
+      if (k === 'style') Object.assign(el.style, attrs[k]);
+      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+      else el.setAttribute(k, attrs[k]);
+    });
+    (children||[]).forEach(function(c) { if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  }
+  function icon(path, color, size) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', size||19); svg.setAttribute('height', size||19); svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', color||'currentColor');
+    svg.setAttribute('stroke-width', '1.7'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', path); svg.appendChild(p);
+    return svg;
+  }
+
+  // ── NAWIGACJA (sidebar) ──
+  var pages = ['start','features','screens','install','project','faq'];
+  function goTo(key) {
+    pages.forEach(function(p) {
+      document.getElementById('page-'+p).classList.toggle('active', p===key);
+    });
+    document.querySelectorAll('.lp-nav-item').forEach(function(b){ b.classList.toggle('active', b.dataset.page===key); });
+    window.scrollTo({ top:0, behavior:'smooth' });
+    if (key === 'start') animateStats();
+    history.replaceState(null, '', '#'+key);
+  }
+  document.getElementById('lpNav').addEventListener('click', function(e) {
+    var btn = e.target.closest('.lp-nav-item'); if (btn) goTo(btn.dataset.page);
+  });
+  document.querySelectorAll('[data-goto]').forEach(function(b) { b.addEventListener('click', function(){ goTo(b.dataset.goto); }); });
+  var initial = (location.hash||'').replace('#','');
+  if (pages.indexOf(initial) !== -1) goTo(initial);
+
+  // ── HERO STATS (count-up) ──
+  function animateStats() {
+    var targets = [190, 31, 100];
+    var els = [document.getElementById('stat1'), document.getElementById('stat2'), document.getElementById('stat3')];
+    var t0 = performance.now(), dur = 1400;
+    function tick(now) {
+      var p = Math.min(1, (now - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      els[0].textContent = Math.round(targets[0]*e);
+      els[1].textContent = Math.round(targets[1]*e);
+      els[2].textContent = Math.round(targets[2]*e) + '%';
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  animateStats();
+
+  // ── MODUŁY ──
+  var mods = [
+    { name:'Siła', color:'#3B82F6', meta:'Sesje, RIR, 1RM', path:'M6.5 8v8M3.8 10v4M17.5 8v8M20.2 10v4M6.5 12h11' },
+    { name:'Bieganie', color:'#10B981', meta:'Tempo, splity', path:'M11 21l2.5-5.5-3-2.5-2 3M14.4 8.2l-3.9 1.6-3 3M13.5 13l3.5 1 1.5 4M13.2 5.4a1 1 0 1 0 0-2 1 1 0 0 0 0 2z' },
+    { name:'Sauna', color:'#F97316', meta:'Wejścia, czas', path:'M8 3c0 2.5-2 3-2 5s2 2.5 2 5M13 3c0 2.5-2 3-2 5s2 2.5 2 5M18 3c0 2.5-2 3-2 5s2 2.5 2 5M4 19h16' },
+    { name:'Suple', color:'#8B5CF6', meta:'Protokół dnia', path:'M9.6 14.4l4.8-4.8M6.7 6.7a4.6 4.6 0 0 1 6.6 0l4 4a4.6 4.6 0 0 1-6.6 6.6l-4-4a4.6 4.6 0 0 1 0-6.6z' },
+    { name:'Pomiary', color:'#14B8A6', meta:'Obwody, zdjęcia', path:'M3 8.5h18v7H3zM7 8.5v3M11 8.5v4.5M15 8.5v3M19 8.5v4.5' },
+    { name:'Sen', color:'#F59E0B', meta:'Fazy, HRV', path:'M20 14.5A8 8 0 1 1 10 4a6.5 6.5 0 0 0 10 10.5z' },
+    { name:'Zawody', color:'#EC4899', meta:'Odliczanie, waga', path:'M8 4h8v4a4 4 0 0 1-8 0zM16 5h3v2a3 3 0 0 1-3 3M8 5H5v2a3 3 0 0 0 3 3M12 12v4M9 20h6' },
+    { name:'Plan', color:'#A0A0C0', meta:'Tydzień, blok', path:'M5 5.5h14v14H5zM5 9.5h14M9 3v3M15 3v3M9 13.5h6' },
+    { name:'Trener', color:'#8B5CF6', meta:'Korekty, czat', path:'M4.5 18.5v-1a4 4 0 0 1 4-4h7a4 4 0 0 1 4 4v1M12 10.5a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8z' },
+    { name:'Profil', color:'#60A5FA', meta:'Konto, eksport', path:'M12 2.6l2.4 5.2 5.7.7-4.2 4 1.1 5.6L12 15.4 6.9 18.1 8 12.5l-4.2-4 5.7-.7z' }
+  ];
+  var modsEl = document.getElementById('lpMods');
+  mods.forEach(function(m) {
+    modsEl.appendChild(h('div', { class:'lp-mod' }, [
+      h('div', { class:'lp-mod-ic', style:{ background:'color-mix(in srgb,'+m.color+' 18%, transparent)' } }, [icon(m.path, m.color, 17)]),
+      h('div', {}, [ h('div', { class:'lp-mod-name' }, [m.name]), h('div', { class:'lp-mod-meta' }, [m.meta]) ])
+    ]));
+  });
+
+  // ── FUNKCJE ──
+  var featureGroups = [
+    { label:'TRENING', color:'#60A5FA', items:[
+      { name:'Siła', desc:'Sesja z zapisem ciężaru, powtórzeń i RIR. Kalkulator 1RM, rekordy i analiza ostatniej sesji.', color:'#3B82F6', path:'M6.5 8v8M3.8 10v4M17.5 8v8M20.2 10v4M6.5 12h11', src:'js/strength.js' },
+      { name:'Kreator planu', desc:'Meta-plan, bloki i jednostki treningowe rozpisane na tydzień.', color:'#3B82F6', path:'M5 5.5h14v14H5zM5 9.5h14M9 3v3M15 3v3M9 13.5h6', src:'js/planner.js' },
+      { name:'ACWR', desc:'Stosunek obciążenia ostrego do chronicznego z paskiem strefy ryzyka.', color:'#F59E0B', path:'M4 19.5V4.5M4 19.5h16M8 16V11M12 16V7.5M16 16v-6', src:'js/acwr.js' },
+      { name:'AI Coach', desc:'Silnik regułowy działający offline — podpowiedzi po każdej sesji, bez wysyłania danych.', color:'#8B5CF6', path:'M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5L15 9M9 15l-2.5 2.5', src:'js/ai-coach.js' },
+      { name:'Baza ćwiczeń', desc:'190 pozycji z przypisanymi mięśniami i informacją, czy ruch jest złożony.', color:'#3B82F6', path:'M5 5.5h14v14H5zM9 9.5h6M9 13.5h6', src:'js/exercises-db.js' },
+      { name:'Interwały', desc:'Timer pracy i przerwy dla biegu oraz kondycji.', color:'#10B981', path:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3 2', src:'js/intervals.js' }
+    ] },
+    { label:'ZDROWIE I REGENERACJA', color:'#10B981', items:[
+      { name:'Bieganie', desc:'Dystans, tempo, tętno i splity interwałów.', color:'#10B981', path:'M11 21l2.5-5.5-3-2.5-2 3M14.4 8.2l-3.9 1.6-3 3M13.5 13l3.5 1 1.5 4M13.2 5.4a1 1 0 1 0 0-2 1 1 0 0 0 0 2z', src:'js/running.js' },
+      { name:'Sen', desc:'Czas snu, fazy, HRV i tętno spoczynkowe z siedmiodniowym wykresem.', color:'#F59E0B', path:'M20 14.5A8 8 0 1 1 10 4a6.5 6.5 0 0 0 10 10.5z', src:'js/sleep.js' },
+      { name:'Sauna', desc:'Wejścia, temperatura i łączny czas w danym dniu.', color:'#F97316', path:'M8 3c0 2.5-2 3-2 5s2 2.5 2 5M13 3c0 2.5-2 3-2 5s2 2.5 2 5M18 3c0 2.5-2 3-2 5s2 2.5 2 5M4 19h16', src:'js/sauna.js' },
+      { name:'Suplementy', desc:'Protokół w trzech porach dnia, checklista i seria dni bez pominięcia.', color:'#8B5CF6', path:'M9.6 14.4l4.8-4.8M6.7 6.7a4.6 4.6 0 0 1 6.6 0l4 4a4.6 4.6 0 0 1-6.6 6.6l-4-4a4.6 4.6 0 0 1 0-6.6z', src:'js/supplements.js' },
+      { name:'Pomiary i zdjęcia', desc:'Masa, obwody i zdjęcia sylwetki z porównaniem w czasie.', color:'#14B8A6', path:'M3 8.5h18v7H3zM7 8.5v3M11 8.5v4.5M15 8.5v3M19 8.5v4.5', src:'js/measurements.js' },
+      { name:'Ból i fizjo', desc:'Mapa ciała, historia dolegliwości i protokoły mobilności.', color:'#EF4444', path:'M12 20.5c-4.5-2.4-7.5-5.6-7.5-9.8V6.2l7.5-3 7.5 3v4.5c0 4.2-3 7.4-7.5 9.8z', src:'js/pain.js' },
+      { name:'Samopoczucie', desc:'Check-in poranny, dziennik i nawyki — wchodzą do wyliczenia gotowości.', color:'#F59E0B', path:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14.5c.9 1.2 2 1.8 3.5 1.8s2.6-.6 3.5-1.8M9 9.5h.01M15 9.5h.01', src:'js/wellbeing.js' }
+    ] },
+    { label:'ANALIZA I DANE', color:'#A78BFA', items:[
+      { name:'Statystyki', desc:'Objętość tygodniowa, wykresy 1RM i trendy w każdym module.', color:'#3B82F6', path:'M4 19.5V4.5M4 19.5h16M8 16V11M12 16V7.5M16 16v-6', src:'js/statistics.js' },
+      { name:'Historia', desc:'Oś czasu wszystkich sesji z rekordami i wskaźnikiem gotowości.', color:'#A0A0C0', path:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3.5 2', src:'js/history.js' },
+      { name:'Cele', desc:'Cele powiązane z konkretnym ćwiczeniem i automatyczny postęp.', color:'#10B981', path:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM12 13.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z', src:'js/goals.js' },
+      { name:'Kalendarz', desc:'Plan i wykonanie w jednym widoku miesiąca.', color:'#60A5FA', path:'M5 5.5h14v14H5zM5 9.5h14M9 3v3M15 3v3', src:'js/calendar.js' },
+      { name:'Zawody', desc:'Odliczanie do startu, kategoria wagowa i fazy przygotowania.', color:'#EC4899', path:'M8 4h8v4a4 4 0 0 1-8 0zM16 5h3v2a3 3 0 0 1-3 3M8 5H5v2a3 3 0 0 0 3 3M12 12v4M9 20h6', src:'js/competitions.js' },
+      { name:'Kopia i eksport', desc:'Eksport danych oraz kopia zapasowa całego stanu aplikacji.', color:'#14B8A6', path:'M12 4v11M7.5 11l4.5 4.5L16.5 11M4.5 19.5h15', src:'js/backup.js' },
+      { name:'Ocena sprawności', desc:'Testy wejściowe i profil gotowości do treningu.', color:'#F59E0B', path:'M9 5.5h6v3H9zM7 8.5h10v11H7zM10 13.5h4M12 11.5v4', src:'js/assessment.js' },
+      { name:'Konto i synchronizacja', desc:'Opcjonalne konto Supabase. Bez niego aplikacja działa w pełni offline.', color:'#A0A0C0', path:'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM3.5 12h17M12 3.5c2.3 2.3 3.5 5.3 3.5 8.5s-1.2 6.2-3.5 8.5c-2.3-2.3-3.5-5.3-3.5-8.5S9.7 5.8 12 3.5z', src:'js/sync.js' }
+    ] }
+  ];
+  var featuresEl = document.getElementById('lpFeatures');
+  featureGroups.forEach(function(g) {
+    var grid = h('div', { class:'lp-fgrid' });
+    g.items.forEach(function(f) {
+      grid.appendChild(h('div', { class:'lp-card' }, [
+        h('div', { class:'lp-ficon', style:{ background:'color-mix(in srgb,'+f.color+' 16%, transparent)' } }, [icon(f.path, f.color, 19)]),
+        h('div', { class:'lp-fname' }, [f.name]),
+        h('div', { class:'lp-fdesc' }, [f.desc]),
+        h('div', { class:'lp-fsrc' }, [f.src])
+      ]));
+    });
+    featuresEl.appendChild(h('section', { class:'lp-fgroup' }, [
+      h('div', { class:'lp-fgroup-hdr' }, [
+        h('span', { class:'lp-kicker', style:{ color:g.color } }, [g.label]),
+        h('div', { class:'lp-fgroup-line' }),
+        h('span', { class:'lp-fgroup-count' }, [g.items.length+' pozycji'])
+      ]),
+      grid
+    ]));
+  });
+
+  // ── EKRANY ──
+  var setDefs = [
+    { label:'S1', main:'77,5 kg × 8', rir:'2', rirColor:'#10B981', done:true },
+    { label:'S2', main:'80 kg × 8', rir:'2', rirColor:'#10B981', done:true },
+    { label:'S3', main:'82,5 kg × 8', rir:'2', rirColor:'#F59E0B', done:false },
+    { label:'S4', main:'82,5 kg × 6', rir:'1', rirColor:'#F97316', done:false }
+  ];
+  var suppDefs = [
+    { label:'RANO', time:'07:00', color:'#F59E0B', items:[
+      { name:'Witamina D3 + K2', dose:'4000 IU', done:true }, { name:'Omega-3', dose:'2 g EPA/DHA', done:true }, { name:'Magnez cytrynian', dose:'200 mg', done:true }
+    ] },
+    { label:'OKOŁOTRENINGOWO', time:'17:00', color:'#3B82F6', items:[
+      { name:'Kreatyna monohydrat', dose:'5 g', done:true }, { name:'Beta-alanina', dose:'3,2 g', done:true }
+    ] },
+    { label:'WIECZÓR', time:'22:00', color:'#8B5CF6', items:[
+      { name:'Cynk', dose:'15 mg', done:false }, { name:'Ashwagandha KSM-66', dose:'600 mg', done:false }
+    ] }
+  ];
+  var summaryStatDefs = [
+    { label:'CZAS', val:'58:24', color:'#F1F1F8' }, { label:'OBJĘTOŚĆ', val:'8,4 t', color:'#F1F1F8' },
+    { label:'ZAPISANE SERIE', val:'18', color:'#F1F1F8' }, { label:'ŚREDNI RIR', val:'1,8', color:'#10B981' }
+  ];
+  var screenNoteDefs = {
+    session:[
+      { name:'Zapis serii to jedno tapnięcie', desc:'Kwadrat 52 × 52 px po prawej stronie wiersza. Zapisana seria zmienia kolor na zielony i od razu startuje przerwę.' },
+      { name:'Edytor bez klawiatury', desc:'Tapnięcie w wiersz rozwija steppery: ciężar co 2,5 kg, powtórzenia co 1, RIR jako pasek pięciu segmentów.' },
+      { name:'Pasek na żywo', desc:'Serie, objętość i średni RIR liczone tylko z faktycznie zapisanych serii — nie z planu.' },
+      { name:'Sterownik zamiast nawigacji', desc:'W trybie treningu pasek zakładek znika. Zostają trzy decyzje: przerwa, zapis serii, koniec.' }
+    ],
+    supp:[
+      { name:'Trzy pory dnia', desc:'Rano, okołotreningowo i wieczór — każda grupa ma własny kolor kropki i godzinę.' },
+      { name:'Seria bez pominięcia', desc:'Licznik dni buduje nawyk. Protokół pokazuje postęp jako pierścień n/9.' },
+      { name:'Odhaczenie z animacją', desc:'Checkbox robi krótkie „pop", wiersz przygasa i przechodzi w fiolet.' }
+    ],
+    summary:[
+      { name:'Cztery liczby, które mają znaczenie', desc:'Czas, objętość w tonach, zapisane serie i średni RIR — wszystko z tej sesji.' },
+      { name:'Rekord wyłapany automatycznie', desc:'Nowy 1RM albo rekord powtórzeń podświetla się osobną kartą.' },
+      { name:'Jak się czułeś?', desc:'Pięć kafli z rosnącym słupkiem zamiast suwaka — jedno tapnięcie, bez celowania.' }
+    ]
+  };
+  var setsEl = document.getElementById('lpSets');
+  setDefs.forEach(function(s) {
+    setsEl.appendChild(h('div', { class:'lp-mini-row', style: s.done ? { background:'rgba(16,185,129,.10)', borderColor:'rgba(16,185,129,.32)' } : {} }, [
+      h('div', { class:'lp-mini-set' }, [ h('span', { style:{ color:'var(--t3)', fontWeight:'700' } }, [s.label]), h('span', { style:{ fontWeight:'800' } }, [s.main]) ]),
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px' } }, [
+        h('span', { style:{ fontSize:'10px', fontWeight:'800', color:s.rirColor } }, ['RIR '+s.rir]),
+        h('div', { class:'lp-check', style: s.done ? { background:'var(--green)', color:'#080810' } : { background:'rgba(255,255,255,.06)', color:'var(--t3)', border:'1px solid var(--b2)' } }, [s.done?'✓':''])
+      ])
+    ]));
+  });
+  var suppEl = document.getElementById('lpSupp');
+  suppDefs.forEach(function(g) {
+    var box = h('div', {}, [
+      h('div', { style:{ fontSize:'9px', fontWeight:'800', letterSpacing:'.1em', color:g.color, marginBottom:'6px' } }, [g.label+' · '+g.time])
+    ]);
+    g.items.forEach(function(it) {
+      box.appendChild(h('div', { class:'lp-mini-row', style: it.done ? { background:'rgba(139,92,246,.10)', borderColor:'rgba(139,92,246,.28)', marginBottom:'4px' } : { marginBottom:'4px' } }, [
+        h('span', {}, [it.name]),
+        h('div', { class:'lp-check', style: it.done ? { background:'var(--purple)', color:'#080810' } : { background:'rgba(255,255,255,.06)', color:'var(--t3)', border:'1px solid var(--b2)' } }, [it.done?'✓':''])
+      ]));
+    });
+    suppEl.appendChild(box);
+  });
+  var summaryEl = document.getElementById('lpSummary');
+  summaryStatDefs.forEach(function(s) {
+    summaryEl.appendChild(h('div', { style:{ padding:'12px', borderRadius:'12px', background:'rgba(255,255,255,.04)', border:'1px solid var(--b1)', textAlign:'center' } }, [
+      h('div', { style:{ fontSize:'9px', fontWeight:'800', letterSpacing:'.08em', color:'var(--t3)', marginBottom:'4px' } }, [s.label]),
+      h('div', { style:{ fontSize:'18px', fontWeight:'800', color:s.color } }, [s.val])
+    ]));
+  });
+  function renderNotes(key) {
+    var el = document.getElementById('lpScreenNotes'); el.innerHTML = '';
+    screenNoteDefs[key].forEach(function(n, i) {
+      el.appendChild(h('div', { class:'lp-note-item' }, [
+        h('div', { class:'lp-note-num' }, [String(i+1)]),
+        h('div', {}, [ h('div', { class:'lp-note-name' }, [n.name]), h('div', { class:'lp-note-desc' }, [n.desc]) ])
+      ]));
+    });
+  }
+  document.getElementById('lpScreenTabs').addEventListener('click', function(e) {
+    var btn = e.target.closest('.lp-tab'); if (!btn) return;
+    document.querySelectorAll('.lp-tab').forEach(function(b){ b.classList.toggle('active', b===btn); });
+    document.querySelectorAll('.lp-screen-inner').forEach(function(s){ s.style.display = 'none'; });
+    document.getElementById('screen-'+btn.dataset.screen).style.display = 'flex';
+    renderNotes(btn.dataset.screen);
+  });
+  renderNotes('session');
+
+  // ── INSTALACJA ──
+  var stepDefs = [
+    { n:'1', name:'Odpal workflow w GitHub Actions', desc:'Zakładka Actions → „Build unsigned iOS IPA". Rusza sam po każdym pushu na main, można też uruchomić ręcznie przez Run workflow.', code:'Actions → Build unsigned iOS IPA' },
+    { n:'2', name:'Pobierz artefakt', desc:'Po kilku minutach zjedzie paczka z gotowym plikiem w środku.', code:'EasyTraining-unsigned-ipa → EasyTraining-unsigned.ipa' },
+    { n:'3', name:'Podpisz przez Sideloadly lub AltStore', desc:'Podłącz iPhone kablem, przeciągnij plik .ipa do okna programu, podaj darmowe Apple ID i kliknij Start.', code:'sideloadly.io · altstore.io' },
+    { n:'4', name:'Zaufaj profilowi na telefonie', desc:'Bez tego iOS nie uruchomi aplikacji podpisanej Twoim własnym kontem.', code:'Ustawienia → Ogólne → VPN i zarządzanie urządzeniem' }
+  ];
+  var stepsEl = document.getElementById('lpSteps');
+  stepDefs.forEach(function(s) {
+    stepsEl.appendChild(h('div', { class:'lp-step' }, [
+      h('div', { class:'lp-step-n' }, [s.n]),
+      h('div', {}, [
+        h('div', { class:'lp-step-name' }, [s.name]),
+        h('div', { class:'lp-step-desc' }, [s.desc]),
+        h('span', { class:'lp-step-code' }, [s.code])
+      ])
+    ]));
+  });
+
+  // ── O PROJEKCIE ──
+  var stackDefs = [
+    { name:'Frontend', desc:'HTML, CSS i zwykły JavaScript. React ładowany lokalnie, bez JSX i bez builda.', src:'js/vendor/' },
+    { name:'Rdzeń domenowy', desc:'TypeScript zbundlowany esbuildem: event bus, wersjonowanie, migracje, silniki zmęczenia i regeneracji.', src:'core/src/' },
+    { name:'Dane', desc:'localStorage pod kluczem et_v1 z jednorazową migracją przy starcie aplikacji.', src:'js/store.js' },
+    { name:'iOS', desc:'Capacitor 6 pakuje katalog www/. Niepodpisany .ipa buduje GitHub Actions.', src:'.github/workflows/ios.yml' },
+    { name:'Live Activity', desc:'Widget na ekranie blokady w trakcie treningu — natywny plugin w Swifcie.', src:'ios-extras/Widgets/' },
+    { name:'Synchronizacja', desc:'Opcjonalne konto i sync przez Supabase. Offline działa bez tego.', src:'supabase/schema.sql' },
+    { name:'Testy', desc:'Vitest — dziesięć zestawów na silniki rdzenia: 1RM, zmęczenie, regeneracja, cele, reguły treningowe.', src:'core/__tests__/' }
+  ];
+  var stackEl = document.getElementById('lpStack');
+  stackDefs.forEach(function(s) {
+    stackEl.appendChild(h('div', { class:'lp-stack-row' }, [
+      h('div', { class:'lp-stack-name' }, [s.name]),
+      h('div', { class:'lp-stack-desc' }, [s.desc]),
+      h('div', { class:'lp-stack-src' }, [s.src])
+    ]));
+  });
+
+  // ── FAQ ──
+  var faqDefs = [
+    { q:'Czy potrzebuję konta, żeby zacząć?', a:'Nie. Aplikacja działa w pełni offline na danych trzymanych w przeglądarce (localStorage). Konto Supabase jest opcjonalne i służy wyłącznie do synchronizacji między urządzeniami.' },
+    { q:'Czy moje dane trafiają na serwer?', a:'Tylko wtedy, gdy sam włączysz synchronizację i zalogujesz się na konto. Domyślnie wszystko zostaje na urządzeniu, a kopię możesz wyeksportować z modułu Kopia i eksport.' },
+    { q:'Dlaczego paczka .ipa jest niepodpisana?', a:'Bo dzięki temu nie potrzeba płatnego konta Apple Developer. Plik podpisuje narzędzie do sideloadu (Sideloadly, AltStore) Twoim darmowym Apple ID, już na Twoim komputerze.' },
+    { q:'Co się dzieje po siedmiu dniach?', a:'Podpis z darmowego Apple ID wygasa i aplikację trzeba odświeżyć. AltStore robi to automatycznie w tle, dopóki AltServer działa na komputerze w tej samej sieci.' },
+    { q:'Czy działa na Androidzie?', a:'Wersja web działa w każdej przeglądarce, także na Androidzie. Natywna paczka jest na razie budowana tylko dla iOS, ale Capacitor obsługuje oba systemy z tego samego kodu.' },
+    { q:'Skąd bierze się baza ćwiczeń?', a:'To 190 pozycji zdefiniowanych w kodzie aplikacji, z przypisanymi grupami mięśniowymi i oznaczeniem ruchów złożonych — na tej podstawie liczą się objętość i szacowany 1RM.' }
+  ];
+  var faqEl = document.getElementById('lpFaq');
+  faqDefs.forEach(function(f) {
+    var det = h('details', { class:'lp-faq-item' }, [
+      h('summary', { class:'lp-faq-q' }, [ h('span', {}, [f.q]), icon('M6 9l6 6 6-6', 'currentColor', 18) ]),
+      h('div', { class:'lp-faq-a' }, [f.a])
+    ]);
+    det.querySelector('summary svg').classList.add('lp-faq-chevron');
+    faqEl.appendChild(det);
+  });
+
+})();
+</script>
+</body>
+</html>
