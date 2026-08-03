@@ -101,3 +101,62 @@ Wymaga jednorazowej akcji w Supabase: w SQL Editorze uruchom nowy blok
 czytać/pisać CUDZE `user_data` — bez tego przycisk "Wejdź jako" zwróci
 błąd braku uprawnień, bo istniejąca `user_data_own` ogranicza dostęp tylko
 do `auth.uid() = user_id`).
+
+## 8. store.js — zapis synchroniczny wewnątrz updatera setState
+`saveStore()` woła się bezpośrednio w funkcji przekazanej do `setStore()`
+(`js/store.js`, `update()`) — czyli efekt uboczny w reducerze. React w tym
+trybie potrafi wywołać updater dwukrotnie, więc każde `update()` robi
+2 pełne zapisy `et_v1` do localStorage zamiast jednego (przy większym
+store to realny koszt — zmierzone w sesji QA: bez tego jedno kliknięcie
+w edytorze planu potrafiło zrobić 10 zapisów, zanim `plan.js` zbatchował
+własne wywołania `update()` do jednego).
+
+Poprawka: przenieść `saveStore(next)` z wnętrza `setStore(fn)` do osobnego
+`React.useEffect(() => saveStore(store), [store])` w `StoreProvider`.
+Wymaga przetestowania:
+- ścieżki wylogowania / zmiany konta (`ET.emptyStoreSnapshot`,
+  `AccountStorage.clearAccountData`) — czy efekt nie zapisze na wychodzące
+  konto po przełączeniu,
+- `sync.js` (debounce 1,5 s do Supabase) — czy dodatkowy takt reaktywności
+  nie zdubluje requestów,
+- trybu "wejdź jako" (`admin-impersonation.js`) — podmieniony `StoreCtx`
+  ma własny provider, upewnić się że efekt nie pisze do złego konta.
+
+## 9. Pozostałe ekrany web bez nowego designu ("EasyTraining Aplikacja")
+Zrobione w designie web: Dziś, Plan, Gotowość, Trener AI (ACWR), Ból i
+fizjo, Kalendarz. Nadal na starych (mobilnych) modułach, tylko wewnątrz
+powłoki web (sidebar+topbar) bez własnego layoutu desktopowego:
+- Trening (sesja siłowa) — największy i najbardziej ryzykowny do przepisania,
+  zawiera cały przepływ kreatora + aktywną sesję z timerem
+- Suplementy
+- Pomiary
+- Statystyki
+- Historia
+
+## 10. Warianty i podłączenia odłożone przy budowie designu web
+Zanotowane wprost w kodzie jako świadomie pominięte podczas wdrażania
+`EasyTraining Aplikacja` — do zrobienia, jeśli/gdy będzie na to zapotrzebowanie:
+- `js/plan.js` — wariant układu tygodnia "board" (kolumny dni); zrobiony
+  tylko "strip" (rekomendowany domyślny w spec). Przełącznik strip/board
+  nie jest jeszcze pokazany w UI.
+- `js/readiness.js` — pole "gotowość przed treningiem" zapisuje się do
+  `store.preReadiness`, ale jeszcze nie jest odczytywane przy zapisie
+  sesji w `strength.js`/`running.js`/`sauna.js` (`workout.readiness`
+  nadal ustawiane tak jak wcześniej, z osobnego kroku kreatora).
+- `js/acwr.js` — `threshold` z ustawień nadal nie wpływa na warunek
+  alertu potreningowego (`ET.ACWRAlert`) — alert leci ze strefy ryzyka,
+  nie z ustawionego progu. Też: metoda "wewnętrzna" (RPE×czas) opiera się
+  na `readiness.fatigue`, bo `ex.rpe` per ćwiczenie nigdy nie jest
+  zapisywane w `strength.js` — do decyzji, czy dodać zapis RPE per
+  ćwiczenie, czy liczyć RPE z RIR (`RPE ≈ 10 − RIR`).
+- `js/pain.js` — mobilny `PainModule` nadal ma wbudowany check-in
+  samopoczucia (`WellbeingInline`), zdublowany z osobnym ekranem
+  "Gotowość" na webie. Na webie usunięty; na iOS zostawiony celowo (nie
+  ma tam jeszcze odpowiednika ekranu Gotowość) — do decyzji, czy scalić.
+
+## 11. Landing (`/landing`) — dalsza rozbudowa
+Strona produktowa wdrożona i wpięta w deploy (`scripts/build-web.mjs`,
+dostępna pod `/EasyTraining/landing/`). Sekcja "Ekrany" w landing page to
+świadomie uproszczona, statyczna wersja telefonu z przykładowymi danymi —
+nie replikuje w pełni animowanej makiety designu. Jeśli będzie potrzeba
+większej wierności wizualnej tej sekcji, to osobna sesja.
