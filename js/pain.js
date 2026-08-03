@@ -403,4 +403,298 @@
   }
 
   ET.PainModule = PainModule;
+
+  // ══════════════════════════════════════════════════════════════════════
+  // WEB — ekran „Ból i fizjo" wg designu „EasyTraining Aplikacja".
+  // Spec: docs/segment-03-bol-fizjo.md. Logika (strefy, typy, blok
+  // korekcyjny, regeneracja) nietknięta — reużywa wprost BodyFigurePain,
+  // FRONT_ZONES/BACK_ZONES, PAIN_TYPES, levelColor, ailmentsKey,
+  // buildBlockRecord z tego samego closure. Bez WellbeingInline (spec
+  // caveat 6) — na webie check-in ma jedno miejsce: ekran Gotowość. Mobile
+  // PainModule zostaje bez zmian (WellbeingInline tam wciąż istnieje —
+  // usunięcie go jest osobną decyzją dot. iOS, nie w zakresie tego ekranu).
+  // ══════════════════════════════════════════════════════════════════════
+
+  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+
+  function WebPainModule() {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+    var nav = ET.useNav(); var navigate = nav.navigate;
+
+    var mm = React.useState('both'); var mapMode = mm[0], setMapMode = mm[1]; // 'both' | 'toggle'
+    var si = React.useState('front'); var side = si[0], setSide = si[1];
+    var ei = React.useState(null); var editId = ei[0], setEditId = ei[1];
+    var chk = React.useState({}); var checked = chk[0], setChecked = chk[1];
+    var emptyForm = { date:ET.dstr(), bodyParts:[], type:'doms', level:3, duration:'', notes:'' };
+    var fs = React.useState(emptyForm); var f = fs[0], setF = fs[1];
+    function upF(key, val) { setF(function(prev){ var o={}; o[key]=val; return Object.assign({},prev,o); }); }
+
+    var ailments = store.ailments || [];
+    var entries = store.painEntries || [];
+    var activeCount = entries.filter(function(e){ return e.type!=='doms'; }).length;
+    var block = store.physioBlock || null;
+    var blockExs = block ? block.exerciseIds.map(function(id){ return ET.exerciseById(id); }).filter(Boolean) : [];
+
+    React.useEffect(function() {
+      if (!ailments.length) return;
+      var needs = !block || block.ailmentsKey !== ailmentsKey(ailments) || daysSince(block.generatedAt) >= REGEN_DAYS;
+      if (needs) update(function(s){ return Object.assign({}, s, { physioBlock: buildBlockRecord(s.ailments||[], (block&&block.seed)||0) }); });
+    }, [ailmentsKey(ailments)]);
+
+    function toggleAilment(tag) {
+      update(function(s) {
+        var cur = s.ailments || [];
+        var next = cur.indexOf(tag)!==-1 ? cur.filter(function(x){ return x!==tag; }) : cur.concat([tag]);
+        var rec = next.length ? buildBlockRecord(next, (s.physioBlock&&s.physioBlock.seed)||0) : null;
+        return Object.assign({}, s, { ailments: next, physioBlock: rec });
+      });
+      setChecked({});
+    }
+    function regenerate() {
+      update(function(s){ var seed=((s.physioBlock&&s.physioBlock.seed)||0)+1; return Object.assign({}, s, { physioBlock: buildBlockRecord(s.ailments||[], seed) }); });
+      setChecked({});
+      toast('Wygenerowano nowy blok korekcyjny 🔄', 'success');
+    }
+    function toggleBodyPart(id) {
+      var parts = f.bodyParts || [];
+      upF('bodyParts', parts.indexOf(id)!==-1 ? parts.filter(function(p){ return p!==id; }) : parts.concat([id]));
+    }
+    function openEdit(e) {
+      setF({ date:e.date, bodyParts:e.bodyParts||[], type:e.type, level:e.level, duration:e.duration||'', notes:e.notes||'' });
+      setEditId(e.id);
+    }
+    function resetForm() { setF(emptyForm); setEditId(null); }
+    function save() {
+      var parts = f.bodyParts || [];
+      if (!parts.length) { toast('Zaznacz miejsce bólu na ludziku', 'error'); return; }
+      var all = allZones();
+      var label = parts.map(function(id){ var z = all.find(function(z){ return z.id===id; }); return z ? z.label : id; }).join(', ');
+      update(function(s) {
+        if (editId) return Object.assign({},s,{ painEntries:(s.painEntries||[]).map(function(e){ return e.id===editId ? Object.assign({},e,f,{bodyPart:label}) : e; }) });
+        return Object.assign({},s,{ painEntries:[Object.assign({id:Date.now()},f,{bodyPart:label})].concat(s.painEntries||[]) });
+      });
+      toast(editId ? 'Wpis zaktualizowany ✓' : 'Ból zapisany ✓', 'success');
+      resetForm();
+    }
+    function deleteEntry(id) {
+      update(function(s){ return Object.assign({},s,{ painEntries:(s.painEntries||[]).filter(function(e){ return e.id!==id; }) }); });
+      if (editId === id) resetForm();
+    }
+
+    function ZoneChips() {
+      var all = allZones();
+      return _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap', minHeight:28 } },
+        (f.bodyParts||[]).map(function(id) {
+          var z = all.find(function(z){ return z.id===id; });
+          return _h('div', { key:id, style:{ display:'flex', alignItems:'center', gap:7, padding:'6px 8px 6px 11px', borderRadius:100, background:'rgba(239,68,68,.14)', border:'1px solid rgba(239,68,68,.34)' } },
+            _h('span', { style:{ fontSize:11, fontWeight:700, color:'var(--red)' } }, z ? z.label : id),
+            _h('div', { onClick:function(){ toggleBodyPart(id); }, style:{ width:17, height:17, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--t2)' } },
+              _h('svg', { width:9, height:9, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:3, strokeLinecap:'round' }, _h('path', { d:'M6 6l12 12M18 6L6 18' })))
+          );
+        }),
+        (f.bodyParts||[]).length===0 && _h('span', { style:{ fontSize:11, color:'var(--s5)' } }, 'Nic nie zaznaczone — kliknij strefę na ludziku.')
+      );
+    }
+
+    return _h('div', { className:'scr-in', style:{ display:'flex', flexDirection:'column', gap:18 } },
+
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, flexWrap:'wrap' } },
+        _h('div', { style:{ display:'flex', gap:9, flexWrap:'wrap' } },
+          [
+            { label:'AKTYWNE', val:activeCount, color: activeCount ? 'var(--red)' : 'var(--t2)' },
+            { label:'WPISY OGÓŁEM', val:entries.length, color:'var(--t1)' },
+            { label:'BLOK KOREKCYJNY', val:blockExs.length, color:'var(--teal)' },
+          ].map(function(s) {
+            return _h('div', { key:s.label, style:{ display:'flex', flexDirection:'column', gap:6, padding:'12px 16px', borderRadius:16, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)' } },
+              _h('span', { style:SECTION_LABEL }, s.label),
+              _h('span', { style:{ fontSize:20, fontWeight:800, letterSpacing:'-.035em', fontVariantNumeric:'tabular-nums', color:s.color } }, s.val)
+            );
+          })
+        ),
+        _h('div', { style:{ display:'flex', gap:4, padding:4, borderRadius:13, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)' } },
+          [{ id:'both', name:'Przód i tył' }, { id:'toggle', name:'Jeden widok' }].map(function(t) {
+            var on = mapMode === t.id;
+            return _h('div', { key:t.id, onClick:function(){ setMapMode(t.id); },
+              style:{ padding:'8px 13px', borderRadius:10, cursor:'pointer', fontSize:11.5, fontWeight:700, color: on ? 'var(--a-light)' : 'var(--t3)', background: on ? 'rgba(59,130,246,.16)' : 'transparent' } }, t.name);
+          })
+        )
+      ),
+
+      _h('div', { style:{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'flex-start' } },
+
+        // ── MAPA BÓLU + FORMULARZ ──
+        _h('div', { className:'glass', style:{ flex:'1 1 440px', minWidth:360, display:'flex', flexDirection:'column', gap:15, padding:20, borderRadius:22 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' } },
+            _h('div', { style:{ display:'flex', flexDirection:'column', gap:5 } },
+              _h('span', { style:SECTION_LABEL }, 'MAPA BÓLU'),
+              _h('span', { style:{ fontSize:11.5, color:'var(--t2)' } }, 'Kliknij strefę, żeby ją zaznaczyć. Można wybrać kilka.')
+            ),
+            mapMode === 'toggle' && _h('div', { style:{ display:'flex', gap:4, padding:4, borderRadius:12, background:'rgba(0,0,0,.28)', border:'1px solid rgba(255,255,255,.08)' } },
+              [{ id:'front', name:'Przód' }, { id:'back', name:'Tył' }].map(function(t) {
+                var on = side === t.id;
+                return _h('div', { key:t.id, onClick:function(){ setSide(t.id); },
+                  style:{ padding:'7px 14px', borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700, color: on ? '#fff' : 'var(--t2)', background: on ? 'var(--a)' : 'transparent' } }, t.name);
+              })
+            )
+          ),
+
+          _h('div', { style:{ display:'flex', gap:14, justifyContent:'center' } },
+            mapMode === 'both'
+              ? [{ id:'front', label:'PRZÓD' }, { id:'back', label:'TYŁ' }].map(function(s) {
+                  return _h('div', { key:s.id, style:{ flex:'1 1 0', minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', gap:8 } },
+                    _h('span', { style:SECTION_LABEL }, s.label),
+                    _h(BodyFigurePain, { selected:f.bodyParts||[], onToggle:toggleBodyPart, side:s.id })
+                  );
+                })
+              : _h('div', { style:{ flex:'1 1 0', minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', gap:8 } },
+                  _h('span', { style:SECTION_LABEL }, side==='front' ? 'PRZÓD' : 'TYŁ'),
+                  _h(BodyFigurePain, { selected:f.bodyParts||[], onToggle:toggleBodyPart, side:side })
+                )
+          ),
+
+          _h(ZoneChips, null),
+
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:9 } },
+            _h('span', { style:SECTION_LABEL }, 'TYP BÓLU'),
+            _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+              PAIN_TYPES.map(function(t) {
+                var on = f.type === t.id;
+                return _h('div', { key:t.id, onClick:function(){ upF('type', t.id); },
+                  style:{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:100, cursor:'pointer', fontSize:11, fontWeight:700,
+                    background: on ? 'color-mix(in srgb,'+t.color+' 20%, transparent)' : 'rgba(255,255,255,.04)', border:'1px solid ' + (on ? 'color-mix(in srgb,'+t.color+' 45%, transparent)' : 'rgba(255,255,255,.09)'), color: on ? t.color : 'var(--t2)' } },
+                  _h('span', null, t.icon), t.label);
+              })
+            )
+          ),
+
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:9 } },
+            _h('div', { style:{ display:'flex', alignItems:'baseline', justifyContent:'space-between' } },
+              _h('span', { style:SECTION_LABEL }, 'INTENSYWNOŚĆ'),
+              _h('span', { style:{ fontSize:15, fontWeight:800, fontVariantNumeric:'tabular-nums', color:levelColor(f.level) } }, f.level+'/10')
+            ),
+            _h('div', { style:{ display:'flex', gap:4 } },
+              [1,2,3,4,5,6,7,8,9,10].map(function(n) {
+                var on = n <= f.level;
+                return _h('div', { key:n, onClick:function(){ upF('level', n); },
+                  style:{ flex:1, height:30, borderRadius:9, cursor:'pointer', transition:'background .18s',
+                    background: on ? levelColor(f.level) : 'rgba(255,255,255,.05)', border:'1px solid ' + (on ? levelColor(f.level) : 'rgba(255,255,255,.09)') } });
+              })
+            ),
+            _h('div', { style:{ display:'flex', justifyContent:'space-between', fontSize:9, fontWeight:600, color:'var(--s5)' } },
+              _h('span', null, 'LEDWO CZUĆ'), _h('span', null, 'UMIARKOWANY'), _h('span', null, 'SILNY'))
+          ),
+
+          _h('div', { onClick:save, style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, height:48, borderRadius:16, cursor:'pointer',
+            background: editId ? 'rgba(59,130,246,.16)' : 'linear-gradient(150deg,#60A5FA,#3B82F6 55%,#8B5CF6)', border: editId ? '1px solid rgba(96,165,250,.34)' : 'none',
+            color: editId ? 'var(--a-light)' : '#fff', fontSize:13, fontWeight:800 } },
+            _h('svg', { width:16, height:16, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.2, strokeLinecap:'round' }, _h('path', { d:'M12 5.5v13M5.5 12h13' })),
+            editId ? 'Zapisz zmiany' : 'Zapisz wpis bólu'
+          ),
+          editId && _h('div', { onClick:resetForm, style:{ textAlign:'center', fontSize:11, color:'var(--t3)', cursor:'pointer' } }, 'Anuluj edycję')
+        ),
+
+        // ── DZIENNIK BÓLU ──
+        _h('div', { style:{ flex:'1 1 300px', minWidth:280, display:'flex', flexDirection:'column', gap:11 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 } },
+            _h('span', { style:SECTION_LABEL }, 'DZIENNIK BÓLU'),
+            _h('span', { style:{ fontSize:10.5, fontWeight:600, color:'var(--s5)' } }, entries.length+' '+(entries.length===1?'wpis':'wpisów'))
+          ),
+          entries.length === 0
+            ? _h('div', { style:{ padding:'34px 18px', borderRadius:18, border:'1px dashed rgba(255,255,255,.12)', background:'rgba(255,255,255,.02)', textAlign:'center', fontSize:12, color:'var(--t3)' } },
+                'Brak wpisów. Zaznacz strefę na ludziku i zapisz — wpisy z ostatnich 7 dni wchodzą do podpowiedzi treningowych.')
+            : entries.map(function(e) {
+                var ti = typeInfo(e.type), lc = levelColor(e.level);
+                var bars = Math.max(1, Math.ceil(e.level/2));
+                return _h('div', { key:e.id, className:'wplan', style:{ display:'flex', flexDirection:'column', gap:10, padding:15, borderRadius:18, background:'rgba(255,255,255,.035)',
+                  border:'1px solid ' + (e.level>=7 ? 'rgba(239,68,68,.4)' : e.level>=4 ? 'rgba(249,115,22,.35)' : 'rgba(255,255,255,.08)'), cursor:'pointer' },
+                  onClick:function(){ openEdit(e); } },
+                  _h('div', { style:{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 } },
+                    _h('div', { style:{ display:'flex', flexDirection:'column', gap:5, minWidth:0 } },
+                      _h('span', { style:SECTION_LABEL }, ET.fmtDate(e.date)),
+                      _h('span', { style:{ fontSize:12.5, fontWeight:700, letterSpacing:'-.01em' } }, e.bodyPart || 'Brak lokalizacji')
+                    ),
+                    _h('div', { style:{ display:'flex', alignItems:'center', gap:8, flex:'none' } },
+                      _h('span', { style:{ fontSize:16, fontWeight:800, fontVariantNumeric:'tabular-nums', color:lc } }, e.level),
+                      _h('div', { onClick:function(ev){ ev.stopPropagation(); deleteEntry(e.id); }, style:{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--s5)' } },
+                        _h('svg', { width:11, height:11, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.4, strokeLinecap:'round' }, _h('path', { d:'M6 6l12 12M18 6L6 18' })))
+                    )
+                  ),
+                  _h('div', { style:{ display:'flex', gap:4 } },
+                    [1,2,3,4,5].map(function(n){ return _h('div', { key:n, style:{ flex:1, height:5, borderRadius:3, background: n<=bars ? lc : 'rgba(255,255,255,.08)' } }); })),
+                  _h('span', { style:{ alignSelf:'flex-start', padding:'4px 9px', borderRadius:100, background:'color-mix(in srgb,'+ti.color+' 20%, transparent)', fontSize:9.5, fontWeight:700, color:ti.color } }, ti.icon+' '+ti.label)
+                );
+              })
+        )
+      ),
+
+      // ── DOLEGLIWOŚCI ──
+      _h('div', { className:'wcard', style:{ display:'flex', flexDirection:'column', gap:15, padding:20, borderRadius:22 } },
+        _h('div', { style:{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:14, flexWrap:'wrap' } },
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:5 } },
+            _h('span', { style:SECTION_LABEL }, 'DOLEGLIWOŚCI'),
+            _h('span', { style:{ fontSize:11.5, color:'var(--t2)' } }, 'Zaznaczenie zmienia blok korekcyjny i podnosi ostrzeżenia przy ćwiczeniach ryzykownych.')
+          ),
+          _h('span', { style:{ padding:'6px 12px', borderRadius:100, background:'rgba(20,184,166,.14)', border:'1px solid rgba(20,184,166,.30)', fontSize:10.5, fontWeight:800, color:'var(--teal)' } }, ailments.length)
+        ),
+        (ET.BODY_REGIONS||[]).map(function(region) {
+          var conds = (ET.CONDITIONS||[]).filter(function(c){ return c.region===region.id; });
+          if (!conds.length) return null;
+          return _h('div', { key:region.id, style:{ display:'flex', gap:14, alignItems:'flex-start', flexWrap:'wrap' } },
+            _h('span', { style:{ flex:'0 0 148px', paddingTop:7, fontSize:9, fontWeight:800, letterSpacing:'.12em', color:'var(--t3)' } }, region.label),
+            _h('div', { style:{ flex:1, display:'flex', gap:6, flexWrap:'wrap', minWidth:220 } },
+              conds.map(function(c) {
+                var on = ailments.indexOf(c.tag) !== -1;
+                return _h('div', { key:c.tag, onClick:function(){ toggleAilment(c.tag); },
+                  style:{ padding:'8px 12px', borderRadius:100, cursor:'pointer', fontSize:11, fontWeight:600, transition:'background .18s',
+                    background: on ? 'rgba(59,130,246,.16)' : 'rgba(255,255,255,.04)', border:'1px solid ' + (on ? 'rgba(96,165,250,.34)' : 'rgba(255,255,255,.09)'), color: on ? 'var(--a-light)' : 'var(--t2)' } }, c.label);
+              })
+            )
+          );
+        })
+      ),
+
+      // ── BLOK KOREKCYJNY ──
+      _h('div', { style:{ display:'flex', flexDirection:'column', gap:15, padding:20, borderRadius:22, background:'linear-gradient(158deg,rgba(20,184,166,.10),rgba(255,255,255,.02))', border:'1px solid rgba(20,184,166,.24)' } },
+        _h('div', { style:{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:14, flexWrap:'wrap' } },
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:5 } },
+            _h('span', { style:SECTION_LABEL }, 'BLOK KOREKCYJNY'),
+            _h('span', { style:{ fontSize:11.5, color:'var(--t2)' } }, block ? 'Złożony '+daysSince(block.generatedAt)+' dni temu · odświeży się po 28 dniach' : 'Zaznacz dolegliwości, żeby dostać blok ćwiczeń.')
+          ),
+          _h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap' } },
+            blockExs.length > 0 && _h('div', { onClick:regenerate, style:{ display:'flex', alignItems:'center', gap:7, height:36, padding:'0 14px', borderRadius:12, cursor:'pointer', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.12)', color:'var(--t2)', fontSize:11.5, fontWeight:700 } },
+              _h('svg', { width:14, height:14, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2, strokeLinecap:'round', strokeLinejoin:'round' }, _h('path', { d:'M20 12a8 8 0 1 1-2.4-5.7M20 4.5V10h-5.5' })), 'Regeneruj'),
+            blockExs.length > 0 && _h('span', { style:{ display:'flex', alignItems:'center', height:36, padding:'0 14px', borderRadius:12, background:'rgba(20,184,166,.14)', border:'1px solid rgba(20,184,166,.30)', fontSize:11.5, fontWeight:800, color:'var(--teal)', fontVariantNumeric:'tabular-nums' } },
+              Object.keys(checked).filter(function(k){ return checked[k]; }).length+'/'+blockExs.length)
+          )
+        ),
+        blockExs.length > 0
+          ? _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+              _h('div', { style:{ height:5, borderRadius:3, background:'rgba(255,255,255,.08)', overflow:'hidden' } },
+                _h('div', { style:{ height:'100%', borderRadius:3, background:'linear-gradient(90deg,#14B8A6,#10B981)', transition:'width .4s',
+                  width:(Object.keys(checked).filter(function(k){ return checked[k]; }).length/blockExs.length*100)+'%' } })),
+              blockExs.map(function(ex, i) {
+                var cond = (ET.CONDITIONS||[]).find(function(c){ return (ex.condition_tags||[]).indexOf(c.tag)!==-1; });
+                var on = !!checked[ex.id];
+                return _h('div', { key:ex.id, onClick:function(){ setChecked(function(c){ var o={}; o[ex.id]=!c[ex.id]; return Object.assign({},c,o); }); },
+                  style:{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:15, cursor:'pointer',
+                    background: on ? 'rgba(20,184,166,.10)' : 'rgba(255,255,255,.03)', border:'1px solid ' + (on ? 'rgba(20,184,166,.32)' : 'rgba(255,255,255,.07)') } },
+                  _h('div', { style:{ flex:'none', width:26, height:26, borderRadius:9, background: on ? 'var(--teal)' : 'rgba(255,255,255,.06)', border:'1.5px solid ' + (on ? 'var(--teal)' : 'rgba(255,255,255,.14)'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color: on ? '#080810' : 'var(--t2)' } }, on ? '✓' : i+1),
+                  _h('div', { style:{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:4 } },
+                    _h('span', { style:{ fontSize:12.5, fontWeight:700, letterSpacing:'-.01em', color: on ? 'var(--t2)' : 'var(--t1)', textDecoration: on ? 'line-through' : 'none' } }, ex.name),
+                    cond && _h('span', { style:{ fontSize:9.5, fontWeight:600, color:'var(--teal)' } }, cond.label)
+                  ),
+                  _h('span', { style:{ flex:'none', fontSize:10, fontWeight:600, color:'var(--t3)' } }, ex.mechanism || ex.target_anatomy || '')
+                );
+              })
+            )
+          : _h('div', { style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:9, padding:'34px 18px', borderRadius:18, border:'1px dashed rgba(255,255,255,.12)', background:'rgba(255,255,255,.02)' } },
+              _h('div', { style:{ fontSize:13.5, fontWeight:700 } }, 'Brak zaznaczonych dolegliwości'),
+              _h('div', { style:{ fontSize:12, color:'var(--t3)', textAlign:'center', maxWidth:360 } }, 'Zaznacz choćby jedną pozycję powyżej — blok 5–15 min złoży się sam i odświeży po 28 dniach albo przy każdej zmianie listy.')
+            )
+      )
+    );
+  }
+
+  ET.WebPainModule = WebPainModule;
 })();
