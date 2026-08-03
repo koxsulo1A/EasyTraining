@@ -814,9 +814,6 @@
   // NewDashboard. Wartości px/kolory 1:1 z makietą, dane realne ze store'u.
   var WEB_DAYS = ['Pn','Wt','Śr','Cz','Pt','So','Nd'];
 
-  function dkey(d) {
-    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  }
   function mondayOf(date) {
     var x = new Date(date); x.setHours(0,0,0,0);
     x.setDate(x.getDate() - ((x.getDay()+6) % 7));   // tydzień od poniedziałku
@@ -831,7 +828,7 @@
     return i > 0 ? String(s).slice(i+1) : String(s);
   }
 
-  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+  var SECTION_LABEL = ET.SECTION_LABEL;
 
   function WebDashboard() {
     var su = ET.useStore(); var store = su.store;
@@ -850,14 +847,8 @@
         : 'Niska gotowość — rozważ lżejszą sesję albo dzień regeneracji.';
 
     var workouts = store.workouts || [];
-    // Dwie różne „dzisiejsze" daty, bo ET.dstr() liczy dzień w UTC
-    // (components.js:7 — toISOString), więc między północą a 1:00/2:00 czasu
-    // polskiego wskazuje wczoraj. `todayLocal` służy do tego, co użytkownik
-    // widzi (podświetlenie dnia na wykresie), `todayStore` do dopasowania
-    // rekordów, które i tak zapisano kluczem z dstr().
-    var todayLocal = dkey(new Date());
-    var todayStore = ET.dstr();
-    var hasCheckin = (store.wellbeingEntries || []).some(function(e){ return e.date === todayStore && !e.tag; });
+    var today = ET.dstr();
+    var hasCheckin = (store.wellbeingEntries || []).some(function(e){ return e.date === today && !e.tag; });
 
     // ── TEN TYDZIEŃ: sesje, objętość, słupki 7 dni ──
     var week = React.useMemo(function() {
@@ -865,7 +856,7 @@
       var days = [];
       for (var i = 0; i < 7; i++) {
         var d = new Date(start); d.setDate(start.getDate() + i);
-        days.push({ key:dkey(d), label:WEB_DAYS[i], vol:0, isToday:dkey(d) === todayLocal });
+        days.push({ key:ET.dstr(d), label:WEB_DAYS[i], vol:0, isToday:ET.dstr(d) === today });
       }
       var index = {};
       days.forEach(function(d){ index[d.key] = d; });
@@ -879,7 +870,7 @@
       });
       var max = days.reduce(function(m,d){ return Math.max(m, d.vol); }, 0);
       return { days:days, sessions:sessions, volume:volume, max:max };
-    }, [workouts, todayLocal]);
+    }, [workouts, today]);
 
     var volLabel = week.volume >= 1000 ? plDec(week.volume/1000, 1) + ' t' : Math.round(week.volume) + ' kg';
 
@@ -894,9 +885,9 @@
       }
       var d = new Date();
       // Dzień jeszcze trwa — niedokończone „dziś" nie zeruje serii.
-      if (!complete(dkey(d))) d.setDate(d.getDate() - 1);
+      if (!complete(ET.dstr(d))) d.setDate(d.getDate() - 1);
       var streak = 0;
-      while (complete(dkey(d)) && streak < 999) { streak++; d.setDate(d.getDate() - 1); }
+      while (complete(ET.dstr(d)) && streak < 999) { streak++; d.setDate(d.getDate() - 1); }
       return streak;
     }, [store.supplements, store.supplementChecks]);
 

@@ -415,7 +415,7 @@
   // usunięcie go jest osobną decyzją dot. iOS, nie w zakresie tego ekranu).
   // ══════════════════════════════════════════════════════════════════════
 
-  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+  var SECTION_LABEL = ET.SECTION_LABEL;
 
   function WebPainModule() {
     var su = ET.useStore(); var store = su.store, update = su.update;

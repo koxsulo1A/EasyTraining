@@ -7,16 +7,10 @@
   // GOTOWOŚĆ — ekran „Gotowość" (WEB), design „EasyTraining Aplikacja".
   // Spec: docs/segment-02-samopoczucie.md w projekcie designu. Wynik dnia,
   // check-in poranny, log snu, gotowość przed treningiem, trendy 7-dniowe.
-  //
-  // Klucz dnia: ET.dstr() — celowo NIE lokalny helper jak w dashboard.js/
-  // plan.js, bo wellbeingEntries/sleepSessions są już zapisywane tym
-  // kluczem gdzie indziej w aplikacji (np. DailyWellbeingCheck w app.js).
-  // Użycie innego klucza tutaj rozjechałoby wpisy z tej samej doby.
-  // Znany bug UTC w dstr() (components.js:7) zgłoszony osobno.
   // ══════════════════════════════════════════════════════════════════════
 
   var DOW = ['Nd','Pn','Wt','Śr','Cz','Pt','So'];
-  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+  var SECTION_LABEL = ET.SECTION_LABEL;
 
   var CHECKIN_FIELDS = [
     { key:'energy',     label:'Energia' },
@@ -136,10 +130,13 @@
 
     // ── TRENDY 7 DNI ──
     var trends = React.useMemo(function() {
-      var todayMs = new Date(ET.dstr()).getTime();
+      // Arytmetyka na lokalnej dacie. Wcześniej szło to przez
+      // `new Date(ET.dstr())`, które parsuje 'YYYY-MM-DD' jako PÓŁNOC UTC —
+      // a potem czytaliśmy z tego lokalne getFullYear/Month/Date, więc w
+      // strefach ujemnych (np. Ameryka) cały wykres przesuwał się o dzień.
       var days = [];
       for (var i=6;i>=0;i--) {
-        var d = new Date(todayMs - i*86400000);
+        var d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() - i);
         var key = ET.dstr(d);
         days.push({ key:key, label:DOW[d.getDay()], isToday:i===0,
           sleep:(store.sleepSessions||[]).find(function(e){ return e.date===key; }),

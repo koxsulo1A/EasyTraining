@@ -402,8 +402,12 @@
       // Sauna → Wellbeing
       if (saunas.length >= 3 && wbs.length >= 4) {
         var saunaDays = new Set(saunas.map(function(s){return s.date;}));
-        var afterSauna = wbs.filter(function(e){ var prev=new Date(e.date+'T12:00'); prev.setDate(prev.getDate()-1); var ps=prev.toISOString().slice(0,10); return saunaDays.has(ps); });
-        var noSauna = wbs.filter(function(e){ var prev=new Date(e.date+'T12:00'); prev.setDate(prev.getDate()-1); var ps=prev.toISOString().slice(0,10); return !saunaDays.has(ps); });
+        // Klucz dnia przez ET.dstr (czas lokalny) — saunaDays trzyma daty w tym
+        // samym formacie, więc porównanie przez toISOString (UTC) potrafiło
+        // rozminąć się o jeden dzień i przypisać wpis do złej grupy.
+        var prevKey = function(dateStr){ var p=new Date(dateStr+'T12:00'); p.setDate(p.getDate()-1); return ET.dstr(p); };
+        var afterSauna = wbs.filter(function(e){ return saunaDays.has(prevKey(e.date)); });
+        var noSauna = wbs.filter(function(e){ return !saunaDays.has(prevKey(e.date)); });
         if (afterSauna.length>=2 && noSauna.length>=2) {
           var saunaEnergy=avg(afterSauna.map(function(e){return e.energy||0;}));
           var noSaunaEnergy=avg(noSauna.map(function(e){return e.energy||0;}));
@@ -574,7 +578,7 @@
       var weeksLeft=Math.ceil((target-current)/weightGain);
       var est=new Date(); est.setDate(est.getDate()+weeksLeft*7);
       return {possible:true, current:current+'kg', target:target+'kg', weeklyGain:weightGain.toFixed(2)+'kg/tydz.',
-        weeksLeft:weeksLeft, estimatedDate:fmtDatePL(est.toISOString().slice(0,10)),
+        weeksLeft:weeksLeft, estimatedDate:fmtDatePL(ET.dstr(est)),
         confidence:weightGain>1?'wysoka':weightGain>0.3?'średnia':'niska',
         reason:'Przy tempie '+weightGain.toFixed(2)+'kg/tydz. cel '+target+'kg zostanie osiągnięty za ok. '+weeksLeft+' tygodni.'};
     },
@@ -591,7 +595,7 @@
       var weeksLeft=Math.ceil((target-avgDist)/weeklyGain);
       var est=new Date(); est.setDate(est.getDate()+weeksLeft*7);
       return {possible:true, current:avgDist.toFixed(1)+'km', target:target+'km', weeklyGain:(weeklyGain>0?'+':'')+weeklyGain.toFixed(2)+'km/tydz.',
-        weeksLeft:weeksLeft, estimatedDate:fmtDatePL(est.toISOString().slice(0,10)), confidence:'niska',
+        weeksLeft:weeksLeft, estimatedDate:fmtDatePL(ET.dstr(est)), confidence:'niska',
         reason:'Przy obecnym tempie wzrostu dystansu cel zostanie osiągnięty za ok. '+weeksLeft+' tygodni.'};
     },
 
@@ -608,7 +612,7 @@
       var weeksLeft=Math.ceil(Math.abs(target-current)/Math.abs(weeklyChange));
       var est=new Date(); est.setDate(est.getDate()+weeksLeft*7);
       return {possible:true, current:current.toFixed(1)+'kg', target:target+'kg', weeklyGain:(weeklyChange>0?'+':'')+weeklyChange.toFixed(2)+'kg/tydz.',
-        weeksLeft:weeksLeft, estimatedDate:fmtDatePL(est.toISOString().slice(0,10)), confidence:'średnia',
+        weeksLeft:weeksLeft, estimatedDate:fmtDatePL(ET.dstr(est)), confidence:'średnia',
         reason:'Przy obecnym tempie '+weeklyChange.toFixed(2)+'kg/tydz. cel zostanie osiągnięty za ok. '+weeksLeft+' tygodni.'};
     },
 
@@ -619,7 +623,7 @@
       var weeksToComplete=Math.ceil((100-goal.progress)/(goal.progress>0?Math.max(goal.progress/4,2):5));
       var est=new Date(); est.setDate(est.getDate()+weeksToComplete*7);
       return {possible:true, current:goal.progress+'%', target:'100%', weeklyGain:null,
-        weeksLeft:weeksToComplete, estimatedDate:fmtDatePL(est.toISOString().slice(0,10)), confidence:'niska',
+        weeksLeft:weeksToComplete, estimatedDate:fmtDatePL(ET.dstr(est)), confidence:'niska',
         reason:'Szacunek oparty na obecnym postępie ('+goal.progress+'%).'};
     }
   };

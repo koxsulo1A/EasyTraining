@@ -18,17 +18,14 @@
 
   function puid(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
-  function pDkey(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
-  // Tydzień od poniedziałku, w czasie lokalnym — ET.dstr() liczy UTC (bug
-  // components.js:7, znany i zgłoszony osobno); tu liczymy dzień lokalnie,
-  // żeby siatka tygodnia zawsze zgadzała się z tym, co widzi użytkownik.
+  // Tydzień od poniedziałku (czas lokalny, jak ET.dstr).
   function pWeekStart(offsetWeeks) {
     var d = new Date(); d.setHours(0,0,0,0);
     d.setDate(d.getDate() - ((d.getDay()+6) % 7) + offsetWeeks*7);
     return d;
   }
   function pIsDone(store, type, date) {
-    if (type === 'rest') return date <= pDkey(new Date());
+    if (type === 'rest') return date <= ET.dstr(new Date());
     if (type === 'strength')  return (store.workouts||[]).some(function(w){ return w.date===date; });
     if (type === 'running')   return (store.runs||[]).some(function(r){ return r.date===date; });
     if (type === 'sauna')     return (store.saunaSessions||[]).some(function(s){ return s.date===date; });
@@ -58,30 +55,38 @@
 
   // Zapis meta-planu + mirror jednostek siłowych do customWorkoutPlans /
   // workoutPlans (bez tego trening nie pojawi się w pickerze — spec §3).
+  //
+  // Wszystko w JEDNYM update(): każde wywołanie update() serializuje CAŁY store
+  // do localStorage (store.js:40), więc poprzednia wersja — osobny zapis na
+  // meta-plan + jeden na każdą jednostkę — robiła 5+ pełnych zapisów (~347 KB
+  // każdy) na jedno kliknięcie steppera, rosnąc liniowo z rozmiarem planu.
   function saveMetaPlan(update, metaPlans, mp) {
     var updated = metaPlans.some(function(m){ return m.id===mp.id; })
       ? metaPlans.map(function(m){ return m.id===mp.id ? mp : m; })
       : metaPlans.concat([mp]);
-    ET.saveMetaPlans(update, updated);
-    mp.units.forEach(function(unit) {
-      if (unit.unitType !== 'strength') return;
-      if (unit._isCustom) {
-        update(function(s) {
-          var list = s.customWorkoutPlans || [];
-          var exists = list.some(function(p){ return p.id===unit.id; });
-          return Object.assign({}, s, { customWorkoutPlans: exists ? list.map(function(p){ return p.id===unit.id?unit:p; }) : list.concat([unit]) });
-        });
-      } else {
-        update(function(s) {
-          var ov = Object.assign({}, s.workoutPlans || {}); ov[unit.id] = unit;
-          return Object.assign({}, s, { workoutPlans: ov });
-        });
-      }
+
+    update(function(s) {
+      var customs = (s.customWorkoutPlans || []).slice();
+      var overrides = Object.assign({}, s.workoutPlans || {});
+      mp.units.forEach(function(unit) {
+        if (unit.unitType !== 'strength') return;
+        if (unit._isCustom) {
+          var idx = customs.findIndex(function(p){ return p.id === unit.id; });
+          if (idx >= 0) customs[idx] = unit; else customs.push(unit);
+        } else {
+          overrides[unit.id] = unit;
+        }
+      });
+      return Object.assign({}, s, {
+        trainingPlans: updated,
+        customWorkoutPlans: customs,
+        workoutPlans: overrides,
+      });
     });
     return updated;
   }
 
-  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+  var SECTION_LABEL = ET.SECTION_LABEL;
   function iconFor(unit) { return unit.unitType === 'running' ? 'running' : 'dumbbell'; }
 
   function PlanModule() {
@@ -188,9 +193,9 @@
       var days = [];
       for (var i = 0; i < 7; i++) {
         var d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
-        var key = pDkey(d);
+        var key = ET.dstr(d);
         var entries = (store.weekPlans || []).filter(function(p){ return p.date === key; });
-        days.push({ key:key, label:PLAN_DAYS[i], num:d.getDate(), isToday:key === pDkey(new Date()), isPast:key < pDkey(new Date()), entries:entries });
+        days.push({ key:key, label:PLAN_DAYS[i], num:d.getDate(), isToday:key === ET.dstr(new Date()), isPast:key < ET.dstr(new Date()), entries:entries });
       }
       return days;
     }, [store.weekPlans, weekOff]);
@@ -352,7 +357,7 @@
               ),
               d.entries.map(function(e) {
                 var done = pIsDone(store, e.type, d.key);
-                var status = e.type==='rest' ? 'ODPOCZYNEK' : done ? 'ZROBIONE' : d.key===pDkey(new Date()) ? 'DZIŚ' : d.isPast ? 'POMINIĘTE' : 'PLAN';
+                var status = e.type==='rest' ? 'ODPOCZYNEK' : done ? 'ZROBIONE' : d.key===ET.dstr(new Date()) ? 'DZIŚ' : d.isPast ? 'POMINIĘTE' : 'PLAN';
                 var statColor = e.type==='rest' ? 'var(--t3)' : done ? 'var(--green)' : d.isPast ? 'var(--red)' : 'var(--a-light)';
                 return _h('div', { key:e.id, style:{ display:'flex', flexDirection:'column', gap:4, padding:'6px 7px', borderRadius:11,
                   background:'color-mix(in srgb,'+(e.color||'var(--a)')+' 14%, transparent)', border:'1px solid color-mix(in srgb,'+(e.color||'var(--a)')+' 30%, transparent)' } },

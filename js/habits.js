@@ -18,7 +18,7 @@
     var days = [];
     for (var i=6; i>=0; i--) {
       var d = new Date(); d.setDate(d.getDate()-i);
-      days.push(d.toISOString().slice(0,10));
+      days.push(ET.dstr(d));
     }
     return days;
   }
@@ -71,7 +71,7 @@
       var s = 0;
       var d = new Date();
       while (true) {
-        var key = d.toISOString().slice(0,10);
+        var key = ET.dstr(d);
         var dayL = logs[key] || {};
         if (Object.keys(dayL).length === 0 && key !== today) break;
         if (habits.some(function(h){ return dayL[h.id]; })) s++;

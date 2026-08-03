@@ -190,6 +190,7 @@
     }
 
     var runs = store.runs || [];
+    var page = ET.useProgressive(runs);
     var total = runs.reduce(function(t,r){ return t+(r.distance||0); }, 0);
     var avgPaceAll = runs.length > 0 ? ET.calcPace(total, runs.reduce(function(t,r){ return t+(r.duration||0); }, 0)) : '—';
 
@@ -245,7 +246,9 @@
       runs.length===0
         ? _h(ET.Placeholder, { icon:'🏃', title:'Brak biegów', desc:'Rejestruj treningi biegowe: dystans, tempo, tętno i gotowość.' })
         : CATEGORIES.map(function(cat) {
-            var catRuns = runs.filter(cat.match);
+            // Kategorie filtrujemy z okna progresywnego, nie z całej kolekcji —
+            // inaczej ekran rysuje wszystkie biegi z historii naraz.
+            var catRuns = page.items.filter(cat.match);
             if (catRuns.length === 0) return null;
             return _h('div', { key:cat.id, style:{ marginBottom:18 } },
               _h('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:8, paddingBottom:6, borderBottom:'1px solid var(--b1)' } },
@@ -256,6 +259,8 @@
               catRuns.map(renderRun)
             );
           }),
+
+      _h(ET.ShowMore, { state:page }),
 
       _h(RunningAddSheet, { open:showAdd, onClose:function(){ setShowAdd(false); } }),
       _h(RunningAddSheet, { open:!!editRun, edit:editRun, onClose:function(){ setEditRun(null); } })

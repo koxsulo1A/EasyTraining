@@ -241,7 +241,7 @@
       var d = new Date(dateStr+'T12:00:00');
       var dow = (d.getDay()+6)%7; // 0=poniedziałek
       d.setDate(d.getDate()-dow);
-      return d.toISOString().slice(0,10);
+      return ET.dstr(d);
     }
     var buckets = {};
     (workouts||[]).forEach(function(w){
@@ -3079,6 +3079,7 @@
 
     // LIST VIEW
     var workouts = store.workouts || [];
+    var histPage = ET.useProgressive(workouts);
     var update = su.update;
     var toast = ET.useToast();
     var effectivePlans = getEffectivePlans(store);
@@ -3308,7 +3309,7 @@
         ? _h(ET.Placeholder, { icon:'🏋️', title:'Brak zapisanych treningów', desc:'Wybierz plan i zacznij swój pierwszy trening.' })
         : _h('div', null,
             _h('div', { className:'section-hdr' }, _h('h2', null, 'Historia')),
-            workouts.map(function(w) {
+            histPage.items.map(function(w) {
               var totalMin = Math.round((w.duration||0)/60000);
               var workMin = w.workMs ? Math.round(w.workMs/60000) : totalMin;
               var restMin = w.restMs ? Math.round(w.restMs/60000) : 0;
@@ -3333,7 +3334,8 @@
                   )
                 )
               );
-            })
+            }),
+            _h(ET.ShowMore, { state:histPage })
           )
     );
   }

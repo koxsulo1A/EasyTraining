@@ -4,7 +4,14 @@
   var _h = React.createElement;
 
   // ── UTILS ────────────────────────────────────────
-  function dstr(d) { d = d || new Date(); return d.toISOString().slice(0,10); }
+  // Klucz dnia 'YYYY-MM-DD' liczony w czasie LOKALNYM. Wcześniej używaliśmy
+  // toISOString(), czyli UTC — w Polsce (UTC+1/+2) między północą a 1:00/2:00
+  // zwracało to WCZORAJSZĄ datę, więc trening zapisany o 00:30 lądował na
+  // poprzednim dniu, a "dziś" na wykresach i seriach wskazywało wczoraj.
+  function dstr(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
   function fmtDate(d) { return new Date(d).toLocaleDateString('pl-PL', { day:'numeric', month:'short', year:'numeric' }); }
   function fmtDateShort(d) { return new Date(d).toLocaleDateString('pl-PL', { day:'numeric', month:'short' }); }
   function greeting() { var h = new Date().getHours(); return h < 12 ? 'Dzień dobry' : h < 18 ? 'Cześć' : 'Dobry wieczór'; }
@@ -23,7 +30,7 @@
     entries.forEach(function(e) {
       var d = new Date(e[dateKey] + 'T12:00');
       var mon = new Date(d); mon.setDate(d.getDate() - (d.getDay()||7) + 1);
-      var key = mon.toISOString().slice(0,10);
+      var key = dstr(mon);
       if (!weeks[key]) weeks[key] = [];
       weeks[key].push(e);
     });
@@ -258,7 +265,42 @@
     );
   }
 
+  // Etykieta sekcji w powłoce web (WERSALIKI, tracking .14em) — jedno źródło
+  // dla wszystkich ekranów web, wcześniej powielane w 6 plikach.
+  var SECTION_LABEL = { fontSize:9, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' };
+
+  // ── PROGRESYWNA LISTA ─────────────────────────────────────────────────
+  // Ekrany historii (sen, bieganie, sauna, pomiary) mapowały CAŁĄ kolekcję,
+  // więc po dwóch latach logowania jeden ekran to ~5,5 tys. węzłów DOM i
+  // wyraźne zacinanie scrolla na telefonie. Renderujemy porcjami, z
+  // przyciskiem doładowania — dane pozostają w pełni dostępne.
+  function useProgressive(items, step) {
+    step = step || 30;
+    var vs = React.useState(step);
+    var visible = vs[0], setVisible = vs[1];
+    var len = (items || []).length;
+    React.useEffect(function(){ setVisible(step); }, [len, step]);
+    return {
+      items: (items || []).slice(0, visible),
+      hasMore: len > visible,
+      remaining: Math.max(0, len - visible),
+      more: function(){ setVisible(function(v){ return v + step; }); },
+    };
+  }
+
+  // Przycisk „pokaż więcej" — zwraca null, gdy nie ma czego dobierać.
+  function ShowMore(props) {
+    if (!props.state || !props.state.hasMore) return null;
+    return _h('button', {
+      className: 'btn btn-secondary',
+      style: { width:'100%', marginTop:8 },
+      onClick: props.state.more,
+    }, 'Pokaż więcej (' + props.state.remaining + ')');
+  }
+
   Object.assign(window.ET, {
+    SECTION_LABEL: SECTION_LABEL,
+    useProgressive: useProgressive, ShowMore: ShowMore,
     dstr: dstr, fmtDate: fmtDate, fmtDateShort: fmtDateShort,
     greeting: greeting, calcPace: calcPace, daysUntil: daysUntil,
     groupByWeek: groupByWeek, last30Days: last30Days,

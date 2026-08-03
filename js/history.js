@@ -124,7 +124,7 @@
     var all = [];
     function add(arr, type) {
       (arr||[]).forEach(function(e) {
-        var dateKey = e.date || (e.startTime?new Date(e.startTime).toISOString().slice(0,10):null);
+        var dateKey = e.date || (e.startTime?ET.dstr(new Date(e.startTime)):null);
         if (dateKey) all.push({ id:e.id, type:type, date:dateKey, data:e });
       });
     }
