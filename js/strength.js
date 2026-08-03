@@ -620,16 +620,46 @@
   }
 
   // ── STEP 4: TRENING WŁAŚCIWY ─────────────────────────────────────────────
+  // ── ZAPIS ROBOCZY AKTYWNEJ SESJI ────────────────────────────────────────
+  // Trwający trening żył wyłącznie w stanie komponentu, więc ubicie aplikacji
+  // (a na telefonie system robi to sam, gdy appka długo jest w tle) kasowało
+  // cały postęp. Trzymamy szkic pod OSOBNYM kluczem — dopisanie go do et_v1
+  // znaczyłoby serializowanie całej historii przy każdej zapisanej serii.
+  var DRAFT_KEY = 'et_session_draft';
+  var DRAFT_MAX_AGE_MS = 12 * 3600 * 1000;   // po 12 h szkic jest bezużyteczny
+
+  function readDraft() {
+    try {
+      var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (!d || !d.startedAt || !d.plan) return null;
+      if (Date.now() - d.startedAt > DRAFT_MAX_AGE_MS) { localStorage.removeItem(DRAFT_KEY); return null; }
+      return d;
+    } catch (e) { return null; }
+  }
+  function writeDraft(d) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) {} }
+  function clearDraft()  { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+  ET.readSessionDraft = readDraft;
+  ET.clearSessionDraft = clearDraft;
+
   function StrengthSession(props) {
     var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
     var plan = props.plan;
 
-    var t0 = React.useRef(Date.now());
+    // Szkic czytamy raz przy montowaniu i tylko dla TEGO planu — inaczej
+    // wejście w inny trening podstawiłoby serie z poprzedniego.
+    var draftRef = React.useRef(undefined);
+    if (draftRef.current === undefined) {
+      var d0 = readDraft();
+      draftRef.current = (d0 && d0.plan && d0.plan.id === plan.id) ? d0 : null;
+    }
+    var restored = draftRef.current;
+
+    var t0 = React.useRef(restored ? restored.startedAt : Date.now());
     var el = React.useState(0); var elapsed = el[0], setElapsed = el[1];
     var rl = React.useState(0); var restLeft = rl[0], setRestLeft = rl[1];
     var sa = React.useState(false); var showAdd = sa[0], setShowAdd = sa[1];
-    var tr = React.useState(0); var totalRestMs = tr[0], setTotalRestMs = tr[1];
+    var tr = React.useState(restored ? (restored.totalRestMs || 0) : 0); var totalRestMs = tr[0], setTotalRestMs = tr[1];
     var restStartRef = React.useRef(null);
     // Koniec przerwy jako timestamp (zegar ścienny) — timery JS są zamrażane
     // przy zablokowanym telefonie, więc odliczanie MUSI liczyć się z Date.now().
@@ -715,6 +745,9 @@
     }
 
     var es = React.useState(function() {
+      // Wznowienie: bierzemy serie ze szkicu zamiast liczyć je od nowa
+      // (inaczej przepadłyby zapisane powtórzenia i ciężary).
+      if (restored && restored.exs && restored.exs.length) return restored.exs;
       var overrides = (store.planSuggestions||{})[plan.id]||{};
       return plan.exercises.map(function(e, i) {
         var ov = overrides[e.name]||{};
@@ -750,6 +783,21 @@
       var t = setInterval(function(){ setElapsed(Date.now()-t0.current); }, 1000);
       return function(){ clearInterval(t); };
     }, []);
+
+    // Szkic sesji — zapisywany po każdej zmianie serii/przerw, żeby ubicie
+    // aplikacji w trakcie treningu nie kasowało postępu.
+    React.useEffect(function() {
+      writeDraft({
+        plan: plan,
+        planId: plan.id,
+        planName: plan.name,
+        startedAt: t0.current,
+        readiness: props.readiness,
+        exs: exs,
+        totalRestMs: totalRestMs,
+        savedAt: Date.now(),
+      });
+    }, [exs, totalRestMs]);
 
     // Live Activity (iOS): ekran blokady + Dynamic Island
     React.useEffect(function() {
@@ -1026,6 +1074,7 @@
       // Core (Faza 1): zdarzenie → Workout Engine liczy objętość per mięsień
       if (window.etcore) { try { window.etcore.bus.publish('WorkoutFinished', session, 'user'); } catch(e) { console.error('[core] publish:', e); } }
       if (ET.LiveActivity) ET.LiveActivity.end();
+      clearDraft();   // sesja trafiła do historii — szkic nie jest już potrzebny
       props.onFinish({ session:session, prs:prs });
     }
 
@@ -3043,6 +3092,16 @@
     var ma = React.useState(false); var showManualAdd = ma[0], setShowManualAdd = ma[1];
     var se = React.useState(false); var showEditor = se[0], setShowEditor = se[1];
     var st = React.useState(null); var selTileId = st[0], setSelTileId = st[1];
+    // Szkic niedokończonej sesji czytany raz przy wejściu na listę treningów.
+    var sd = React.useState(function(){ return readDraft(); }); var sessionDraft = sd[0], setSessionDraft = sd[1];
+    // UWAGA: wszystkie hooki MUSZĄ być wywołane przed wczesnymi `return` niżej.
+    // Widoki kroków treningu wychodzą z komponentu wcześniej, więc hook
+    // postawiony za nimi byłby pomijany przy zmianie widoku i React przerywał
+    // render błędem „Rendered fewer hooks than expected".
+    var workouts = store.workouts || [];
+    var histPage = ET.useProgressive(workouts);
+    var update = su.update;
+    var toast = ET.useToast();
 
     if (view==='ai-coach') return _h(AICoachView, { onBack:function(){ setView('list'); } });
     if (showEditor) return _h(PlanEditorSheet, { onClose:function(){ setShowEditor(false); } });
@@ -3078,10 +3137,6 @@
     if (view==='summary' && result) return _h(WorkoutSummary, { result:result, readiness:readiness, postWellbeing:postWb, store:store, onBack:function(){ setView('list'); setPlan(null); } });
 
     // LIST VIEW
-    var workouts = store.workouts || [];
-    var histPage = ET.useProgressive(workouts);
-    var update = su.update;
-    var toast = ET.useToast();
     var effectivePlans = getEffectivePlans(store);
 
     return _h('div', { className:'fade-in' },
@@ -3096,6 +3151,40 @@
       ),
 
       ET.ACWRAlert && _h(ET.ACWRAlert, null),
+
+      // ── WZNOWIENIE NIEDOKOŃCZONEGO TRENINGU ────────────────────────────
+      // Szkic zapisywany w trakcie sesji (patrz DRAFT_KEY) — bez tego ubicie
+      // aplikacji w tle kasowało cały postęp bez śladu.
+      (function() {
+        if (!sessionDraft) return null;
+        var doneSets = (sessionDraft.exs || []).reduce(function(t, e) {
+          return t + (e.setsData || []).filter(function(s){ return s.done; }).length;
+        }, 0);
+        var mins = Math.round((Date.now() - sessionDraft.startedAt) / 60000);
+        return _h('div', { className:'card', style:{ marginBottom:14, borderColor:'var(--a)', background:'var(--a-dim)' } },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' } },
+            _h('div', { style:{ fontSize:'1.6rem' } }, '⏸️'),
+            _h('div', { style:{ flex:1, minWidth:160 } },
+              _h('div', { style:{ fontWeight:700, fontSize:'.9rem' } }, 'Niedokończony trening'),
+              _h('div', { style:{ fontSize:'.72rem', color:'var(--t2)', marginTop:3 } },
+                sessionDraft.planName + ' · ' + doneSets + ' zapisanych serii · sprzed ' + mins + ' min')
+            ),
+            _h('div', { style:{ display:'flex', gap:8 } },
+              _h('button', { className:'btn btn-primary btn-sm', onClick:function() {
+                setPlan(sessionDraft.plan);
+                if (sessionDraft.readiness) setReadiness(sessionDraft.readiness);
+                setSessionDraft(null);
+                setView('session');
+              } }, '▶ Wznów'),
+              _h('button', { className:'btn btn-ghost btn-sm', onClick:function() {
+                if (!confirm('Odrzucić niedokończony trening? Zapisane serie przepadną.')) return;
+                clearDraft(); setSessionDraft(null);
+                toast('Niedokończony trening odrzucony', 'default');
+              } }, 'Odrzuć')
+            )
+          )
+        );
+      })(),
 
       // ── KAFELKI NARZĘDZI (prompt 1.1) ──────────────────────────────────
       (function() {

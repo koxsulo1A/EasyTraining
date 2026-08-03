@@ -49,6 +49,27 @@ for (const item of ITEMS) {
 const htmlPath = `${OUT}/index.html`;
 let html = await readFile(htmlPath, 'utf8');
 
+// ── React: development → production ───────────────────────────────────────
+// W repo (i przy lokalnym podglądzie) zostają buildy deweloperskie, bo dają
+// czytelne komunikaty błędów i ostrzeżenia Reacta. Do www/ — czyli na GitHub
+// Pages i do paczki iOS — wchodzą buildy produkcyjne: 142 KB zamiast 1195 KB
+// (dev to było 47% całego JS aplikacji) i bez dev-only sprawdzeń w runtime.
+const REACT_SWAP = [
+  ['js/vendor/react.development.js', 'js/vendor/react.production.min.js'],
+  ['js/vendor/react-dom.development.js', 'js/vendor/react-dom.production.min.js'],
+];
+for (const [dev, prod] of REACT_SWAP) {
+  if (!existsSync(prod)) {
+    throw new Error(`build-web: brak ${prod} — produkcyjny build Reacta jest wymagany do wydania`);
+  }
+  if (!html.includes(dev)) {
+    throw new Error(`build-web: nie znaleziono ${dev} w index.html — podmiana Reacta na produkcyjny nie zadziałała`);
+  }
+  html = html.replaceAll(dev, prod);
+  // Nieużywany build deweloperski nie ma po co lecieć do paczki (1,2 MB).
+  await rm(`${OUT}/${dev}`, { force: true });
+}
+
 // Każdy lokalny plik js/ i css/ dostaje ten sam build ID — także te bez ?v=,
 // żeby żaden zasób nie mógł zostać podany ze starego cache.
 html = html.replace(/(src|href)="((?:js|css)\/[^"?]+)(\?v=[^"]*)?"/g,
