@@ -413,7 +413,10 @@
   }
 
   // ── CALENDAR MODULE (root) ─────────────────────────────────────────────────
-  function CalendarModule() {
+  // Klasyczny widok — bez zmian (fallback, web faktycznie używa
+  // WebCalendarModule). Patrz dispatcher `CalendarModule` i
+  // `CalendarModuleMobile` poniżej.
+  function CalendarModuleClassic() {
     var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
     var nav = ET.useNav(); var navigate = nav.navigate;
@@ -439,6 +442,211 @@
 
       activeTab === 'week'  && _h(WeekPlanner,    { store:store, update:update, toast:toast }),
       activeTab === 'month' && _h(MonthCalendar,   { store:store, navigate:navigate })
+    );
+  }
+
+  // Web zostaje przy widoku klasycznym; iOS dostaje redesign „Aurora Glass".
+  function CalendarModule() {
+    return ET.IS_WEB ? _h(CalendarModuleClassic, null) : _h(CalendarModuleMobile, null);
+  }
+
+  var CAL_STATUS_DOT = { pon_gora_sila:'var(--a-light)', wt_dol_sila:'var(--a)', sr_push:'var(--orange)', czw_pull:'var(--purple)',
+    running:'var(--green)', sauna:'var(--red)', intervals:'var(--teal)', rest:'var(--b2)' };
+
+  // ── PLAN TYGODNIA (iOS) — redesign „Aurora Glass" ─────────────────────────
+  // Handoff sekcja 10: 7 wierszy (skrót dnia+numer, pasek koloru modułu,
+  // nazwa, meta, plakietka statusu ZROBIONE/DZIŚ/PLAN/WOLNE). Arkusz
+  // przypisania treningu do dnia NIE jest objęty makietą — reużyty wprost
+  // z `WeekPlanner` (ta sama logika `plansForDay`/`addPlan`/`isCompleted`).
+  // Widok miesięczny zostaje dostępny jako drugi tab (poza makietą, real
+  // funkcja) — reużywa niezmieniony `MonthCalendar`.
+  // Odstępstwo: design ma „Kartę postępu bloku" z 12 segmentami periodyzacji
+  // (progresja/deload) — wymagałoby to bezpiecznego dostępu do prywatnej
+  // logiki `periodInfo`/`findPeriodBlock` z strength.js (nieeksportowanej
+  // jako ET.*, tylko `ET.getMetaPlans` jest publiczne). Replikowanie tej
+  // matematyki na skróty ryzykowałoby subtelny błąd w liczeniu tygodnia
+  // bloku — pominięte w tym przebiegu, zamiast tego zostaje już istniejąca,
+  // realna karta „Treningi do ukończenia tygodnia" (z aktywnego meta-planu).
+  function CalendarModuleMobile() {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+    var nav = ET.useNav();
+    var tv = React.useState('week'); var activeTab = tv[0], setActiveTab = tv[1];
+
+    var wo = React.useState(0); var weekOffset = wo[0], setWeekOffset = wo[1];
+    var as = React.useState(null); var assignDay = as[0], setAssignDay = as[1];
+    var an = React.useState(''); var assignNote = an[0], setAssignNote = an[1];
+
+    var today = ET.dstr();
+    var ws = weekStartDate(weekOffset);
+    var weekDays = [];
+    for (var i = 0; i < 7; i++) { var d = new Date(ws.getTime()); d.setDate(ws.getDate()+i); weekDays.push(toStr(d)); }
+    var plans = store.weekPlans || [];
+    function plansForDay(date) { return plans.filter(function(p){ return p.date===date; }); }
+
+    function openAssign(date) { setAssignDay(date); setAssignNote(''); }
+    function addPlan(opt) {
+      var newPlan = { id:Date.now(), date:assignDay, type:opt.type, planId:opt.id, planName:opt.label, icon:opt.icon, color:opt.color, note:assignNote };
+      update(function(s){ return Object.assign({},s,{ weekPlans:(s.weekPlans||[]).concat([newPlan]) }); });
+      toast(opt.label+' dodany ✓', 'success');
+      setAssignNote('');
+    }
+    function deleteSinglePlan(planId) {
+      update(function(s){ return Object.assign({},s,{ weekPlans:(s.weekPlans||[]).filter(function(p){ return p.id!==planId; }) }); });
+      toast('Plan usunięty', 'default');
+    }
+    function deleteAllForDay() {
+      update(function(s){ return Object.assign({},s,{ weekPlans:(s.weekPlans||[]).filter(function(p){ return p.date!==assignDay; }) }); });
+      toast('Wszystkie plany dnia usunięte', 'default');
+      setAssignDay(null);
+    }
+
+    var wEnd = new Date(ws.getTime()); wEnd.setDate(ws.getDate()+6);
+    var wLabel = ws.toLocaleDateString('pl-PL',{day:'numeric',month:'short'})+' — '+wEnd.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'});
+
+    // Treningi do ukończenia tygodnia — z aktywnego meta-planu (realna dana,
+    // ta sama logika co w klasycznym WeekPlanner).
+    var weekRemaining = (function(){
+      if (typeof ET.getMetaPlans !== 'function') return null;
+      var metas = ET.getMetaPlans(store) || [];
+      if (!metas.length) return null;
+      var active = metas[0];
+      var lastW = (store.workouts||[])[0];
+      if (metas.length > 1 && lastW) {
+        var m = metas.find(function(mp){ return (mp.units||[]).some(function(u){ return u.id===lastW.planId; }); });
+        if (m) active = m;
+      }
+      var segs = (active.segments && active.segments.length) ? active.segments : [{ id:'seg_default' }];
+      var lastSeg = segs[segs.length-1].id;
+      var units = (active.units||[]).filter(function(u){ return (u.segmentId||segs[0].id)===lastSeg; });
+      if (!units.length) return null;
+      var runsThisWeek = (store.runs||[]).filter(function(r){ return weekDays.indexOf(r.date)!==-1; }).length;
+      var runSeen = 0, doneCount = 0;
+      units.forEach(function(u){
+        var done;
+        if (u.unitType==='running') { done = runSeen < runsThisWeek; if (done) runSeen++; }
+        else done = (store.workouts||[]).some(function(w){ return w.planId===u.id && weekDays.indexOf(w.date)!==-1; });
+        if (done) doneCount++;
+      });
+      return { total:units.length, done:doneCount, remaining:units.length-doneCount, planName:active.name };
+    })();
+
+    return _h('div', { className:'scr-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 } },
+        _h('div', { style:{ fontSize:27, fontWeight:800, letterSpacing:'-.03em' } }, 'Plan'),
+        _h('div', { style:{ display:'flex', gap:6, borderRadius:12, overflow:'hidden', border:'1px solid var(--b1)' } },
+          _h('button', { onClick:function(){ setActiveTab('week'); },
+            style:{ padding:'7px 14px', fontSize:11.5, fontWeight:700, border:'none', cursor:'pointer',
+              background: activeTab==='week' ? 'var(--a-light)' : 'var(--s2)', color: activeTab==='week' ? 'var(--bg)' : 'var(--t2)' } }, 'Tydzień'),
+          _h('button', { onClick:function(){ setActiveTab('month'); },
+            style:{ padding:'7px 14px', fontSize:11.5, fontWeight:700, border:'none', cursor:'pointer',
+              background: activeTab==='month' ? 'var(--a-light)' : 'var(--s2)', color: activeTab==='month' ? 'var(--bg)' : 'var(--t2)' } }, 'Miesiąc')
+        )
+      ),
+
+      activeTab === 'month' && _h(MonthCalendar, { store:store, navigate:nav.navigate }),
+
+      activeTab === 'week' && _h(React.Fragment, null,
+        _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 } },
+          _h('button', { onClick:function(){ setWeekOffset(weekOffset-1); },
+            style:{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', cursor:'pointer' } }, '‹'),
+          _h('div', { style:{ textAlign:'center' } },
+            _h('div', { style:{ fontSize:13, fontWeight:700 } }, wLabel),
+            _h('div', { style:{ fontSize:10.5, color:'var(--t3)', marginTop:2 } },
+              weekOffset===0 ? 'Bieżący tydzień' : weekOffset<0 ? Math.abs(weekOffset)+' tyg. temu' : 'Za '+weekOffset+' tyg.')
+          ),
+          _h('button', { onClick:function(){ setWeekOffset(weekOffset+1); },
+            style:{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', cursor:'pointer' } }, '›')
+        ),
+
+        weekRemaining && _h('div', { className:'glass', style:{ padding:16, borderRadius:18, marginBottom:16 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:12 } },
+            _h('span', { style:{ fontSize:22 } }, weekRemaining.remaining===0 ? '🏆' : '🏋️'),
+            _h('div', { style:{ flex:1, minWidth:0 } },
+              _h('div', { style:{ fontSize:12.5, fontWeight:700 } }, weekRemaining.planName),
+              _h('div', { style:{ fontSize:11, color:'var(--t3)', marginTop:2 } },
+                'Wykonano ' + weekRemaining.done + ' z ' + weekRemaining.total + (weekRemaining.remaining===0 ? ' — tydzień zaliczony!' : ''))
+            ),
+            _h('span', { style:{ fontSize:19, fontWeight:800, color: weekRemaining.remaining===0 ? 'var(--green)' : 'var(--a-light)' } }, weekRemaining.remaining)
+          )
+        ),
+
+        // ── 7 WIERSZY DNI ──────────────────────────────────────────────
+        _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+          weekDays.map(function(date, i) {
+            var dayPlans = plansForDay(date);
+            var nonRest = dayPlans.filter(function(p){ return p.type!=='rest'; });
+            var hasRest = dayPlans.some(function(p){ return p.type==='rest'; });
+            var doneAll = nonRest.length > 0 && nonRest.every(function(p){ return isCompleted(store,p,date); });
+            var doneAny = nonRest.some(function(p){ return isCompleted(store,p,date); });
+            var isToday = date === today, isPast = date < today;
+            var dayNum = parseInt(date.split('-')[2], 10);
+            var main = nonRest[0] || null;
+            var barColor = main ? main.color : hasRest ? 'var(--b2)' : 'var(--b1)';
+
+            var status = !main && !hasRest ? { l:'WOLNE', c:'var(--t3)', bg:'var(--s2)' }
+              : doneAll ? { l:'ZROBIONE', c:'var(--green)', bg:'rgba(16,185,129,.12)' }
+              : isToday ? { l:'DZIŚ', c:'var(--a-light)', bg:'rgba(96,165,250,.14)' }
+              : doneAny ? { l:'W TOKU', c:'var(--yellow)', bg:'rgba(245,158,11,.12)' }
+              : isPast ? { l:'POMINIĘTE', c:'var(--red)', bg:'rgba(239,68,68,.10)' }
+              : { l:'PLAN', c:'var(--t2)', bg:'var(--s2)' };
+
+            return _h('div', { key:date, onClick:function(){ openAssign(date); },
+              style:{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:16, cursor:'pointer',
+                background: isToday ? 'rgba(96,165,250,.08)' : 'var(--s2)',
+                border:'1px solid ' + (isToday ? 'rgba(96,165,250,.3)' : 'var(--b1)') } },
+              _h('div', { style:{ width:34, textAlign:'center', flexShrink:0 } },
+                _h('div', { style:{ fontSize:9, fontWeight:800, color: isToday?'var(--a-light)':'var(--t3)', letterSpacing:'.04em' } }, DAY_LABELS[i]),
+                _h('div', { style:{ fontSize:15, fontWeight:800, color: isToday?'var(--a-light)':isPast?'var(--t3)':'var(--t1)', marginTop:2 } }, dayNum)
+              ),
+              _h('div', { style:{ width:3, height:34, borderRadius:2, background:barColor, flexShrink:0 } }),
+              _h('div', { style:{ flex:1, minWidth:0 } },
+                _h('div', { style:{ fontSize:13, fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } },
+                  main ? main.planName : hasRest ? 'Odpoczynek' : 'Brak planu'),
+                _h('div', { style:{ fontSize:10.5, color:'var(--t3)', marginTop:2 } },
+                  nonRest.length>1 ? '+' + (nonRest.length-1) + ' więcej' : (main && main.note) || '')
+              ),
+              _h('span', { style:{ fontSize:9, fontWeight:800, letterSpacing:'.06em', padding:'4px 9px', borderRadius:100, flexShrink:0, background:status.bg, color:status.c } }, status.l)
+            );
+          })
+        ),
+
+        _h(ET.Sheet, { open:!!assignDay, onClose:function(){ setAssignDay(null); },
+          title: assignDay ? new Date(assignDay+'T12:00').toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'}) : '' },
+          assignDay && _h('div', null,
+            plansForDay(assignDay).length > 0 && _h('div', { style:{ marginBottom:16 } },
+              _h('div', { style:{ fontSize:'.7rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 } }, 'Zaplanowane'),
+              plansForDay(assignDay).map(function(p) {
+                return _h('div', { key:p.id, style:{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', marginBottom:6, borderRadius:'var(--r2)', background:p.color+'15', border:'1px solid '+p.color+'44' } },
+                  _h('span', { style:{ fontSize:'1.2rem' } }, p.icon),
+                  _h('div', { style:{ flex:1 } },
+                    _h('div', { style:{ fontSize:'.82rem', fontWeight:700, color:p.color } }, p.planName),
+                    p.note && _h('div', { style:{ fontSize:'.65rem', color:'var(--t3)' } }, p.note)
+                  ),
+                  _h('button', { style:{ padding:'4px 10px', borderRadius:'var(--r2)', border:'1px solid var(--red)', background:'none', color:'var(--red)', cursor:'pointer', fontSize:'.72rem', fontWeight:600 },
+                    onClick:function(){ deleteSinglePlan(p.id); } }, '✕')
+                );
+              }),
+              _h('button', { style:{ width:'100%', padding:'7px', background:'none', border:'1px solid var(--b1)', borderRadius:'var(--r2)', color:'var(--t3)', cursor:'pointer', fontSize:'.72rem', marginTop:4 },
+                onClick:deleteAllForDay }, '🗑 Usuń wszystkie plany dnia')
+            ),
+            _h('div', { style:{ fontSize:'.75rem', fontWeight:700, color:'var(--t2)', marginBottom:10 } }, '➕ Dodaj trening do dnia'),
+            _h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:14 } },
+              PLAN_OPTS.map(function(opt) {
+                return _h('button', { key:opt.id, onClick:function(){ addPlan(opt); },
+                  style:{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:'var(--r2)', border:'1.5px solid var(--b1)', background:'var(--s2)', cursor:'pointer', textAlign:'left' } },
+                  _h('span', { style:{ fontSize:'1.3rem' } }, opt.icon),
+                  _h('div', { style:{ fontSize:'.78rem', fontWeight:700, color:'var(--t1)' } }, opt.label)
+                );
+              })
+            ),
+            _h('div', { className:'field' },
+              _h('label', null, 'Notatka do nowego (opcjonalnie)'),
+              _h('input', { type:'text', placeholder:'np. lekki, po kontuzji, długi...', value:assignNote, onChange:function(e){ setAssignNote(e.target.value); } })
+            )
+          )
+        )
+      )
     );
   }
 

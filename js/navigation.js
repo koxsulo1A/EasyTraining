@@ -55,7 +55,12 @@
       setParams(prms || {});
       window.scrollTo && window.scrollTo(0, 0);
     }, []);
-    return React.createElement(NavCtx.Provider, { value: { current: current, params: params, navigate: navigate } }, props.children);
+    // Ekran aktywnej sesji treningu (iOS) zastępuje pasek nawigacji własnym
+    // dolnym sterownikiem — patrz StrengthSessionMobile (strength.js) i
+    // MobileNav (app.js). null = normalny pasek nawigacji.
+    var sc = React.useState(null);
+    var sessionController = sc[0], setSessionController = sc[1];
+    return React.createElement(NavCtx.Provider, { value: { current: current, params: params, navigate: navigate, sessionController: sessionController, setSessionController: setSessionController } }, props.children);
   }
 
   function useNav() { return React.useContext(NavCtx); }

@@ -335,8 +335,8 @@
     );
   }
 
-  // ── Main Module ───────────────────────────────────────────────────────────
-  function SupplementsModule() {
+  // ── Main Module (klasyczny — bez zmian, ścieżka WEB) ─────────────────────
+  function SupplementsModuleClassic() {
     var su = ET.useStore(); var store = su.store, update = su.update;
     var toast = ET.useToast();
 
@@ -536,6 +536,265 @@
       ),
 
       // ── ADD SHEET ─────────────────────────────────────────────────────────
+      _h(ET.Sheet, { open:showAdd, onClose:function(){ setShowAdd(false); }, title:'Nowy suplement' },
+        _h('div', { className:'field' }, _h('label', null, 'Nazwa *'), _h('input', { type:'text', placeholder:'np. Kreatyna, Omega-3, Wit. D3', value:f.name, onChange:function(e){ upF('name',e.target.value); } })),
+        _h('div', { className:'grid-2' },
+          _h('div', { className:'field' }, _h('label', null, 'Dawka'), _h('input', { type:'text', placeholder:'np. 5', value:f.dose, onChange:function(e){ upF('dose',e.target.value); } })),
+          _h('div', { className:'field' }, _h('label', null, 'Jednostka'),
+            _h('select', { value:f.unit, onChange:function(e){ upF('unit',e.target.value); } },
+              UNITS.map(function(u){ return _h('option', { key:u, value:u }, u); })
+            )
+          )
+        ),
+        _h('div', { className:'field' },
+          _h('label', null, 'Pora przyjmowania'),
+          _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+            TIMINGS.map(function(t) {
+              return _h('button', { key:t.id, className:'tag-btn'+(f.timing===t.id?' active':''), onClick:function(){ upF('timing',t.id); } }, t.icon+' '+t.label);
+            })
+          )
+        ),
+        _h('div', { className:'field' }, _h('label', null, 'Notatki'), _h('textarea', { value:f.notes, onChange:function(e){ upF('notes',e.target.value); }, placeholder:'Producent, forma, wskazówki...', style:{ minHeight:60 } })),
+        _h('button', { className:'btn btn-primary', style:{ width:'100%' }, onClick:addSupplement }, 'Dodaj suplement')
+      )
+    );
+  }
+
+  // Web zostaje przy widoku klasycznym; iOS dostaje redesign „Aurora Glass".
+  function SupplementsModule() {
+    return ET.IS_WEB ? _h(SupplementsModuleClassic, null) : _h(SupplementsModuleMobile, null);
+  }
+
+  // ── SUPLEMENTY (iOS) — redesign „Aurora Glass" ────────────────────────────
+  // Handoff sekcja 5: seria dni bez pominięcia, karta protokołu z pierścieniem,
+  // grupy pory dnia z kropką+glow, checkbox 26px. Zakładka „Baza wiedzy" i
+  // arkusze dodawania/edycji NIE są w makiecie (znacznie bogatsza funkcja niż
+  // design) — reużyte wprost z wersji klasycznej (BasaTab/PlanDetail/edit/add),
+  // zero duplikacji, bo to czysta, nie-platformowa treść.
+  // Odstępstwa: design ma 3 stałe grupy ze zmyślonymi godzinami (07:00 itd.)
+  // — apka realnie ma 5 kategorycznych pór (bez zegarowych godzin), więc
+  // zostają wszystkie 5 z realnymi etykietami, ale w kolorystyce/układzie
+  // designu (kropka+glow zamiast emoji). „Wskazówka trenera" w karcie
+  // protokołu zastąpiona realną liczbą pozostałych do wzięcia (brak backendu
+  // trenera).
+  var TIMING_DOT = { morning:'var(--yellow)', preworkout:'var(--a-light)', postworkout:'var(--a-light)', evening:'var(--purple)', night:'var(--purple)' };
+
+  function SupplementsModuleMobile() {
+    var su = ET.useStore(); var store = su.store, update = su.update;
+    var toast = ET.useToast();
+
+    var tvs = React.useState('plan'); var tab = tvs[0], setTab = tvs[1];
+    var sa = React.useState(false); var showAdd = sa[0], setShowAdd = sa[1];
+    var fs = React.useState({ name:'', dose:'', unit:'g', timing:'morning', notes:'' });
+    var f = fs[0], setF = fs[1];
+    function upF(key, val) { setF(function(prev){ var o={}; o[key]=val; return Object.assign({},prev,o); }); }
+
+    var es = React.useState(null); var editEntry = es[0], setEditEntry = es[1];
+    var efs = React.useState(null); var editF = efs[0], setEditF = efs[1];
+    function upEF(key, val) { setEditF(function(prev){ var o={}; o[key]=val; return Object.assign({},prev,o); }); }
+
+    var pds = React.useState(null); var planDetail = pds[0], setPlanDetail = pds[1];
+
+    var today = ET.dstr();
+    var suppls = store.supplements || [];
+    var checks = store.supplementChecks || {};
+    var todayChecks = checks[today] || {};
+
+    function toggleCheck(id) {
+      update(function(s) {
+        var c = Object.assign({}, s.supplementChecks||{});
+        var td = Object.assign({}, c[today]||{});
+        td[id] = !td[id];
+        c[today] = td;
+        return Object.assign({}, s, { supplementChecks:c });
+      });
+    }
+    function addSupplement() {
+      if (!f.name) { toast('Podaj nazwę suplementu', 'error'); return; }
+      update(function(s){ return Object.assign({},s,{ supplements:(s.supplements||[]).concat([Object.assign({id:Date.now()},f)]) }); });
+      toast('Suplement dodany ✓', 'success');
+      setShowAdd(false);
+      setF({ name:'', dose:'', unit:'g', timing:'morning', notes:'' });
+    }
+    function addFromDB(s) {
+      var newEntry = { id:Date.now(), name:s.name, dose:s.defaultDose, unit:s.defaultUnit, timing:s.defaultTiming, notes:s.nameEn };
+      update(function(st){ return Object.assign({},st,{ supplements:(st.supplements||[]).concat([newEntry]) }); });
+      toast(s.name+' dodano do planu ✓', 'success');
+      setTab('plan');
+    }
+    function addManyFromDB(list) {
+      var base = Date.now();
+      var newEntries = list.map(function(s, i) {
+        return { id:base+i, name:s.name, dose:s.defaultDose, unit:s.defaultUnit, timing:s.defaultTiming, notes:s.nameEn };
+      });
+      update(function(st){ return Object.assign({},st,{ supplements:(st.supplements||[]).concat(newEntries) }); });
+      toast(newEntries.length+' suplementów dodano do planu ✓', 'success');
+      setTab('plan');
+    }
+    function removeSupplement(id) {
+      update(function(s){ return Object.assign({},s,{ supplements:(s.supplements||[]).filter(function(x){ return x.id!==id; }) }); });
+      toast('Usunięto', 'default');
+    }
+    function openEdit(s) {
+      setEditEntry(s);
+      setEditF({ name:s.name, dose:s.dose||'', unit:s.unit||'g', timing:s.timing||'morning', notes:s.notes||'' });
+    }
+    function saveEdit() {
+      update(function(st){
+        return Object.assign({}, st, {
+          supplements: (st.supplements||[]).map(function(x){
+            return x.id === editEntry.id ? Object.assign({}, x, editF) : x;
+          })
+        });
+      });
+      toast('Zapisano zmiany ✓', 'success');
+      setEditEntry(null);
+      setEditF(null);
+    }
+
+    var doneCount = suppls.filter(function(s){ return todayChecks[s.id]; }).length;
+    var remaining = suppls.length - doneCount;
+    var timingGroups = {};
+    TIMINGS.forEach(function(t){ timingGroups[t.id] = suppls.filter(function(s){ return s.timing===t.id; }); });
+
+    var streak = React.useMemo(function() {
+      if (!suppls.length) return 0;
+      function complete(k) { var day = checks[k] || {}; return suppls.every(function(s){ return !!day[s.id]; }); }
+      var d = new Date();
+      if (!complete(ET.dstr(d))) d.setDate(d.getDate() - 1);
+      var n = 0;
+      while (complete(ET.dstr(d)) && n < 999) { n++; d.setDate(d.getDate() - 1); }
+      return n;
+    }, [suppls, checks]);
+
+    var ringPct = suppls.length ? doneCount / suppls.length : 0;
+    var RING_C = 2 * Math.PI * 33; // r=33 → pierścień ~78px
+
+    return _h('div', { className:'scr-in' },
+
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 } },
+        _h('div', null,
+          _h('div', { style:{ fontSize:27, fontWeight:800, letterSpacing:'-.03em' } }, 'Suplementy'),
+          suppls.length > 0 && _h('div', { style:{ fontSize:12, color:'var(--t3)', marginTop:2 } },
+            streak > 0 ? 'Seria ' + streak + ' ' + (streak===1?'dzień':'dni') + ' bez pominięcia' : 'Zacznij dzisiejszą serię')
+        ),
+        tab==='plan' && _h('button', { onClick:function(){ setShowAdd(true); },
+          style:{ width:36, height:36, borderRadius:'50%', border:'none', background:'var(--purple)', color:'#fff', fontSize:18, fontWeight:700, cursor:'pointer' } }, '+')
+      ),
+
+      _h('div', { style:{ display:'flex', gap:6, marginBottom:16 } },
+        _h('button', { className:'tag-btn'+(tab==='plan'?' active':''), onClick:function(){ setTab('plan'); } }, '📋 Plan dzienny'),
+        _h('button', { className:'tag-btn'+(tab==='baza'?' active':''), onClick:function(){ setTab('baza'); } }, '📚 Baza wiedzy')
+      ),
+
+      // ── KARTA PROTOKOŁU ─────────────────────────────────────────────────
+      tab==='plan' && suppls.length > 0 && _h('div', { className:'glass', style:{ display:'flex', alignItems:'center', gap:16, padding:18, borderRadius:20, marginBottom:18 } },
+        _h('div', { style:{ position:'relative', width:78, height:78, flexShrink:0 } },
+          _h('svg', { width:78, height:78, viewBox:'0 0 78 78', style:{ transform:'rotate(-90deg)' } },
+            _h('circle', { cx:39, cy:39, r:33, fill:'none', stroke:'rgba(255,255,255,.08)', strokeWidth:7 }),
+            _h('circle', { cx:39, cy:39, r:33, fill:'none', stroke:'var(--purple)', strokeWidth:7, strokeLinecap:'round',
+              strokeDasharray:RING_C, strokeDashoffset:RING_C * (1 - ringPct), style:{ transition:'stroke-dashoffset .5s cubic-bezier(.2,.8,.2,1)' } })
+          ),
+          _h('div', { style:{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' } },
+            _h('span', { style:{ fontSize:15, fontWeight:800, fontVariantNumeric:'tabular-nums' } }, doneCount+'/'+suppls.length)
+          )
+        ),
+        _h('div', { style:{ flex:1, minWidth:0 } },
+          _h('div', { style:{ fontSize:14, fontWeight:700, marginBottom:3 } }, 'Protokół dnia'),
+          _h('div', { style:{ fontSize:12, color:'var(--t2)', lineHeight:1.4 } },
+            remaining === 0 ? 'Wszystko przyjęte na dziś. 🎉' : 'Zostało ' + remaining + ' ' + (remaining===1?'suplement':'do wzięcia') + ' do końca dnia.')
+        )
+      ),
+
+      // ── GRUPY PÓR DNIA ────────────────────────────────────────────────
+      tab==='plan' && suppls.length > 0 && TIMINGS.map(function(t) {
+        var grp = timingGroups[t.id];
+        if (!grp.length) return null;
+        var dotColor = TIMING_DOT[t.id] || 'var(--a-light)';
+        return _h('div', { key:t.id, style:{ marginBottom:18 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:7, marginBottom:9 } },
+            _h('div', { style:{ width:7, height:7, borderRadius:'50%', background:dotColor, boxShadow:'0 0 8px '+dotColor } }),
+            _h('span', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase' } }, t.label)
+          ),
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:7 } },
+            grp.map(function(s) {
+              var checked = !!todayChecks[s.id];
+              var confl = conflictsWithin(s, grp);
+              var tags = intakeTags(s.name);
+              return _h('div', { key:s.id, style:{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:16,
+                background: checked ? 'rgba(139,92,246,.10)' : 'var(--s2)',
+                border:'1px solid ' + (checked ? 'rgba(139,92,246,.28)' : 'var(--b1)') } },
+                _h('div', { onClick:function(e){ e.stopPropagation(); toggleCheck(s.id); },
+                  style:{ width:26, height:26, borderRadius:9, flexShrink:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+                    background: checked ? 'var(--purple)' : 'transparent', border:'1.5px solid ' + (checked ? 'var(--purple)' : 'var(--b2)') } },
+                  checked && _h('svg', { width:14, height:14, viewBox:'0 0 24 24', fill:'none', stroke:'#fff', strokeWidth:3, strokeLinecap:'round', strokeLinejoin:'round' },
+                    _h('path', { d:'M4 12.5l5.2 5.2L20 6.8' }))
+                ),
+                _h('div', { style:{ flex:1, minWidth:0, cursor:'pointer' }, onClick:function(){ setPlanDetail(s); } },
+                  _h('div', { style:{ fontSize:14, fontWeight:600, color: checked ? 'var(--t2)' : 'var(--t1)' } }, s.name),
+                  s.dose && _h('div', { style:{ fontSize:11, color:'var(--t3)', marginTop:2 } }, s.dose+' '+s.unit),
+                  tags.length > 0 && _h('div', { style:{ display:'flex', gap:3, flexWrap:'wrap', marginTop:4 } },
+                    tags.map(function(tg){ return _h('span', { key:tg.t, style:{ fontSize:9.5, padding:'1px 6px', borderRadius:99, background:'var(--s3)', border:'1px solid var(--b1)', color:tg.c, fontWeight:600 } }, tg.t); })
+                  ),
+                  confl.length > 0 && _h('div', { style:{ fontSize:10, color:'var(--red)', marginTop:4, fontWeight:600 } },
+                    'Nie łącz z: '+confl.join(', ')+' — rozdziel min. 2 h')
+                ),
+                _h('span', { style:{ color:'var(--t3)', fontSize:12, flexShrink:0 } }, '›')
+              );
+            })
+          )
+        );
+      }),
+
+      tab==='plan' && suppls.length===0 && _h(ET.Placeholder, { icon:'💊', title:'Brak suplementów', desc:'Dodaj suplementy ręcznie lub przejdź do Bazy wiedzy, aby wybrać z gotowej listy.' }),
+
+      // ── MOJE SUPLEMENTY (zarządzanie — poza makietą, real CRUD) ──────────
+      tab==='plan' && suppls.length > 0 && _h('div', { style:{ marginTop:6 } },
+        _h('div', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:9 } }, 'Moje suplementy'),
+        suppls.map(function(s) {
+          var tInfo = TIMINGS.find(function(t){ return t.id===s.timing; }) || TIMINGS[0];
+          return _h('div', { key:s.id, style:{ display:'flex', alignItems:'center', gap:10, padding:'9px 2px' } },
+            _h('div', { style:{ flex:1, minWidth:0 } },
+              _h('div', { style:{ fontSize:12.5, fontWeight:600 } }, s.name),
+              _h('div', { style:{ fontSize:10.5, color:'var(--t3)', marginTop:1 } }, (s.dose?s.dose+' '+s.unit+' · ':'')+tInfo.label)
+            ),
+            _h('button', { className:'btn btn-ghost btn-sm btn-icon', onClick:function(){ openEdit(s); } }, '✏️'),
+            _h('button', { className:'btn btn-ghost btn-sm btn-icon', style:{ color:'var(--red)' }, onClick:function(){ removeSupplement(s.id); } }, '✕')
+          );
+        })
+      ),
+
+      // ── BAZA WIEDZY (bez zmian) ───────────────────────────────────────
+      tab==='baza' && _h(BasaTab, { onAdd:addFromDB, onAddMany:addManyFromDB }),
+
+      _h(ET.Sheet, { open:!!planDetail, onClose:function(){ setPlanDetail(null); }, title:planDetail?planDetail.name:'' },
+        planDetail && _h(PlanDetail, { entry:planDetail })
+      ),
+
+      _h(ET.Sheet, { open:!!editEntry, onClose:function(){ setEditEntry(null); setEditF(null); }, title:'Edytuj suplement' },
+        editF && _h('div', null,
+          _h('div', { className:'field' }, _h('label', null, 'Nazwa'), _h('input', { type:'text', value:editF.name, onChange:function(e){ upEF('name',e.target.value); } })),
+          _h('div', { className:'grid-2' },
+            _h('div', { className:'field' }, _h('label', null, 'Dawka'), _h('input', { type:'text', value:editF.dose, onChange:function(e){ upEF('dose',e.target.value); } })),
+            _h('div', { className:'field' }, _h('label', null, 'Jednostka'),
+              _h('select', { value:editF.unit, onChange:function(e){ upEF('unit',e.target.value); } },
+                UNITS.map(function(u){ return _h('option', { key:u, value:u }, u); })
+              )
+            )
+          ),
+          _h('div', { className:'field' },
+            _h('label', null, 'Pora przyjmowania'),
+            _h('div', { style:{ display:'flex', gap:6, flexWrap:'wrap' } },
+              TIMINGS.map(function(t) {
+                return _h('button', { key:t.id, className:'tag-btn'+(editF.timing===t.id?' active':''), onClick:function(){ upEF('timing',t.id); } }, t.icon+' '+t.label);
+              })
+            )
+          ),
+          _h('div', { className:'field' }, _h('label', null, 'Notatki'), _h('textarea', { value:editF.notes, onChange:function(e){ upEF('notes',e.target.value); }, placeholder:'Producent, forma, wskazówki...', style:{ minHeight:60 } })),
+          _h('button', { className:'btn btn-primary', style:{ width:'100%' }, onClick:saveEdit }, 'Zapisz zmiany')
+        )
+      ),
+
       _h(ET.Sheet, { open:showAdd, onClose:function(){ setShowAdd(false); }, title:'Nowy suplement' },
         _h('div', { className:'field' }, _h('label', null, 'Nazwa *'), _h('input', { type:'text', placeholder:'np. Kreatyna, Omega-3, Wit. D3', value:f.name, onChange:function(e){ upF('name',e.target.value); } })),
         _h('div', { className:'grid-2' },

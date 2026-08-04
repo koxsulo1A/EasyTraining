@@ -337,8 +337,9 @@
     );
   }
 
-  // ── MEASUREMENTS MODULE ──────────────────────────────────────────────────
-  function MeasurementsModule() {
+  // Klasyczny widok — bez zmian, ścieżka WEB. Patrz dispatcher
+  // `MeasurementsModule` i `MeasurementsModuleMobile` poniżej.
+  function MeasurementsModuleClassic() {
     var su = ET.useStore(); var store = su.store;
     var nav = ET.useNav(); var params = nav.params || {};
     var sa = React.useState(!!params.openAdd); var showAdd = sa[0], setShowAdd = sa[1];
@@ -577,6 +578,247 @@
                 padding:'4px 10px', borderRadius:'var(--r2)', cursor:'pointer', fontSize:'.78rem' },
               onClick:function(){ setLightbox(null); }
             }, '✕')
+          )
+        )
+      )
+    );
+  }
+
+  // Web zostaje przy widoku klasycznym; iOS dostaje redesign „Aurora Glass".
+  function MeasurementsModule() {
+    return ET.IS_WEB ? _h(MeasurementsModuleClassic, null) : _h(MeasurementsModuleMobile, null);
+  }
+
+  // ── POMIARY (iOS) — redesign „Aurora Glass" ───────────────────────────────
+  // Handoff sekcja 8: karta teal z masą ciała + sparkline, „OBWODY" jako
+  // lista wierszy z paskiem, „ZDJĘCIA SYLWETKI" 3 sloty + „Porównaj".
+  // Wejście danych (klikalny ludzik, suwaki, upload zdjęć) NIE jest objęte
+  // makietą — `MeasurementsAddSheet` reużyty wprost, bez zmian.
+  // Odstępstwa (real data, bez fabrykacji):
+  //  - design ma plakietkę „cel 84,0 kg" — apka NIE ma pojęcia celu masy
+  //    ciała nigdzie (sprawdzone: js/goals.js nie ma kategorii wagowej,
+  //    profil też nie) — pominięte, zamiast zmyślać cel, którego user nigdy
+  //    nie ustawił.
+  //  - „OBWODY" pokazuje WSZYSTKIE zapisane obwody (apka śledzi 8, design
+  //    ma sztywno 5) — nie obcinam realnych danych do liczby z makiety.
+  //  - zdjęcia: apka ma 4 realne sloty (Przód/Bok Lewy/Plecy/Bok Prawy),
+  //    design ma 3 (Przód/Bok/Tył) — zostają wszystkie 4, bo to więcej
+  //    precyzyjnych, realnych danych, nie mniej.
+  //  - BMI/WHR/skład ciała/porównanie-do-pierwszego-pomiaru to prawdziwe,
+  //    już istniejące analizy spoza makiety — zostają pod spodem (jak
+  //    AIWorkoutAnalysis w podsumowaniu treningu), zamiast je wyrzucać.
+  function MeasurementsModuleMobile() {
+    var su = ET.useStore(); var store = su.store;
+    var sa = React.useState(false); var showAdd = sa[0], setShowAdd = sa[1];
+    var lb = React.useState(null); var lightbox = lb[0], setLightbox = lb[1];
+    var ed = React.useState(null); var editTarget = ed[0], setEditTarget = ed[1];
+    var cmp = React.useState(false); var showCompare = cmp[0], setShowCompare = cmp[1];
+    var co = React.useState(false); var showCoach = co[0], setShowCoach = co[1];
+
+    function openEdit(m) { setEditTarget(m); setShowAdd(true); }
+
+    var meas = store.measurements || [];
+    var last = meas[0] || null, prev = meas[1] || null;
+    var firstMeas = meas.length ? meas[meas.length-1] : null;
+    var height = (store.profile && store.profile.height) || null;
+    var comp = last ? ET.bodyComp(last, store.profile) : {};
+
+    if (showCoach) {
+      var insights = (ET.AIEngine && ET.AIEngine.coachMeasurements) ? ET.AIEngine.coachMeasurements(store) : [];
+      return _h('div', { className:'scr-in' },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:16 } },
+          _h('button', { onClick:function(){ setShowCoach(false); },
+            style:{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' } },
+            _h('svg', { width:15, height:15, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.4, strokeLinecap:'round', strokeLinejoin:'round' }, _h('path', { d:'M15 6l-6 6 6 6' }))),
+          _h('div', null,
+            _h('div', { style:{ fontSize:15, fontWeight:800 } }, 'AI Coach — Pomiary'),
+            _h('div', { style:{ fontSize:11.5, color:'var(--t3)' } }, 'Analiza trendów i składu ciała'))
+        ),
+        ET.InsightList ? ET.InsightList(insights) : null
+      );
+    }
+
+    // Referencja do delty masy — najstarszy pomiar sprzed ≥42 dni, w braku
+    // takiego: najstarszy dostępny (etykieta okresu liczona z realnych dat).
+    var weightRef = null, weightRefWeeks = null;
+    if (last && meas.length > 1) {
+      var threshold = new Date(); threshold.setDate(threshold.getDate()-42);
+      var thresholdKey = ET.dstr(threshold);
+      weightRef = meas.slice(1).find(function(m){ return m.date <= thresholdKey; }) || meas[meas.length-1];
+      if (weightRef && weightRef.weight != null && last.weight != null) {
+        weightRefWeeks = Math.max(1, Math.round((new Date(last.date) - new Date(weightRef.date)) / (7*86400000)));
+      } else weightRef = null;
+    }
+    var weightDelta = (weightRef && last.weight!=null && weightRef.weight!=null) ? +(last.weight - weightRef.weight).toFixed(1) : null;
+
+    var weightSeries = meas.slice().reverse().filter(function(m){ return m.weight!=null; }).map(function(m){ return { date:m.date, val:m.weight }; });
+
+    function FilledSparkline(pts, color) {
+      if (pts.length < 2) return _h('div', { style:{ fontSize:11, color:'var(--t3)', padding:'16px 0', textAlign:'center' } }, 'Za mało danych do wykresu');
+      var vals = pts.map(function(p){ return p.val; });
+      var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+      var W=280, H=56, pad=4, rng=(max-min)||1;
+      function x(i){ return pad + i/(pts.length-1)*(W-2*pad); }
+      function y(v){ return H-pad - ((v-min)/rng)*(H-2*pad); }
+      var line = pts.map(function(p,i){ return x(i)+','+y(p.val); }).join(' ');
+      var area = x(0)+','+H+' '+line+' '+x(pts.length-1)+','+H;
+      return _h('svg', { viewBox:'0 0 '+W+' '+H, style:{ width:'100%', height:56, display:'block' } },
+        _h('defs', null, _h('linearGradient', { id:'measSpark', x1:'0', y1:'0', x2:'0', y2:'1' },
+          _h('stop', { offset:'0', stopColor:color, stopOpacity:'.35' }),
+          _h('stop', { offset:'1', stopColor:color, stopOpacity:'0' }))),
+        _h('polygon', { points:area, fill:'url(#measSpark)' }),
+        _h('polyline', { points:line, fill:'none', stroke:color, strokeWidth:2, strokeLinecap:'round', strokeLinejoin:'round' })
+      );
+    }
+
+    var CIRCUM_FIELDS = MEAS_FIELDS.filter(function(m){ return m.k!=='weight'; });
+
+    return _h('div', { className:'scr-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 } },
+        _h('div', { style:{ fontSize:27, fontWeight:800, letterSpacing:'-.03em' } }, 'Pomiary'),
+        _h('div', { style:{ display:'flex', gap:8 } },
+          _h('button', { onClick:function(){ setShowCoach(true); },
+            style:{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 } }, '🤖'),
+          _h('button', { onClick:function(){ setEditTarget(null); setShowAdd(true); },
+            style:{ width:36, height:36, borderRadius:'50%', border:'none', background:'var(--teal)', color:'var(--bg)', fontSize:18, fontWeight:700, cursor:'pointer' } }, '+')
+        )
+      ),
+
+      !last && _h(ET.Placeholder, { icon:'📏', title:'Brak pomiarów', desc:'Kliknij część ciała na ludziku i ustaw wartość suwakiem.' }),
+
+      // ── KARTA MASY CIAŁA ────────────────────────────────────────────────
+      last && last.weight != null && _h('div', { className:'glass', style:{ padding:20, borderRadius:22, marginBottom:16,
+        background:'linear-gradient(158deg,rgba(20,184,166,.14),rgba(255,255,255,.02))', border:'1px solid rgba(20,184,166,.28)' } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6, flexWrap:'wrap', gap:8 } },
+          _h('div', null,
+            _h('div', { style:{ fontSize:9.5, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:5 } }, 'Masa ciała'),
+            _h('div', { style:{ fontSize:32, fontWeight:800, letterSpacing:'-.03em', color:'var(--teal)' } }, last.weight+' kg')
+          ),
+          weightDelta != null && _h('div', { style:{ display:'flex', alignItems:'center', gap:5, padding:'6px 11px', borderRadius:100, flexShrink:0,
+            background: weightDelta===0 ? 'var(--s3)' : weightDelta>0 ? 'rgba(239,68,68,.12)' : 'rgba(16,185,129,.12)',
+            color: weightDelta===0 ? 'var(--t3)' : weightDelta>0 ? 'var(--red)' : 'var(--green)' } },
+            _h('span', { style:{ fontSize:12, fontWeight:800 } }, (weightDelta>0?'+':'')+weightDelta+' kg'),
+            _h('span', { style:{ fontSize:10.5, opacity:.85 } }, '/ '+weightRefWeeks+' tyg.')
+          )
+        ),
+        FilledSparkline(weightSeries, '#14B8A6')
+      ),
+
+      // ── OBWODY ────────────────────────────────────────────────────────
+      last && _h('div', { style:{ marginBottom:20 } },
+        _h('div', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:10 } }, 'Obwody'),
+        _h('div', { style:{ display:'flex', flexDirection:'column', gap:10 } },
+          CIRCUM_FIELDS.filter(function(m){ return last[m.k]!=null; }).map(function(m) {
+            var pct = Math.max(4, Math.min(100, (last[m.k]-m.min)/(m.max-m.min)*100));
+            var d = (prev && prev[m.k]!=null) ? +(last[m.k]-prev[m.k]).toFixed(1) : null;
+            return _h('div', { key:m.k, style:{ display:'flex', alignItems:'center', gap:12 } },
+              _h('span', { style:{ width:78, flexShrink:0, fontSize:12.5, fontWeight:600, color:'var(--t2)' } }, m.l),
+              _h('div', { style:{ width:88, height:5, borderRadius:3, background:'rgba(255,255,255,.08)', flexShrink:0, overflow:'hidden' } },
+                _h('div', { style:{ width:pct+'%', height:'100%', borderRadius:3, background:m.c } })),
+              _h('span', { style:{ fontSize:12.5, fontWeight:700, fontVariantNumeric:'tabular-nums' } }, last[m.k]+m.u),
+              _h('span', { style:{ marginLeft:'auto', fontSize:11, fontWeight:700, color: d==null||d===0 ? 'var(--t3)' : (d>0?'var(--red)':'var(--green)') } },
+                d==null ? '' : (d===0 ? '—' : (d>0?'+':'')+d))
+            );
+          })
+        )
+      ),
+
+      // ── ZDJĘCIA SYLWETKI ──────────────────────────────────────────────
+      last && _h('div', { style:{ marginBottom:20 } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 } },
+          _h('span', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase' } }, 'Zdjęcia sylwetki'),
+          prev && _h('span', { onClick:function(){ setShowCompare(true); }, style:{ fontSize:11.5, fontWeight:700, color:'var(--teal)', cursor:'pointer' } }, 'Porównaj')
+        ),
+        _h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 } },
+          PHOTO_SLOTS.map(function(sl) {
+            var src = last.photos && last.photos[sl.k];
+            return _h('div', { key:sl.k, style:{ cursor: src?'pointer':'default' },
+              onClick:function(){ if (src) setLightbox({ src:src, label:sl.l, date:last.date }); } },
+              src
+                ? _h('img', { src:src, style:{ width:'100%', aspectRatio:'3/4', objectFit:'cover', borderRadius:14, border:'1px solid var(--b1)', display:'block' } })
+                : _h('div', { style:{ width:'100%', aspectRatio:'3/4', borderRadius:14, border:'1.5px dashed var(--b2)', background:'var(--s2)',
+                    display:'flex', alignItems:'center', justifyContent:'center' } },
+                    _h('svg', { width:18, height:18, viewBox:'0 0 24 24', fill:'none', stroke:'var(--t3)', strokeWidth:1.6, strokeLinecap:'round', strokeLinejoin:'round' },
+                      _h('path', { d:'M4 8a1 1 0 0 1 1-1h2l1.5-2h7L17 7h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z' }), _h('circle', { cx:12, cy:13, r:3.3 }))),
+              _h('div', { style:{ fontSize:9.5, fontWeight:600, color:src?'var(--t2)':'var(--t3)', textAlign:'center', marginTop:4 } }, sl.l)
+            );
+          })
+        )
+      ),
+
+      // ── BMI / WHR / SKŁAD CIAŁA (poza makietą, prawdziwa analiza) ────────
+      last && height && _h('div', { style:{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 } },
+        _h('div', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:2 } }, 'Wskaźniki'),
+        _h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 } },
+          [
+            { l:'BMI', v: comp.bmi!=null ? comp.bmi.toFixed(1) : '—', cat:comp.bmiCat },
+            { l:'WHR', v: comp.whr!=null ? comp.whr.toFixed(2) : '—', cat:comp.whrCat },
+            { l:'Tłuszcz', v: comp.bodyFat!=null ? comp.bodyFat.toFixed(1)+'%' : '—', cat:comp.bodyFatCat },
+          ].map(function(t, i) {
+            return _h('div', { key:i, style:{ padding:'12px 8px', borderRadius:14, background:'var(--s2)', border:'1px solid var(--b1)', textAlign:'center' } },
+              _h('div', { style:{ fontSize:16, fontWeight:800 } }, t.v),
+              _h('div', { style:{ fontSize:9, color:'var(--t3)', marginTop:3 } }, t.l),
+              t.cat && _h('div', { style:{ fontSize:9, fontWeight:700, color:t.cat.color, marginTop:2 } }, t.cat.label)
+            );
+          })
+        )
+      ),
+
+      // ── HISTORIA ──────────────────────────────────────────────────────
+      meas.length > 0 && _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+        _h('div', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:2 } }, 'Historia'),
+        meas.map(function(m) {
+          return _h('div', { key:m.id, onClick:function(){ openEdit(m); },
+            style:{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:16, background:'var(--s2)', border:'1px solid var(--b1)', cursor:'pointer' } },
+            _h('div', { style:{ flex:1, minWidth:0 } },
+              _h('div', { style:{ fontSize:13, fontWeight:700 } }, ET.fmtDate(m.date)),
+              _h('div', { style:{ fontSize:11, color:'var(--t3)', marginTop:2 } },
+                MEAS_FIELDS.filter(function(fld){ return m[fld.k]!=null; }).map(function(fm){ return fm.l+' '+m[fm.k]+fm.u; }).join(' · '))
+            ),
+            m.photos && Object.keys(m.photos).length>0 && _h('span', { style:{ fontSize:11, color:'var(--teal)', fontWeight:700, flexShrink:0 } }, Object.keys(m.photos).length+' 📸')
+          );
+        })
+      ),
+
+      _h(MeasurementsAddSheet, { open:showAdd, edit:editTarget, onClose:function(){ setShowAdd(false); setEditTarget(null); } }),
+
+      // ── PORÓWNAJ (najnowszy vs poprzedni pomiar, te same sloty) ─────────
+      showCompare && prev && _h('div', { style:{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)', zIndex:9999, display:'flex', flexDirection:'column',
+        padding:'max(16px,env(safe-area-inset-top,0px)) 16px 16px' }, onClick:function(){ setShowCompare(false); } },
+        _h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 } },
+          _h('span', { style:{ color:'#fff', fontWeight:700, fontSize:14 } }, 'Porównanie'),
+          _h('button', { onClick:function(){ setShowCompare(false); }, style:{ background:'none', border:'1px solid rgba(255,255,255,.3)', color:'#fff', width:30, height:30, borderRadius:'50%', cursor:'pointer' } }, '✕')
+        ),
+        _h('div', { style:{ display:'flex', gap:12, overflowX:'auto' }, onClick:function(e){ e.stopPropagation(); } },
+          PHOTO_SLOTS.filter(function(sl){ return (prev.photos&&prev.photos[sl.k]) || (last.photos&&last.photos[sl.k]); }).map(function(sl) {
+            return _h('div', { key:sl.k, style:{ flexShrink:0, width:130 } },
+              _h('div', { style:{ fontSize:11, color:'#fff', fontWeight:700, marginBottom:6, textAlign:'center' } }, sl.l),
+              _h('div', { style:{ display:'flex', flexDirection:'column', gap:6 } },
+                [{ m:prev, tag:ET.fmtDate(prev.date) }, { m:last, tag:ET.fmtDate(last.date) }].map(function(x, i) {
+                  var src = x.m.photos && x.m.photos[sl.k];
+                  return _h('div', { key:i, style:{ textAlign:'center' } },
+                    src ? _h('img', { src:src, style:{ width:'100%', aspectRatio:'3/4', objectFit:'cover', borderRadius:10, display:'block' } })
+                        : _h('div', { style:{ width:'100%', aspectRatio:'3/4', borderRadius:10, background:'rgba(255,255,255,.08)' } }),
+                    _h('div', { style:{ fontSize:9.5, color:'#aaa', marginTop:3 } }, x.tag)
+                  );
+                })
+              )
+            );
+          })
+        )
+      ),
+
+      lightbox && _h('div', {
+        style:{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)', zIndex:9999,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
+        onClick:function(){ setLightbox(null); }
+      },
+        _h('div', { style:{ position:'relative', maxWidth:420, width:'100%' }, onClick:function(e){ e.stopPropagation(); } },
+          _h('img', { src:lightbox.src, style:{ width:'100%', borderRadius:'var(--r2)', display:'block' } }),
+          _h('div', { style:{ padding:'8px 12px', background:'rgba(0,0,0,.7)', borderRadius:'0 0 var(--r2) var(--r2)', display:'flex', justifyContent:'space-between', alignItems:'center' } },
+            _h('div', { style:{ color:'white', fontSize:'.82rem', fontWeight:600 } }, lightbox.label, _h('span', { style:{ color:'#aaa', marginLeft:8, fontWeight:400 } }, ET.fmtDate(lightbox.date))),
+            _h('button', { style:{ background:'none', border:'1px solid rgba(255,255,255,.3)', color:'white', padding:'4px 10px', borderRadius:'var(--r2)', cursor:'pointer', fontSize:'.78rem' },
+              onClick:function(){ setLightbox(null); } }, '✕')
           )
         )
       )

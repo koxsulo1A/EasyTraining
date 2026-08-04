@@ -343,6 +343,22 @@ a{color:inherit;text-decoration:none}
 .gnav-center:active{transform:scale(.92)}
 .gnav-center svg{width:24px;height:24px}
 
+/* ══════════════ STEROWNIK SESJI TRENINGOWEJ (zastępuje gnav) ══════════════ */
+.session-ctrl{display:none}
+@media(max-width:768px){
+  .session-ctrl{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:200;
+    height:calc(var(--bnh) + env(safe-area-inset-bottom,0px));
+    padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+    gap:10px;align-items:center;
+    background:rgba(20,20,37,.72);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+    border-top:1px solid var(--b2);
+    box-shadow:0 -6px 30px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.07)}
+}
+.session-ctrl-side{width:52px;height:52px;border-radius:17px;flex-shrink:0;
+  border:1px solid var(--b2);background:var(--s3);color:var(--t2);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s}
+.session-ctrl-side:active{transform:scale(.92)}
+
 /* ══════════════ SZUFLADA MODUŁÓW (drawer) ══════════════ */
 .drawer-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .drawer-tile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 4px;
@@ -352,9 +368,13 @@ a{color:inherit;text-decoration:none}
 .drawer-ic svg{width:22px;height:22px}
 .drawer-label{font-size:11px;font-weight:600;color:var(--t2);text-align:center;line-height:1.15}
 
+/* — avatar z pulsującym pierścieniem (nagłówek „Dziś") — */
+.avatar-ring-pulse{position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--a-light);
+  animation:pulseRing 2.6s ease-out infinite}
+
 /* — wygaszanie animacji — */
 @media(prefers-reduced-motion:reduce){
-  .aurora,.cta-card-inner::before{animation:none}
+  .aurora,.cta-card-inner::before,.avatar-ring-pulse{animation:none}
   .scr-in{animation-duration:0ms}
 }
 
