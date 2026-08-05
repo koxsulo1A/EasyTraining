@@ -27,33 +27,57 @@
   }
 
   // ── READINESS CARD & SHEET ────────────────────────────────────────────────
+  // Karta gotowości wg handoffu: pierścień 112 px w karcie szklanej, obok
+  // nagłówek + trzy metryki. Design zakłada metryki SEN/HRV/RPE — apka nie
+  // ma integracji z wearable (brak HRV), więc zamiast fabrykować dane
+  // zostają realne pola check-inu (chęć/samopoczucie/zmęczenie), tak samo
+  // jak w web-owym odpowedniku tej karty (WebDashboard, dashboard.js).
   function ReadinessCard(props) {
     var rd = props.readiness;
     var pct = calcReadinessPct(rd);
     var rc = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--yellow)' : 'var(--red)';
     var label = pct >= 70 ? 'Dobra gotowość' : pct >= 40 ? 'Średnia gotowość' : 'Niska gotowość';
+    var desc = pct >= 70
+      ? 'Organizm odpowiada dobrze — realizuj plan w pełnym obciążeniu.'
+      : pct >= 40
+        ? 'Stan przeciętny — trzymaj się planu, bez ustawiania dziś rekordów.'
+        : 'Niska gotowość — rozważ lżejszą sesję albo dzień regeneracji.';
 
-    return _h('div', { className:'card card-accent', style:{ marginBottom:16, cursor:'pointer' }, onClick:props.onOpen },
-      _h('div', { style:{ display:'flex', alignItems:'center', gap:16, marginBottom:14 } },
-        _h(ET.ReadinessRing, { value:pct, size:90, stroke:7, color:rc }),
-        _h('div', { style:{ flex:1 } },
-          _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.1em', marginBottom:4 } }, 'Gotowość do treningu'),
-          _h('div', { style:{ fontSize:'1.3rem', fontWeight:700, color:rc, lineHeight:1.1 } }, label),
-          _h('div', { style:{ fontSize:'.72rem', color:'var(--t3)', marginTop:4 } }, 'Dotknij by zaktualizować →')
+    return _h('div', { className:'glass', style:{ display:'flex', gap:16, alignItems:'center', padding:18, borderRadius:22, marginBottom:14, cursor:'pointer' }, onClick:props.onOpen },
+      _h('div', { style:{ position:'relative', flex:'none', width:112, height:112 } },
+        _h('svg', { width:112, height:112, viewBox:'0 0 112 112', style:{ transform:'rotate(-90deg)' } },
+          _h('defs', null,
+            _h('linearGradient', { id:'mdashRing', x1:'0', y1:'0', x2:'1', y2:'1' },
+              _h('stop', { offset:'0', stopColor:'#60A5FA' }),
+              _h('stop', { offset:'.55', stopColor:'#3B82F6' }),
+              _h('stop', { offset:'1', stopColor:'#8B5CF6' })
+            )
+          ),
+          _h('circle', { cx:56, cy:56, r:47.5, fill:'none', stroke:'rgba(255,255,255,.07)', strokeWidth:9 }),
+          _h('circle', { cx:56, cy:56, r:47.5, fill:'none', stroke:'url(#mdashRing)', strokeWidth:9,
+            strokeLinecap:'round', strokeDasharray:298.5, strokeDashoffset:298.5 * (1 - pct/100),
+            style:{ transition:'stroke-dashoffset 1.3s cubic-bezier(.2,.8,.2,1)' } })
+        ),
+        _h('div', { style:{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 } },
+          _h('span', { style:{ fontSize:32, fontWeight:800, lineHeight:1, letterSpacing:'-.05em', fontVariantNumeric:'tabular-nums' } }, pct),
+          _h('span', { style:{ fontSize:8, fontWeight:800, lineHeight:1, letterSpacing:'.14em', color:'var(--t3)' } }, 'GOTOWOŚĆ')
         )
       ),
-      _h('div', { style:{ display:'flex', gap:6 } },
-        READINESS_FIELDS.map(function(f) {
-          var val = rd[f.key] || 2;
-          var chip = f.opts[val - 1];
-          var chipC = f.key === 'fatigue'
-            ? (val === 3 ? 'var(--green)' : val === 1 ? 'var(--red)' : 'var(--yellow)')
-            : (val === 3 ? 'var(--green)' : val === 1 ? 'var(--red)' : 'var(--yellow)');
-          return _h('div', { key:f.key, style:{ flex:1, background:'var(--s3)', borderRadius:'var(--r2)', padding:'6px 8px', textAlign:'center' } },
-            _h('div', { style:{ fontSize:'.55rem', color:'var(--t3)', fontWeight:700, textTransform:'uppercase', marginBottom:3 } }, f.label),
-            _h('div', { style:{ fontSize:'.72rem', fontWeight:600, color:chipC } }, chip)
-          );
-        })
+      _h('div', { style:{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:7 } },
+        _h('div', { style:{ fontSize:15, fontWeight:700, lineHeight:1.2, letterSpacing:'-.02em', color:rc } }, label),
+        _h('div', { style:{ fontSize:11.5, fontWeight:400, lineHeight:1.4, color:'var(--t2)' } }, desc),
+        _h('div', { style:{ display:'flex', gap:6, marginTop:2 } },
+          READINESS_FIELDS.map(function(f, i) {
+            var val = rd[f.key] || 2;
+            var chip = stripEmoji(f.opts[val - 1]);
+            var chipC = val === 3 ? 'var(--green)' : val === 1 ? 'var(--red)' : 'var(--yellow)';
+            return _h('div', { key:f.key, style:{ flex:1, textAlign:'center', padding:'6px 4px',
+              borderLeft: i>0 ? '1px solid rgba(255,255,255,.07)' : 'none' } },
+              _h('div', { style:{ fontSize:8, color:'var(--t3)', fontWeight:800, textTransform:'uppercase', letterSpacing:'.1em', marginBottom:3 } }, f.label),
+              _h('div', { style:{ fontSize:11.5, fontWeight:700, color:chipC } }, chip)
+            );
+          })
+        )
       )
     );
   }
@@ -543,34 +567,75 @@
     var lastM = store.measurements && store.measurements[0];
     var activeGoals = (store.goals || []).filter(function(g) { return g.progress < 100; });
 
+    // ── Karta CTA treningu: co realnie zaplanowano/zrobiono dziś ──────────
+    // Design zakłada stały harmonogram godzinowy ("DZIŚ 17:30") — apka nie ma
+    // pola z godziną sesji, więc pomijamy godzinę i pokazujemy tylko to, co
+    // faktycznie wynika z danych (Kalendarz/Plan → store.weekPlans, albo brak).
+    var today = ET.dstr();
+    var todayWorkout = (store.workouts || []).find(function(w){ return w.date === today; });
+    var todayPlanEntry = (store.weekPlans || []).find(function(e){ return e.date === today && e.type !== 'rest'; });
+    var effectivePlans = (typeof ET.getEffectivePlans === 'function') ? ET.getEffectivePlans(store) : [];
+    var todayPlan = todayPlanEntry && effectivePlans.find(function(pl){ return pl.id === todayPlanEntry.planId; });
+
+    // Segment aktywnego meta-planu (Plan tygodnia) — pokazujemy tylko, gdy user
+    // faktycznie podzielił plan na >1 segment; inaczej nie ma nic realnego
+    // do wyświetlenia (design zakłada "Tydzień 6 · blok siłowy", ale apka nie
+    // liczy numeru tygodnia — nie fabrykujemy tej liczby).
+    var segmentLabel = (function() {
+      var metaPlans = (typeof ET.getMetaPlans === 'function') ? ET.getMetaPlans(store) : [];
+      if (!metaPlans.length) return null;
+      var meta = (lastW && metaPlans.find(function(m){ return (m.units || []).some(function(u){ return u.id === lastW.planId; }); })) || metaPlans[0];
+      var segs = meta.segments || [];
+      if (segs.length < 2) return null;
+      return meta.name + ' · ' + segs[segs.length - 1].name;
+    })();
+
+    // Wykres objętości: bieżący tydzień (Pn→Nd), suma kg zapisanych treningów/dzień.
+    var weekVol = React.useMemo(function() {
+      var start = mondayOf(new Date());
+      var days = [];
+      for (var i = 0; i < 7; i++) {
+        var d = new Date(start); d.setDate(start.getDate() + i);
+        days.push({ key:dkey(d), label:WEB_DAYS[i], vol:0, isToday:dkey(d) === dkey(new Date()) });
+      }
+      var index = {}; days.forEach(function(d){ index[d.key] = d; });
+      (store.workouts || []).forEach(function(w){ var slot = index[w.date]; if (slot) slot.vol += (+w.volume || 0); });
+      var max = days.reduce(function(m, d){ return Math.max(m, d.vol); }, 0);
+      return { days:days, max:max };
+    }, [store.workouts]);
+
+    // Siatka modułów 3×2 wg handoffu. `icon` to nazwa ścieżki z ET.Icon
+    // (rodzina liniowa SVG) — emoji usunięte, były sygnałem „darmowej" apki.
+    // Tap otwiera arkusz szybkiego wpisu, bo główny kontekst to siłownia
+    // w pośpiechu; pełny moduł jest pod przyciskiem [+] w pasku nawigacji.
     var QUICK = [
       {
-        icon:'💪', label:'Trening siłowy', color:'var(--a)',
+        icon:'dumbbell', label:'Siła', color:'var(--a)',
         sub: lastW ? daysAgo(lastW.date) : 'Brak danych',
         onClick: function(){ setShowWorkoutPicker(true); }
       },
       {
-        icon:'🏃', label:'Bieganie', color:'var(--green)',
+        icon:'running', label:'Bieganie', color:'var(--green)',
         sub: lastR ? daysAgo(lastR.date) + (lastR.distance ? ' · ' + lastR.distance + ' km' : '') : 'Brak danych',
         onClick: function(){ setShowRunAdd(true); }
       },
       {
-        icon:'🔥', label:'Sauna', color:'var(--orange)',
+        icon:'flame', label:'Sauna', color:'var(--orange)',
         sub: lastSa ? daysAgo(lastSa.date) + (lastSa.duration ? ' · ' + lastSa.duration + ' min' : '') : 'Brak danych',
         onClick: function(){ setShowSaunaAdd(true); }
       },
       {
-        icon:'💊', label:'Suplementy', color:'var(--purple)',
+        icon:'pill', label:'Suple', color:'var(--purple)',
         sub: (store.supplements || []).length + ' suplementów',
         onClick: function(){ setShowSuppl(true); }
       },
       {
-        icon:'📏', label:'Pomiary', color:'var(--teal)',
+        icon:'ruler', label:'Pomiary', color:'var(--teal)',
         sub: lastM ? daysAgo(lastM.date) : 'Brak danych',
         onClick: function(){ setShowMeasAdd(true); }
       },
       {
-        icon:'😴', label:'Sen', color:'var(--yellow)',
+        icon:'moon', label:'Sen', color:'var(--yellow)',
         sub: lastS ? (lastS.duration ? lastS.duration + 'h · ' : '') + daysAgo(lastS.date) : 'Brak danych',
         onClick: function(){ setShowSleepAdd(true); }
       },
@@ -588,14 +653,70 @@
     var dw = store.dashboardWidgets || {};
     function widgetOn(id) { return dw[id] !== false; }
 
-    return _h('div', { className:'fade-in' },
+    return _h('div', { className:'scr-in' },
 
-      _h('div', { style:{ marginBottom:18 } },
-        _h('div', { className:'dash-greeting' }, ET.greeting() + (p && p.name ? ', ' + p.name : '') + ' 👋'),
-        _h('div', { className:'dash-date' }, new Date().toLocaleDateString('pl-PL', { weekday:'long', day:'numeric', month:'long' }))
+      // ── NAGŁÓWEK: data · powitanie · segment planu (jeśli realny) · avatar ──
+      _h('div', { style:{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:18 } },
+        _h('div', { style:{ minWidth:0 } },
+          _h('div', { style:{ fontSize:10.5, fontWeight:800, letterSpacing:'.14em', color:'var(--t3)', textTransform:'uppercase', marginBottom:6 } },
+            new Date().toLocaleDateString('pl-PL', { weekday:'long', day:'numeric', month:'long' })),
+          _h('div', { className:'dash-greeting' }, ET.greeting() + (p && p.name ? ', ' + p.name : '')),
+          segmentLabel && _h('div', { onClick:function(){ navigate('plan'); },
+            style:{ display:'inline-flex', alignItems:'center', gap:4, marginTop:7, cursor:'pointer', color:'var(--t2)', fontSize:12, fontWeight:600 } },
+            segmentLabel,
+            _h('svg', { width:12, height:12, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.4, strokeLinecap:'round', strokeLinejoin:'round' },
+              _h('path', { d:'M9 6l6 6-6 6' }))
+          )
+        ),
+        _h('div', { onClick:function(){ navigate('profile'); }, style:{ position:'relative', flexShrink:0, width:42, height:42, cursor:'pointer' } },
+          _h('div', { className:'avatar-ring-pulse' }),
+          _h('div', { style:{ width:42, height:42, borderRadius:'50%', background:'linear-gradient(150deg,#60A5FA,#3B82F6 55%,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color:'#fff' } },
+            (p && p.name ? p.name.trim().charAt(0).toUpperCase() : (typeof ET.Icon === 'function' ? ET.Icon('user', 19) : 'U'))
+          )
+        )
       ),
 
       widgetOn('readiness') && _h(ReadinessCard, { readiness:readiness, setReadiness:setReadiness, onOpen:function(){ setShowReadiness(true); } }),
+
+      // ── KARTA CTA TRENINGU — gradientowa ramka + shimmer (.cta-card) ──────
+      widgetOn('todayCta') && _h('div', { className:'cta-card', style:{ marginBottom:16 } },
+        _h('div', { className:'cta-card-inner' },
+          todayWorkout
+            ? // sesja dziś już zapisana — spokojny wariant „zrobione"
+              _h('div', { style:{ position:'relative', display:'flex', alignItems:'center', gap:12 }, onClick:function(){ navigate('history'); } },
+                _h('div', { style:{ width:38, height:38, borderRadius:13, background:'rgba(16,185,129,.16)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 } },
+                  _h('svg', { width:19, height:19, viewBox:'0 0 24 24', fill:'none', stroke:'var(--green)', strokeWidth:2.6, strokeLinecap:'round', strokeLinejoin:'round' },
+                    _h('path', { d:'M4 12.5l5.2 5.2L20 6.8' }))),
+                _h('div', { style:{ flex:1, minWidth:0 } },
+                  _h('div', { style:{ fontSize:'.65rem', fontWeight:800, letterSpacing:'.08em', color:'var(--green)', textTransform:'uppercase' } }, 'Dziś · zrobione'),
+                  _h('div', { style:{ fontSize:15, fontWeight:700, marginTop:3 } }, todayWorkout.name || 'Trening'),
+                  _h('div', { style:{ fontSize:11.5, color:'var(--t3)', marginTop:2 } }, Math.round(+todayWorkout.volume || 0) + ' kg objętości')
+                )
+              )
+            : todayPlanEntry
+              ? // sesja zaplanowana na dziś (Kalendarz/Plan), jeszcze nie zrobiona
+                _h('div', { style:{ position:'relative' } },
+                  _h('div', { style:{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:100, background:'rgba(96,165,250,.16)', marginBottom:12 } },
+                    _h('span', { style:{ width:6, height:6, borderRadius:'50%', background:'var(--a-light)', boxShadow:'0 0 6px var(--a-light)' } }),
+                    _h('span', { style:{ fontSize:9.5, fontWeight:800, letterSpacing:'.1em', color:'var(--a-light)', textTransform:'uppercase' } }, 'Dziś')
+                  ),
+                  _h('div', { style:{ fontSize:22, fontWeight:800, letterSpacing:'-.03em', marginBottom:4 } }, todayPlanEntry.planName),
+                  _h('div', { style:{ fontSize:12, color:'var(--t3)', marginBottom:16 } },
+                    todayPlan ? (todayPlan.exercises || []).length + ' ćwiczeń' + (todayPlan.desc ? ' · ' + todayPlan.desc : '') : 'Zaplanowana sesja'),
+                  _h('button', { className:'btn-accent', style:{ width:'100%', height:52, border:'none', fontSize:14, cursor:'pointer' },
+                    onClick:function(){ navigate('strength', { plan: todayPlan || { id:todayPlanEntry.planId, name:todayPlanEntry.planName, icon:todayPlanEntry.icon } }); }
+                  }, 'Start')
+                )
+              : // nic nie zaplanowano na dziś — ogólne zaproszenie, bez zmyślonej godziny
+                _h('div', { style:{ position:'relative' } },
+                  _h('div', { style:{ fontSize:18, fontWeight:800, letterSpacing:'-.02em', marginBottom:4 } }, 'Brak zaplanowanej sesji'),
+                  _h('div', { style:{ fontSize:12, color:'var(--t3)', marginBottom:16 } }, 'Wybierz trening z listy i zacznij, gdy będziesz gotów.'),
+                  _h('button', { className:'btn-accent', style:{ width:'100%', height:52, border:'none', fontSize:14, cursor:'pointer' },
+                    onClick:function(){ setShowWorkoutPicker(true); }
+                  }, 'Wybierz trening')
+                )
+        )
+      ),
 
       widgetOn('regen') && _h(RegenerationBar, { store:store }),
 
@@ -603,21 +724,45 @@
 
       widgetOn('smartCoach') && _h(SmartCoach, { store:store }),
 
+      // ── SIATKA MODUŁÓW 3×2 — kafelki tintowane kolorem modułu, bez emoji ──
       widgetOn('quickStart') && _h('div', { style:{ marginBottom:20 } },
         _h('div', { className:'section-hdr', style:{ marginBottom:10 } },
           _h('h2', null, 'Szybki start')
         ),
         _h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 } },
           QUICK.map(function(q, i) {
+            // Kafelki dodane przez usera (Profil → Ustawienia → Dodatkowe kafelki)
+            // wciąż niosą emoji z NAV_GROUPS (ten katalog nie jest jeszcze
+            // przeprojektowany) — pokaż je jako tekst, a nazwy ikon SVG jako Icon().
+            var isSvgIcon = typeof q.icon === 'string' && /^[a-z]+$/.test(q.icon);
             return _h('div', { key:i,
-              style:{ background:'var(--s2)', border:'1px solid var(--b1)', borderRadius:'var(--r3)', padding:'14px 10px', textAlign:'center', cursor:'pointer', transition:'all .15s', userSelect:'none' },
-              onClick:q.onClick,
-              onMouseEnter:function(e){ e.currentTarget.style.borderColor='var(--b3)'; e.currentTarget.style.background='var(--s3)'; },
-              onMouseLeave:function(e){ e.currentTarget.style.borderColor='var(--b1)'; e.currentTarget.style.background='var(--s2)'; }
+              style:{ background:'linear-gradient(160deg,color-mix(in srgb,'+q.color+' 13%, transparent),rgba(255,255,255,.02))',
+                border:'1px solid color-mix(in srgb,'+q.color+' 24%, transparent)', borderRadius:18,
+                padding:'14px 10px', textAlign:'center', cursor:'pointer', transition:'transform .15s', userSelect:'none' },
+              onClick:q.onClick
             },
-              _h('div', { style:{ fontSize:'1.6rem', marginBottom:6 } }, q.icon),
-              _h('div', { style:{ fontSize:'.75rem', fontWeight:700, color:'var(--t1)', marginBottom:3, lineHeight:1.2 } }, q.label),
-              _h('div', { style:{ fontSize:'.6rem', color:'var(--t3)', lineHeight:1.3, minHeight:16 } }, q.sub)
+              _h('div', { style:{ width:34, height:34, margin:'0 auto 8px', borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center',
+                color:q.color, background:'color-mix(in srgb,'+q.color+' 18%, transparent)' } },
+                isSvgIcon ? ET.Icon(q.icon, 19) : _h('span', { style:{ fontSize:16 } }, q.icon)
+              ),
+              _h('div', { style:{ fontSize:12.5, fontWeight:700, color:'var(--t1)', marginBottom:3, lineHeight:1.2 } }, q.label),
+              _h('div', { style:{ fontSize:10.5, color:'var(--t3)', lineHeight:1.3, minHeight:14 } }, q.sub)
+            );
+          })
+        )
+      ),
+
+      // ── WYKRES OBJĘTOŚCI 7 DNI (bieżący tydzień) ───────────────────────
+      widgetOn('weekVolume') && weekVol.max > 0 && _h('div', { className:'card', style:{ marginBottom:20 } },
+        _h('div', { className:'section-hdr', style:{ marginBottom:14 } }, _h('h2', null, 'Objętość — ten tydzień')),
+        _h('div', { style:{ display:'flex', alignItems:'flex-end', gap:8, height:72 } },
+          weekVol.days.map(function(d) {
+            var h = weekVol.max > 0 ? Math.max(4, Math.round(d.vol / weekVol.max * 100)) : 4;
+            var bg = d.isToday ? 'linear-gradient(180deg,#8B5CF6,#3B82F6)' : d.vol > 0 ? 'rgba(59,130,246,.55)' : 'rgba(255,255,255,.06)';
+            return _h('div', { key:d.key, style:{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:6 } },
+              _h('div', { style:{ width:'100%', borderRadius:'4px 4px 0 0', height:h+'%', background:bg,
+                boxShadow: d.isToday ? '0 0 12px -2px rgba(139,92,246,.6)' : 'none', transition:'height .4s cubic-bezier(.2,.8,.2,1)' } }),
+              _h('span', { style:{ fontSize:9.5, fontWeight:700, color: d.isToday ? 'var(--a-light)' : 'var(--t3)' } }, d.label)
             );
           })
         )
@@ -1069,17 +1214,25 @@
     return _h(NewDashboard, null);
   }
 
+  // Reużyte przez js/coach.js (ekran „Trener AI") — ten sam silnik pytań,
+  // co widget Smart Coach na Dashboardzie.
+  ET.aiCoachIntents = INTENTS;
+  ET.analyzeAiCoachIntent = analyzeIntent;
+  ET.getWorkoutExerciseNames = getExerciseNames;
+
   ET.Dashboard = Dashboard;
   ET.OldDashboard = OldDashboard;
   // Lista widgetów Dashboardu — konfiguracja widoczności w Profil → Ustawienia
   ET.DASHBOARD_WIDGETS = [
-    { id:'readiness',  label:'Gotowość do treningu', icon:'📊' },
-    { id:'regen',      label:'Pasek regeneracji',    icon:'🔋' },
-    { id:'coreScores', label:'Wskaźniki core',       icon:'🧠' },
-    { id:'smartCoach', label:'Smart Coach',          icon:'🧠' },
-    { id:'quickStart', label:'Szybki start',         icon:'⚡' },
-    { id:'recent',     label:'Ostatnie aktywności',  icon:'🕘' },
-    { id:'goals',      label:'Aktywne cele',         icon:'🎯' },
-    { id:'comingSoon', label:'Wkrótce',              icon:'🔜' },
+    { id:'readiness',  label:'Gotowość do treningu',        icon:'📊' },
+    { id:'todayCta',   label:'Karta dzisiejszego treningu', icon:'🚀' },
+    { id:'regen',      label:'Pasek regeneracji',           icon:'🔋' },
+    { id:'coreScores', label:'Wskaźniki core',              icon:'🧠' },
+    { id:'smartCoach', label:'Smart Coach',                 icon:'🧠' },
+    { id:'quickStart', label:'Szybki start',                icon:'⚡' },
+    { id:'weekVolume', label:'Wykres objętości (7 dni)',    icon:'📈' },
+    { id:'recent',     label:'Ostatnie aktywności',         icon:'🕘' },
+    { id:'goals',      label:'Aktywne cele',                icon:'🎯' },
+    { id:'comingSoon', label:'Wkrótce',                     icon:'🔜' },
   ];
 })();

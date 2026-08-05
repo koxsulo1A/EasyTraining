@@ -167,7 +167,9 @@
     );
   }
 
-  function RunningModule() {
+  // Klasyczny widok — bez zmian, ścieżka WEB. Patrz dispatcher `RunningModule`
+  // i `RunningModuleMobile` poniżej.
+  function RunningModuleClassic() {
     var su = ET.useStore(); var store = su.store;
     var toast = ET.useToast();
     var nav = ET.useNav(); var params = nav.params || {};
@@ -256,6 +258,159 @@
               catRuns.map(renderRun)
             );
           }),
+
+      _h(RunningAddSheet, { open:showAdd, onClose:function(){ setShowAdd(false); } }),
+      _h(RunningAddSheet, { open:!!editRun, edit:editRun, onClose:function(){ setEditRun(null); } })
+    );
+  }
+
+  // Web zostaje przy widoku klasycznym; iOS dostaje redesign „Aurora Glass".
+  function RunningModule() {
+    return ET.IS_WEB ? _h(RunningModuleClassic, null) : _h(RunningModuleMobile, null);
+  }
+
+  function rdkey(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function rMondayOf(date) {
+    var x = new Date(date); x.setHours(0,0,0,0);
+    x.setDate(x.getDate() - ((x.getDay()+6) % 7));
+    return x;
+  }
+
+  // ── BIEGANIE (iOS) — redesign „Aurora Glass" ──────────────────────────────
+  // Handoff sekcja 9: karta zielona (dystans/tempo/tętno) + wykres splitów,
+  // karta kilometrażu (pierścień 74%, „X z Y km · N z M sesji"), lista 4
+  // ostatnich biegów. Wejście danych (readiness→formularz→podsumowanie z AI)
+  // NIE jest objęte makietą — `RunningAddSheet` reużyty bez zmian.
+  // Odstępstwa (real data, bez fabrykacji):
+  //  - „wykres splitów interwałów" zakłada dane z zegarka GPS (tempo per km
+  //    w obrębie JEDNEGO biegu) — apka zbiera tylko zagregowany dystans+czas
+  //    ręcznie wpisany, zero danych per-split. Pominięte, nie zmyślam.
+  //  - „X z Y km" w karcie kilometrażu w designie to STAŁY cel — sprawdziłem
+  //    js/goals.js: cel typu „running" istnieje, ale śledzi NAJDŁUŻSZY
+  //    pojedynczy bieg (`Math.max`), nie sumę tygodniową — użycie go tutaj
+  //    sugerowałoby coś innego niż faktycznie mierzy. Zamiast fabrykować cel,
+  //    pierścień pokazuje ten tydzień względem ŚREDNIEJ z ostatnich 4 tygodni
+  //    (realne, policzone porównanie do własnej historii, nie zmyślony cel).
+  function RunningModuleMobile() {
+    var su = ET.useStore(); var store = su.store;
+    var toast = ET.useToast();
+    var nav = ET.useNav(); var params = nav.params || {};
+    var sa = React.useState(!!params.openAdd); var showAdd = sa[0], setShowAdd = sa[1];
+    var ed = React.useState(null); var editRun = ed[0], setEditRun = ed[1];
+    var co = React.useState(false); var showCoach = co[0], setShowCoach = co[1];
+
+    if (showCoach) {
+      var insights = (ET.AIEngine && ET.AIEngine.coachRunning) ? ET.AIEngine.coachRunning(store) : [];
+      return _h('div', { className:'scr-in' },
+        _h('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:16 } },
+          _h('button', { onClick:function(){ setShowCoach(false); },
+            style:{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' } },
+            _h('svg', { width:15, height:15, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2.4, strokeLinecap:'round', strokeLinejoin:'round' }, _h('path', { d:'M15 6l-6 6 6 6' }))),
+          _h('div', null,
+            _h('div', { style:{ fontSize:15, fontWeight:800 } }, 'AI Coach — Bieganie'),
+            _h('div', { style:{ fontSize:11.5, color:'var(--t3)' } }, 'Analiza reguł na podstawie Twoich biegów'))
+        ),
+        ET.InsightList ? ET.InsightList(insights) : null
+      );
+    }
+
+    var runs = store.runs || [];
+    var latest = runs[0] || null;
+
+    // Ten tydzień vs średnia z ostatnich 4 tygodni (realne porównanie, nie cel)
+    var now = new Date();
+    var weekStart = rMondayOf(now);
+    var thisWeekRuns = runs.filter(function(r){ return new Date(r.date+'T12:00') >= weekStart; });
+    var thisWeekKm = thisWeekRuns.reduce(function(t,r){ return t+(r.distance||0); }, 0);
+    var last4WeeksRuns = runs.filter(function(r){ var d=new Date(r.date+'T12:00'); return d < weekStart && d >= new Date(weekStart.getTime()-28*86400000); });
+    var avg4wk = last4WeeksRuns.length ? last4WeeksRuns.reduce(function(t,r){ return t+(r.distance||0); },0) / 4 : null;
+    var ringPct = avg4wk && avg4wk > 0 ? Math.max(0, Math.min(1, thisWeekKm / avg4wk)) : null;
+    var RING_C = 2*Math.PI*27;
+
+    function renderRunRow(r) {
+      var rt = RUN_TYPES.find(function(t){ return t.id===r.type; }) || RUN_TYPES[1];
+      return _h('div', { key:r.id, onClick:function(){ setEditRun(r); },
+        style:{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:16, background:'var(--s2)', border:'1px solid var(--b1)', cursor:'pointer' } },
+        _h('div', { style:{ width:28, height:28, borderRadius:9, flexShrink:0, background:'rgba(16,185,129,.14)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13 } }, rt.icon),
+        _h('div', { style:{ flex:1, minWidth:0 } },
+          _h('div', { style:{ fontSize:13, fontWeight:700 } }, r.distance+' km'),
+          _h('div', { style:{ fontSize:11, color:'var(--t3)', marginTop:2 } }, ET.fmtDate(r.date)+' · '+r.duration+' min')
+        ),
+        _h('span', { style:{ fontSize:12.5, fontWeight:700, color:'var(--green)', flexShrink:0 } }, r.pace+'/km')
+      );
+    }
+
+    return _h('div', { className:'scr-in' },
+      _h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 } },
+        _h('div', { style:{ fontSize:27, fontWeight:800, letterSpacing:'-.03em' } }, 'Bieganie'),
+        _h('div', { style:{ display:'flex', gap:8 } },
+          _h('button', { onClick:function(){ setShowCoach(true); },
+            style:{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 } }, '🤖'),
+          _h('button', { onClick:function(){ setShowAdd(true); },
+            style:{ width:36, height:36, borderRadius:'50%', border:'none', background:'var(--green)', color:'var(--bg)', fontSize:18, fontWeight:700, cursor:'pointer' } }, '+')
+        )
+      ),
+
+      !latest && _h(ET.Placeholder, { icon:'🏃', title:'Brak biegów', desc:'Rejestruj treningi biegowe: dystans, tempo, tętno i gotowość.' }),
+
+      // ── KARTA OSTATNIEGO BIEGU ──────────────────────────────────────────
+      latest && _h('div', { className:'glass', style:{ padding:20, borderRadius:22, marginBottom:16,
+        background:'linear-gradient(158deg,rgba(16,185,129,.14),rgba(255,255,255,.02))', border:'1px solid rgba(16,185,129,.28)' } },
+        _h('div', { style:{ fontSize:9.5, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:14 } }, 'Ostatni bieg · '+ET.fmtDate(latest.date)),
+        _h('div', { style:{ display:'flex' } },
+          [
+            { l:'DYSTANS', v:latest.distance+' km' },
+            { l:'TEMPO', v:latest.pace+'/km' },
+            { l:'TĘTNO', v: latest.avgHr ? latest.avgHr : '—' },
+          ].map(function(st, i) {
+            return _h('div', { key:i, style:{ flex:1, textAlign:'center', borderLeft: i>0 ? '1px solid rgba(255,255,255,.08)' : 'none' } },
+              _h('div', { style:{ fontSize:19, fontWeight:800, color:'var(--green)', fontVariantNumeric:'tabular-nums' } }, st.v),
+              _h('div', { style:{ fontSize:8.5, fontWeight:800, color:'var(--t3)', letterSpacing:'.08em', marginTop:4 } }, st.l)
+            );
+          })
+        )
+      ),
+
+      // ── KARTA TYGODNIA ────────────────────────────────────────────────
+      latest && _h('div', { className:'glass', style:{ display:'flex', alignItems:'center', gap:16, padding:18, borderRadius:20, marginBottom:20 } },
+        ringPct != null
+          ? _h('div', { style:{ position:'relative', width:64, height:64, flexShrink:0 } },
+              _h('svg', { width:64, height:64, viewBox:'0 0 64 64', style:{ transform:'rotate(-90deg)' } },
+                _h('circle', { cx:32, cy:32, r:27, fill:'none', stroke:'rgba(255,255,255,.08)', strokeWidth:6 }),
+                _h('circle', { cx:32, cy:32, r:27, fill:'none', stroke:'var(--green)', strokeWidth:6, strokeLinecap:'round',
+                  strokeDasharray:RING_C, strokeDashoffset:RING_C*(1-ringPct) })
+              ),
+              _h('div', { style:{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' } },
+                _h('span', { style:{ fontSize:12, fontWeight:800 } }, Math.round(ringPct*100)+'%'))
+            )
+          : _h('div', { style:{ width:64, height:64, borderRadius:'50%', flexShrink:0, background:'var(--s3)', display:'flex', alignItems:'center', justifyContent:'center' } },
+              _h('span', { style:{ fontSize:20 } }, '🏃')),
+        _h('div', { style:{ flex:1, minWidth:0 } },
+          _h('div', { style:{ fontSize:14, fontWeight:700, marginBottom:3 } }, 'Ten tydzień'),
+          _h('div', { style:{ fontSize:12, color:'var(--t2)' } },
+            thisWeekKm.toFixed(1)+' km · '+thisWeekRuns.length+' '+(thisWeekRuns.length===1?'sesja':'sesji')
+            + (avg4wk!=null ? ' (śr. 4 tyg.: '+avg4wk.toFixed(1)+' km)' : ''))
+        )
+      ),
+
+      // ── OSTATNIE BIEGI ────────────────────────────────────────────────
+      runs.length > 0 && _h('div', { style:{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 } },
+        _h('div', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:2 } }, 'Ostatnie biegi'),
+        runs.slice(0,4).map(renderRunRow)
+      ),
+
+      // ── WSZYSTKIE (wg kategorii, poza makietą) ───────────────────────────
+      runs.length > 4 && CATEGORIES.map(function(cat) {
+        var catRuns = runs.filter(cat.match);
+        if (!catRuns.length) return null;
+        return _h('div', { key:cat.id, style:{ marginBottom:18 } },
+          _h('div', { style:{ display:'flex', alignItems:'center', gap:7, marginBottom:9 } },
+            _h('span', { style:{ fontSize:13 } }, cat.icon),
+            _h('span', { style:{ fontSize:10, fontWeight:800, letterSpacing:'.1em', color:cat.color, textTransform:'uppercase' } }, cat.label + ' · ' + catRuns.length)
+          ),
+          _h('div', { style:{ display:'flex', flexDirection:'column', gap:8 } }, catRuns.map(renderRunRow))
+        );
+      }),
 
       _h(RunningAddSheet, { open:showAdd, onClose:function(){ setShowAdd(false); } }),
       _h(RunningAddSheet, { open:!!editRun, edit:editRun, onClose:function(){ setEditRun(null); } })

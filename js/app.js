@@ -32,8 +32,14 @@
   //   • przeglądarka → powłoka web wg designu „EasyTraining Aplikacja"
   //     (sidebar 236 px + pasek górny), niezależnie od szerokości okna.
   // Brak Capacitora = zwykła przeglądarka, więc web jest wartością domyślną.
+  // Dev-override: localStorage.et_force_shell = 'native' | 'web' — do podglądu
+  // powłoki mobilnej „Aurora Glass" w zwykłej przeglądarce podczas budowy
+  // redesignu (bez tego nie da się jej zobaczyć poza realnym Capacitorem).
   function detectWeb() {
     try {
+      var force = window.localStorage && window.localStorage.getItem('et_force_shell');
+      if (force === 'native') return false;
+      if (force === 'web') return true;
       var cap = window.Capacitor;
       if (cap) {
         if (typeof cap.getPlatform === 'function') return cap.getPlatform() === 'web';
@@ -191,6 +197,9 @@
   function MobileNav() {
     var nav = ET.useNav(); var current = nav.current, navigate = nav.navigate;
     var ds = React.useState(false); var drawer = ds[0], setDrawer = ds[1];
+    // Aktywna sesja treningu renderuje własny dolny sterownik (wewnątrz
+    // StrengthSessionMobile) — nie pokazuj tu drugiego paska nad nim.
+    if (nav.sessionController) return null;
     return _h('div', null,
       _h('nav', { className:'gnav' },
         GNAV_TABS.map(function(t, i) {
@@ -455,6 +464,18 @@
     return props.children;
   }
 
+  // Onboarding + paywall (redesign „Aurora Glass", handoff #2b) — tylko iOS.
+  // Konto bez `profile.onboardingDone` widzi 5 kroków + paywall zamiast
+  // Dashboardu, dopiero potem trafia do normalnej powłoki. Web nie ma
+  // jeszcze tego ekranu w designie — zawsze przechodzi prosto dalej.
+  function OnboardingGate(props) {
+    var su = ET.useStore(); var store = su.store;
+    if (!IS_WEB && ET.OnboardingModule && !(store.profile && store.profile.onboardingDone)) {
+      return _h(ET.OnboardingModule, null);
+    }
+    return props.children;
+  }
+
   // ── APP ──────────────────────────────────────────
   function App() {
     console.log('App entered');
@@ -479,7 +500,9 @@
                   _h(ET.SharedExercisesLoader, null),
                   _h(ET.ImpersonationProvider, null,
                   _h(AuthGate, null,
-                    _h(IS_WEB ? WebShell : NativeShell, null)
+                    _h(OnboardingGate, null,
+                      _h(IS_WEB ? WebShell : NativeShell, null)
+                    )
                   )
                   )
                 )
