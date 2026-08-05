@@ -47,7 +47,12 @@
         _h('textarea', { value:f.notes, onChange:function(e){ upF('notes', e.target.value); }, placeholder:'Co wpłynęło na Twoje samopoczucie?', style:{ minHeight:60 } })
       ),
 
-      _h('div', { style:{ display:'flex', gap:8 } },
+      // Przyklejone do dołu przewijanego kontenera (arkusza lub strony) —
+      // przy niższych ekranach 5 suwaków + notatki potrafią być wyższe niż
+      // widoczny obszor, a przyciski w zwykłym przepływie treści lądowały
+      // pod „fałdą" przewijania (nieklikalne, zgłoszony bug „nie można
+      // kliknąć Pomiń"). position:sticky trzyma je zawsze w zasięgu.
+      _h('div', { style:{ display:'flex', gap:8, position:'sticky', bottom:0, paddingTop:12, marginTop:4, background:'var(--s2)' } },
         props.onSkip && _h('button', { className:'btn btn-ghost', style:{ flex:1 }, onClick:props.onSkip }, 'Pomiń'),
         _h('button', { className:'btn btn-primary', style:{ flex:2 }, onClick:props.onSave }, props.saveLabel || 'Zapisz')
       )

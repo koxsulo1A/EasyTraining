@@ -372,8 +372,20 @@
   }
 
   // ── AUTO WELLBEING (pierwsze otwarcie dnia) ──────
+  // Odstępstwo od poprzedniej wersji (naprawa zgłoszonego bugu — patrz też
+  // WellbeingForm w wellbeing.js): ten popup renderował się bespoke, poza
+  // wspólnym `.sheet`/`.sheet-overlay` (bez bezpiecznika ✕ i bez tej samej
+  // logiki przewijania co reszta arkuszy w apce) i był zamontowany NIEZALEŻNIE
+  // od trasy — jeśli user zdążył wejść w Trening (który ma WŁASNY krok
+  // „samopoczucie przed treningiem") zanim popup się sam zamknął, oba
+  // renderowały się jednocześnie, a ten (późniejszy w drzewie) zakrywał
+  // przyciski tamtego kroku (nieklikalne — dokładnie zgłoszony bug).
+  // Fix: (1) reużyty `ET.Sheet` — ten sam wygląd/zachowanie co reszta apki,
+  // (2) pokazuje się TYLKO na Dashboardzie, gdzie nie koliduje z żadnym
+  // innym krokiem samopoczucia.
   function DailyWellbeingCheck() {
     var su = ET.useStore(); var store = su.store, update = su.update;
+    var nav = ET.useNav();
     var shown = React.useState(false); var isShown = shown[0]; var setShown = shown[1];
     var wv = React.useState(Object.assign({}, ET.WellbeingDefaults));
     var wbVals = wv[0]; var setWbVals = wv[1];
@@ -394,25 +406,15 @@
       setShown(false);
     }
 
-    if (!isShown) return null;
+    if (!isShown || nav.current !== 'dashboard') return null;
 
-    return _h('div', { style:{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.7)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:0 },
-      onClick:function(){ setShown(false); }
-    },
-      _h('div', { style:{ background:'var(--s1)', borderRadius:'var(--r3) var(--r3) 0 0', padding:'20px 20px 32px', width:'100%', maxWidth:520, maxHeight:'85vh', overflowY:'auto' },
-        onClick:function(e){ e.stopPropagation(); }
-      },
-        _h('div', { style:{ textAlign:'center', marginBottom:16 } },
-          _h('div', { style:{ width:40, height:4, borderRadius:2, background:'var(--b1)', margin:'0 auto 14px' } }),
-          _h('div', { style:{ fontSize:'1.1rem', fontWeight:700 } }, '🌡 Jak się dziś czujesz?'),
-          _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:4 } }, 'Codzienne samopoczucie · '+ET.fmtDate(today))
-        ),
-        _h(ET.WellbeingForm, {
-          values:wbVals, onChange:upWb,
-          saveLabel:'Zapisz samopoczucie',
-          onSave:save, onSkip:function(){ setShown(false); }
-        })
-      )
+    return _h(ET.Sheet, { open:true, onClose:function(){ setShown(false); }, title:'🌡 Jak się dziś czujesz?' },
+      _h('div', { style:{ fontSize:'.75rem', color:'var(--t3)', marginTop:-10, marginBottom:16 } }, 'Codzienne samopoczucie · '+ET.fmtDate(today)),
+      _h(ET.WellbeingForm, {
+        values:wbVals, onChange:upWb,
+        saveLabel:'Zapisz samopoczucie',
+        onSave:save, onSkip:function(){ setShown(false); }
+      })
     );
   }
 
