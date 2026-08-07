@@ -326,9 +326,7 @@
         } })
       ),
 
-      multiMode && selectedIds.length > 0 && _h('div', {
-        style:{ position:'fixed', left:0, right:0, bottom:'calc(var(--bnh, 0px) + env(safe-area-inset-bottom,0px))', padding:'10px 16px', background:'var(--s2)', borderTop:'1px solid var(--b1)', zIndex:250, display:'flex', justifyContent:'center' }
-      },
+      multiMode && selectedIds.length > 0 && _h('div', { className:'float-action-bar' },
         _h('button', { className:'btn btn-primary', style:{ width:'100%', maxWidth:640 }, onClick:addSelected },
           '+ Dodaj ('+selectedIds.length+')')
       )

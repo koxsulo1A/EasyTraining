@@ -48,7 +48,12 @@
 
     return _h(ToastCtx.Provider, { value: show },
       props.children,
-      _h('div', { style:{ position:'fixed', top:20, right:20, zIndex:9999, display:'flex', flexDirection:'column', gap:6, pointerEvents:'none' } },
+      // position:fixed jest względem viewportu, więc OMIJA `padding-top:env(safe-area-inset-top)`
+      // ustawiony na `.app` — bez jawnego uwzględnienia bezpiecznego obszaru toast
+      // lądował pod wcięciem/paskiem stanu na iPhonie. Prawy inset dla orientacji poziomej.
+      _h('div', { style:{ position:'fixed', top:'calc(20px + env(safe-area-inset-top,0px))',
+        right:'calc(20px + env(safe-area-inset-right,0px))', zIndex:9999,
+        display:'flex', flexDirection:'column', gap:6, pointerEvents:'none' } },
         toasts.map(function(t) {
           var bg = t.type==='success' ? 'rgba(16,185,129,.18)' : t.type==='error' ? 'rgba(239,68,68,.18)' : 'var(--s4)';
           var border = t.type==='success' ? '1px solid var(--green)' : t.type==='error' ? '1px solid var(--red)' : '1px solid var(--b2)';

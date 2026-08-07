@@ -14,7 +14,7 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%}
   --pink:#EC4899;--pink-d:rgba(236,72,153,.15);
   --t1:#F1F1F8;--t2:#A0A0C0;--t3:#60607A;
   --r1:6px;--r2:10px;--r3:14px;--r4:18px;--r5:24px;
-  --sw:220px;--bnh:64px;
+  --sw:220px;--bnh:64px;--sch:72px;
 }
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;overflow-x:hidden;overscroll-behavior-x:none}
 #root{height:100%}
@@ -32,7 +32,7 @@ a{color:inherit;text-decoration:none}
   padding-left:env(safe-area-inset-left);
   padding-right:env(safe-area-inset-right)}
 .sidebar{width:var(--sw);flex-shrink:0;background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow-y:auto}
-.main{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;display:flex;flex-direction:column}
+.main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column}
 .page-content{flex:1;padding:28px 24px;max-width:1100px;width:100%;margin:0 auto}
 @media(max-width:768px){
   .sidebar{display:none}
@@ -75,39 +75,46 @@ a{color:inherit;text-decoration:none}
 .mn-item-label{font-size:.55rem;font-weight:600}
 
 /* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r2);font-size:.82rem;font-weight:600;padding:9px 16px;transition:all .15s;cursor:pointer;border:none;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r3);font-size:.82rem;font-weight:700;padding:11px 18px;transition:all .15s cubic-bezier(.2,.8,.2,1);cursor:pointer;border:none;white-space:nowrap}
 .btn:active{transform:scale(.97)}
-.btn-primary{background:var(--a);color:#fff}
-.btn-primary:hover{background:var(--a-light);box-shadow:0 4px 20px var(--a-glow)}
-.btn-secondary{background:var(--s3);color:var(--t2);border:1px solid var(--b1)}
+/* Odświeżone w ramach audytu Sheetów — gradient+glow zamiast płaskiego wypełnienia,
+   spójne z .btn-accent na przeredagowanych ekranach (zero nowych klas w JS,
+   podnosi wygląd wszystkich starszych arkuszy naraz). */
+.btn-primary{background:linear-gradient(150deg,var(--a-light),var(--a) 60%,var(--purple));color:#fff;
+  box-shadow:0 8px 20px -6px var(--a-glow),inset 0 1px 0 rgba(255,255,255,.25)}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-secondary{background:var(--s3);color:var(--t2);border:1px solid var(--b2)}
 .btn-secondary:hover{background:var(--s4);color:var(--t1)}
 .btn-ghost{background:none;color:var(--t2);border:1px solid var(--b1)}
 .btn-ghost:hover{background:var(--s3);color:var(--t1)}
 .btn-danger{background:var(--red-d);color:var(--red);border:1px solid var(--red)}
 .btn-danger:hover{background:var(--red);color:#fff}
-.btn-sm{padding:6px 12px;font-size:.75rem}
-.btn-lg{padding:12px 22px;font-size:.9rem}
-.btn-icon{width:34px;height:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1rem}
+.btn-sm{padding:7px 13px;font-size:.75rem}
+.btn-lg{padding:13px 24px;font-size:.9rem;border-radius:var(--r4)}
+.btn-icon{width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;border-radius:50%}
 
 /* ── CARDS ── */
-.card{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r3);padding:16px;transition:border-color .2s}
+/* Promień i tło zbliżone do .glass z redesignu (bez kosztownego backdrop-filter
+   na każdej starszej karcie) — spójny wygląd bez przepisywania JSX arkuszy. */
+.card{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r4);padding:16px;transition:border-color .2s,background .2s}
 .card:hover{border-color:var(--b2)}
-.card-sm{padding:12px;border-radius:var(--r2)}
+.card-sm{padding:12px;border-radius:var(--r3)}
 .card-interactive{cursor:pointer}
 .card-interactive:hover{border-color:var(--a);background:var(--s3)}
-.card-accent{border-color:var(--a);background:linear-gradient(135deg,rgba(59,130,246,.05),rgba(139,92,246,.05))}
+.card-accent{border-color:var(--a);background:linear-gradient(158deg,rgba(59,130,246,.10),rgba(139,92,246,.04))}
 
 /* ── FORM ── */
 .field{margin-bottom:14px}
-.field label{display:block;font-size:.72rem;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.field input,.field select,.field textarea{width:100%;background:var(--s3);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t1);padding:9px 12px;font-size:.88rem;transition:border-color .15s;outline:none}
-.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--a)}
+.field label{display:block;font-size:.72rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
+.field input,.field select,.field textarea{width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:var(--r3);color:var(--t1);padding:11px 14px;font-size:.9rem;transition:border-color .15s,box-shadow .15s;outline:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--a-light);box-shadow:0 0 0 3px var(--a-dim)}
 .field input::placeholder{color:var(--t3)}
 .field textarea{resize:vertical;min-height:80px}
 .field select{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2360607A' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .slider-wrap{margin:4px 0}
-.slider-wrap input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:var(--s4);border-radius:2px;outline:none;cursor:pointer}
-.slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--a);cursor:pointer;border:3px solid var(--s2);box-shadow:0 0 0 1px var(--a)}
+.slider-wrap input[type=range]{-webkit-appearance:none;width:100%;height:5px;background:var(--s4);border-radius:3px;outline:none;cursor:pointer}
+.slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:linear-gradient(150deg,var(--a-light),var(--a));cursor:pointer;border:3px solid var(--s1);box-shadow:0 3px 10px -2px var(--a-glow)}
+.slider-wrap input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:linear-gradient(150deg,var(--a-light),var(--a));cursor:pointer;border:3px solid var(--s1);box-shadow:0 3px 10px -2px var(--a-glow)}
 
 /* ── GRIDS ── */
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -134,17 +141,40 @@ a{color:inherit;text-decoration:none}
 .progress-fill{height:100%;border-radius:3px;transition:width .5s ease}
 .chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--s3);border:1px solid var(--b1);border-radius:100px;font-size:.72rem;color:var(--t2)}
 .divider{height:1px;background:var(--b1);margin:14px 0}
-.tag-btn{padding:5px 12px;border-radius:100px;font-size:.75rem;font-weight:600;border:1px solid var(--b1);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .15s}
-.tag-btn.active{background:var(--a-dim);border-color:var(--a);color:var(--a-light)}
+.tag-btn{padding:8px 14px;border-radius:100px;font-size:.75rem;font-weight:700;border:1px solid var(--b2);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .15s cubic-bezier(.2,.8,.2,1)}
+.tag-btn:active{transform:scale(.95)}
+.tag-btn.active{background:var(--a-dim);border-color:var(--a-light);color:var(--a-light);box-shadow:0 0 0 1px var(--a-light) inset}
 
 /* ── SHEET ── */
-.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s ease}
-.sheet{background:var(--s2);border-radius:var(--r4) var(--r4) 0 0;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));animation:slideUp .25s ease;position:relative;scrollbar-width:none}
+/* Arkusze wg handoffu „Aurora Glass" (sekcja Cienie i szkło / Promienie):
+   gradient 170deg --s3→--s1, górny promień 32px, cień 0 -20px 60px rgba(0,0,0,.7),
+   wejście `sheetUp` 340ms cubic-bezier(.2,.9,.25,1), tło overlay fadeIn 220ms.
+   Ta jedna reguła obsługuje WSZYSTKIE arkusze w apce — łącznie z szufladą
+   modułów (główne menu), która też jest `.sheet`. Wcześniej było tu płaskie
+   `var(--s2)` + promień 18px + `slideUp .25s`, czyli stary wygląd sprzed
+   redesignu, przez co arkusze odstawały od reszty aplikacji. */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .22s ease}
+.sheet{background:linear-gradient(170deg,var(--s3),var(--s1));border-radius:32px 32px 0 0;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;padding:22px 20px;padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -20px 60px rgba(0,0,0,.7);animation:sheetUp .34s cubic-bezier(.2,.9,.25,1);position:relative;scrollbar-width:none}
 .sheet::-webkit-scrollbar{display:none}
-.sheet-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;background:var(--s4);color:var(--t2);font-size:.85rem;display:flex;align-items:center;justify-content:center;z-index:2}
-.sheet-close:active{background:var(--s5)}
-.sheet-handle{width:36px;height:4px;background:var(--s4);border-radius:2px;margin:0 auto 16px}
-.sheet h2{font-size:1.05rem;font-weight:700;margin-bottom:16px}
+.sheet-close{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:var(--s4);border:1px solid var(--b2);color:var(--t2);font-size:.85rem;display:flex;align-items:center;justify-content:center;z-index:2;cursor:pointer;transition:transform .15s}
+.sheet-close:active{background:var(--s5);transform:scale(.92)}
+.sheet-handle{width:38px;height:4px;background:var(--b3);border-radius:2px;margin:0 auto 18px}
+.sheet h2{font-size:1.1rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px}
+
+/* Pływający pasek akcji (np. „Dodaj (N)" w Bazie wiedzy suplementów).
+   Na mobile siada NAD paskiem nawigacji, na webie (gdzie .gnav jest ukryty)
+   przy samej krawędzi — wcześniej inline `bottom:calc(var(--bnh) + safe-area)`
+   zakładał obecność paska nawigacji zawsze i na webie wisiał 64px nad pustką. */
+.float-action-bar{position:fixed;left:0;right:0;bottom:0;z-index:250;
+  display:flex;justify-content:center;padding:10px 16px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  background:rgba(20,20,37,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--b1)}
+@media(max-width:768px){
+  /* pasek nawigacji zajmuje już dolny bezpieczny obszar — nie liczymy go dwa razy */
+  .float-action-bar{bottom:calc(var(--bnh) + env(safe-area-inset-bottom,0px));padding-bottom:10px}
+  body.session-active .float-action-bar{bottom:calc(var(--sch) + env(safe-area-inset-bottom,0px))}
+}
 
 /* ── RING ── */
 .ring-wrap{position:relative;flex-shrink:0}
@@ -344,20 +374,39 @@ a{color:inherit;text-decoration:none}
 .gnav-center svg{width:24px;height:24px}
 
 /* ══════════════ STEROWNIK SESJI TRENINGOWEJ (zastępuje gnav) ══════════════ */
+/* Wysokość sterownika = przycisk 52px (wymóg handoffu: cele dotykowe w trybie
+   treningu) + 10px oddechu góra/dół. WAŻNE: poprzednio height wynosiło
+   `--bnh + safeArea` (64px), a padding odejmował 20px + safeArea — na przyciski
+   zostawało 44px, więc 52px przyciski wychodziły poza pasek i pas u dołu czytał
+   się jako czarna belka. Teraz box-sizing:border-box + jawna wysokość 72px. */
 .session-ctrl{display:none}
 @media(max-width:768px){
   .session-ctrl{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:200;
-    height:calc(var(--bnh) + env(safe-area-inset-bottom,0px));
+    box-sizing:border-box;
+    height:calc(var(--sch) + env(safe-area-inset-bottom,0px));
     padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
     gap:10px;align-items:center;
     background:rgba(20,20,37,.72);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
     border-top:1px solid var(--b2);
-    box-shadow:0 -6px 30px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.07)}
+    box-shadow:0 -6px 24px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.07)}
+  /* Sterownik jest wyższy niż zwykły pasek nawigacji — treść strony musi mieć
+     odpowiednio większy dolny margines, inaczej ostatni wiersz chowa się pod nim.
+     Klasę ustawia/zdejmuje StrengthSessionMobile (js/strength.js). */
+  body.session-active .main{padding-bottom:calc(var(--sch) + env(safe-area-inset-bottom,0px))}
 }
 .session-ctrl-side{width:52px;height:52px;border-radius:17px;flex-shrink:0;
   border:1px solid var(--b2);background:var(--s3);color:var(--t2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s}
 .session-ctrl-side:active{transform:scale(.92)}
+
+/* Sticky nagłówek aktywnej sesji. Wcześniej miał nieprzezroczyste
+   `background:var(--bg)` (#080810) wcięte o 10px od krawędzi ekranu — zasłaniał
+   poświatę aurory i czytał się jako czarny pasek u góry. Teraz pełna szerokość
+   (ujemne marginesy kasują padding .page-content) + szkło, więc aurora prześwituje. */
+.session-hdr{position:sticky;top:0;z-index:5;
+  margin:-16px -14px 14px;padding:16px 14px 10px;
+  background:linear-gradient(180deg,rgba(8,8,16,.94),rgba(8,8,16,.62));
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 
 /* ══════════════ SZUFLADA MODUŁÓW (drawer) ══════════════ */
 .drawer-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}

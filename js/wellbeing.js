@@ -52,7 +52,11 @@
       // widoczny obszor, a przyciski w zwykłym przepływie treści lądowały
       // pod „fałdą" przewijania (nieklikalne, zgłoszony bug „nie można
       // kliknąć Pomiń"). position:sticky trzyma je zawsze w zasięgu.
-      _h('div', { style:{ display:'flex', gap:8, position:'sticky', bottom:0, paddingTop:12, marginTop:4, background:'var(--s2)' } },
+      // Półprzezroczyste tło + blur zamiast konkretnego koloru: ten sam formularz
+      // renderuje się i w arkuszu (gradient --s3→--s1), i na pełnej stronie
+      // (tło --bg) — sztywny kolor pasowałby tylko do jednego z nich.
+      _h('div', { style:{ display:'flex', gap:8, position:'sticky', bottom:0, paddingTop:12, marginTop:4,
+        background:'rgba(15,15,28,.86)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)' } },
         props.onSkip && _h('button', { className:'btn btn-ghost', style:{ flex:1 }, onClick:props.onSkip }, 'Pomiń'),
         _h('button', { className:'btn btn-primary', style:{ flex:2 }, onClick:props.onSave }, props.saveLabel || 'Zapisz')
       )

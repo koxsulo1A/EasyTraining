@@ -1350,9 +1350,15 @@
     }, []);
 
     // Dolny sterownik zamiast paska nawigacji — patrz MobileNav w app.js.
+    // `session-active` na <body> podbija dolny padding .main do wysokości
+    // sterownika (72px zamiast 64px paska nawigacji) — patrz css/styles.css.
     React.useEffect(function() {
       if (nav.setSessionController) nav.setSessionController({ active:true });
-      return function(){ if (nav.setSessionController) nav.setSessionController(null); };
+      document.body.classList.add('session-active');
+      return function(){
+        if (nav.setSessionController) nav.setSessionController(null);
+        document.body.classList.remove('session-active');
+      };
     }, []);
 
     function laState(esArr, exId, restSec) {
@@ -1695,7 +1701,9 @@
     return _h('div', { className:'scr-in' },
 
       // ── STICKY HEADER ────────────────────────────────────────────────
-      _h('div', { style:{ position:'sticky', top:0, zIndex:5, background:'var(--bg)', paddingBottom:8, marginBottom:14, marginLeft:-4, marginRight:-4, paddingLeft:4, paddingRight:4 } },
+      // Wygląd w .session-hdr (css/styles.css) — pełna szerokość + szkło,
+      // zamiast nieprzezroczystego var(--bg), które czytało się jak czarny pasek.
+      _h('div', { className:'session-hdr' },
         _h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
           _h('button', { onClick:props.onBack, 'aria-label':'Wstecz',
             style:{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--b1)', background:'var(--s2)', color:'var(--t2)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, cursor:'pointer' } },
@@ -1865,7 +1873,7 @@
       ),
 
       // ── DALEJ W SESJI ─────────────────────────────────────────────────
-      exs.length > 1 && _h('div', { style:{ marginBottom:100 } },
+      exs.length > 1 && _h('div', { style:{ marginBottom:8 } },
         _h('div', { style:{ fontSize:9, fontWeight:800, letterSpacing:'.1em', color:'var(--t3)', textTransform:'uppercase', marginBottom:10 } }, 'Dalej w sesji'),
         exs.map(function(ex, idx) {
           if (idx === curIdx) return null;
@@ -1902,9 +1910,13 @@
 
       // ── ARKUSZ PRZERWY ────────────────────────────────────────────────
       restLeft > 0 && _h('div', { className:'sheet-overlay' },
-        _h('div', { style:{ width:'100%', background:'linear-gradient(170deg,#1A1A30,#0F0F1C)', borderRadius:'32px 32px 0 0',
-          display:'flex', flexDirection:'column', alignItems:'center', gap:20, padding:'28px 30px calc(40px + env(safe-area-inset-bottom,0px))',
-          boxShadow:'0 -20px 60px rgba(0,0,0,.7)', animation:'sheetUp .34s cubic-bezier(.2,.9,.25,1)' } },
+        // Reużywa wspólnej klasy `.sheet` (gradient/promień/cień/animacja wg
+        // handoffu) — wcześniej te same wartości były zduplikowane inline, więc
+        // zmiana stylu arkuszy w CSS omijałaby ten jeden. Nadpisane tylko
+        // odstępy i układ, bo ten arkusz ma wyśrodkowany pierścień, nie formularz.
+        _h('div', { className:'sheet',
+          style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:20,
+            padding:'28px 30px calc(40px + env(safe-area-inset-bottom,0px))' } },
           _h('div', { className:'sheet-handle' }),
           _h('div', { style:{ fontSize:10.5, fontWeight:800, letterSpacing:'.14em', color:'var(--t3)', textTransform:'uppercase' } }, 'Przerwa'),
           _h('div', { style:{ position:'relative', width:200, height:200 } },
@@ -3171,7 +3183,14 @@
     var ICONS = ['💪','🦵','🏋️','⚡','🔥','🧘','🏃','🤸','🥊','🎯','🌟','📋'];
 
     return _h('div', { style:{ paddingBottom:20 } },
-      _h('div', { style:{ display:'flex', gap:8, marginBottom:16, position:'sticky', top:0, background:'var(--s1)', padding:'12px 0 8px', zIndex:5, borderBottom:'1px solid var(--b1)' } },
+      // Sticky pasek akcji edytora planu. Wcześniej `background:var(--s1)` —
+      // nieprzezroczysty, więc na ekranie z poświatą aurory czytał się jak
+      // płaska belka (ta sama klasa błędu co nagłówek aktywnej sesji).
+      // Półprzezroczyste tło + blur adaptuje się i do arkusza (--s2), i do
+      // strony (--bg), zamiast wprowadzać trzeci, niepasujący odcień.
+      _h('div', { style:{ display:'flex', gap:8, marginBottom:16, position:'sticky', top:0,
+        background:'rgba(15,15,28,.82)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)',
+        padding:'12px 0 8px', zIndex:5, borderBottom:'1px solid var(--b1)' } },
         _h('button', { className:'btn btn-ghost', onClick:props.onBack }, '←'),
         _h('button', { className:'btn btn-primary', style:{ flex:1 }, onClick:function(){ props.onSave(editing); } }, '✓ Zapisz plan'),
         (props.onReset || props.onDelete) && _h('button', {
