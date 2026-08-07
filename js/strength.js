@@ -1349,14 +1349,14 @@
       return function(){ ET.LiveActivity.end(); };
     }, []);
 
-    // Dolny sterownik zamiast paska nawigacji — patrz MobileNav w app.js.
     // `session-active` na <body> podbija dolny padding .main do wysokości
     // sterownika (72px zamiast 64px paska nawigacji) — patrz css/styles.css.
+    // Ukrywanie dolnego paska nawigacji (gnav) jest teraz sterowane wyżej,
+    // w StrengthModule, na cały przebieg treningu (rozgrzewka…rozciąganie),
+    // nie tylko na ten krok — patrz komentarz przy setSessionController tam.
     React.useEffect(function() {
-      if (nav.setSessionController) nav.setSessionController({ active:true });
       document.body.classList.add('session-active');
       return function(){
-        if (nav.setSessionController) nav.setSessionController(null);
         document.body.classList.remove('session-active');
       };
     }, []);
@@ -4038,6 +4038,18 @@
     var ma = React.useState(false); var showManualAdd = ma[0], setShowManualAdd = ma[1];
     var se = React.useState(false); var showEditor = se[0], setShowEditor = se[1];
     var st = React.useState(null); var selTileId = st[0], setSelTileId = st[1];
+
+    // Dolny pasek nawigacji (gnav) ma być schowany przez CAŁY przebieg
+    // aktywnego treningu — nie tylko w kroku „Trening" (sets), ale też
+    // rozgrzewka/korekcyjne/rozciąganie itd. — wcześniej gnav wracał między
+    // krokami, co na ekranie z seriami wyglądało jak obcy, ciemny pasek
+    // nachodzący na sterownik sesji. Podsumowanie i lista planów wracają
+    // do zwykłej nawigacji.
+    React.useEffect(function() {
+      var hideNav = !!plan && view !== 'list' && view !== 'ai-coach' && view !== 'summary';
+      if (nav.setSessionController) nav.setSessionController(hideNav ? { active:true } : null);
+      return function(){ if (nav.setSessionController) nav.setSessionController(null); };
+    }, [plan, view]);
 
     if (view==='ai-coach') return _h(AICoachView, { onBack:function(){ setView('list'); } });
     if (showEditor) return _h(PlanEditorSheet, { onClose:function(){ setShowEditor(false); } });

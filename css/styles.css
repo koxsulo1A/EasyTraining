@@ -16,7 +16,12 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%}
   --r1:6px;--r2:10px;--r3:14px;--r4:18px;--r5:24px;
   --sw:220px;--bnh:64px;--sch:72px;
 }
-html,body{height:100%;background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;overflow-x:hidden;overscroll-behavior-x:none}
+/* overflow:hidden na obu osiach (nie tylko X) — bez tego iOS WKWebView potrafi
+   przewinąć CAŁY dokument (nie tylko .main) przy focusie inputa w tabeli serii
+   albo przy odbiciu overscroll, co odsłania treść spod notcha i zsuwa sticky
+   nagłówek z timerem poza widok. .app poniżej i tak jest jedynym realnym
+   kontenerem przewijania (height:100dvh + overflow:hidden + .main scrolluje). */
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;overflow:hidden;overscroll-behavior:none}
 #root{height:100%}
 button{font-family:inherit;cursor:pointer;border:none}
 input,textarea,select{font-family:inherit;color:var(--t1);background:transparent}
